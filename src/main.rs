@@ -1,40 +1,75 @@
-use bevy::prelude::*;
-use bevy_ai_remote::BevyAiRemotePlugin;
-
 mod camera;
+mod map;
+mod pawn;
+mod economy;
+mod ui;
+mod game_state;
+mod events;
+mod sets;
+
+use camera::CameraPlugin;
+use map::MapPlugin;
+use pawn::PawnPlugin;
+use economy::EconomyPlugin;
+use ui::UiPlugin;
+use game_state::GameStatePlugin;
+use events::EventsPlugin;
+use sets::SetsPlugin;
+use bevy_ai_remote::BevyAiRemotePlugin;
+use bevy::prelude::*;
+
+// --- CONSTANTS ---
+const WINDOW_TITLE: &str = "Ant Farm: Dark Narrative";
+const WINDOW_WIDTH: u32 = 1280;
+const WINDOW_HEIGHT: u32 = 720;
 
 fn main() {
+    // 4. Panic Hook - Better error reporting for Windows/CLI
+    std::panic::set_hook(Box::new(|info| {
+        error!("Panic occurred: {:?}", info);
+    }));
+
     App::new()
-        .add_plugins(DefaultPlugins)
-        // Axiom integration plugin
-        .add_plugins(BevyAiRemotePlugin)
-        .add_systems(Startup, setup)
-        .run();
-}
-
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // Light (shadows disabled for debugging)
-    commands.spawn((
-        PointLight {
-            shadows_enabled: false,
+        // 1. Plugins Configuration via .set()
+        .add_plugins(DefaultPlugins.set(WindowPlugin {
+            primary_window: Some(Window {
+                title: WINDOW_TITLE.into(),
+                resolution: (WINDOW_WIDTH, WINDOW_HEIGHT).into(),
+                present_mode: bevy::window::PresentMode::AutoVsync,
+                ..default()
+            }),
             ..default()
-        },
-        Transform::from_xyz(4.0, 8.0, 4.0),
-    ));
-
-    // Camera
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(-2.0, 2.5, 5.0).looking_at(Vec3::ZERO, Vec3::Y),
-    ));
-
-    // Ground plane (so we have something to see)
-    commands.spawn((
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(10.0, 10.0))),
-        MeshMaterial3d(materials.add(Color::from(LinearRgba::from_f32_array([0.3, 0.5, 0.3, 1.0])))),
-    ));
+        }).set(bevy::log::LogPlugin {
+            filter: "info,wgpu_core=warn,wgpu_hal=warn,bevy_ai_remote=debug".into(),
+            level: bevy::log::Level::INFO,
+            ..default()
+        }).set(AssetPlugin {
+            // Default to linear filtering, but easily swappable
+            ..default()
+        }))
+        // 2. Grouped Registration
+        // External/Integration Plugins
+        .add_plugins((
+            BevyAiRemotePlugin,
+            MeshPickingPlugin,
+        ))
+        // Internal Game Plugins
+        .add_plugins((
+            SetsPlugin,
+            EventsPlugin,
+            GameStatePlugin,
+            EconomyPlugin,
+            CameraPlugin,
+            MapPlugin,
+            PawnPlugin,
+            UiPlugin,
+        ))
+        // 3. Conditional Debug Tools
+        .add_systems(Update, |_keyboard: Res<ButtonInput<KeyCode>>| {
+            #[cfg(debug_assertions)]
+            {
+                // Space for debug-only systems, like toggling inspector
+            }
+        })
+        .run();
 }
