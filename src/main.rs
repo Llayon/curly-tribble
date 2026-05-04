@@ -7,14 +7,6 @@ mod game_state;
 mod events;
 mod sets;
 
-use camera::CameraPlugin;
-use map::MapPlugin;
-use pawn::PawnPlugin;
-use economy::EconomyPlugin;
-use ui::UiPlugin;
-use game_state::GameStatePlugin;
-use events::EventsPlugin;
-use sets::SetsPlugin;
 use bevy_ai_remote::BevyAiRemotePlugin;
 use bevy::prelude::*;
 
@@ -44,7 +36,6 @@ fn main() {
             level: bevy::log::Level::INFO,
             ..default()
         }).set(AssetPlugin {
-            // Default to linear filtering, but easily swappable
             ..default()
         }))
         // 2. Grouped Registration
@@ -55,14 +46,15 @@ fn main() {
         ))
         // Internal Game Plugins
         .add_plugins((
-            SetsPlugin,
-            EventsPlugin,
-            GameStatePlugin,
-            EconomyPlugin,
-            CameraPlugin,
-            MapPlugin,
-            PawnPlugin,
-            UiPlugin,
+            sets::SetsPlugin,
+            events::EventsPlugin,
+            game_state::GameStatePlugin,
+            economy::EconomyPlugin,
+            camera::CameraPlugin,
+            map::MapPlugin,
+            map::atmosphere::AtmospherePlugin,
+            pawn::PawnPlugin,
+            ui::UiPlugin,
         ))
         // 3. Conditional Debug Tools
         .add_systems(Update, |_keyboard: Res<ButtonInput<KeyCode>>| {

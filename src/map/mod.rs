@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 pub mod zoning;
+pub mod atmosphere;
 
 pub struct MapPlugin;
 

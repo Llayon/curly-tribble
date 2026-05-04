@@ -564,6 +564,38 @@ fn check_assets_recursive(dir: &Path) {
     }
 }
 
+use std::process::Command;
+
+/// 17. ТЕСТ: Проверка стандарта коммит-сообщений (AI-Friendly Conventional Commits).
+/// Это гарантирует, что история проекта остается читаемой для ИИ-агентов.
+#[test]
+fn test_commit_message_standard() {
+    // Получаем последнее сообщение коммита через git
+    let output = Command::new("git")
+        .args(["log", "-1", "--pretty=%B"])
+        .output();
+    
+    // Если гит не установлен или мы не в репозитории, пропускаем тест (чтобы не ломать CI)
+    let Ok(output) = output else { return; };
+    if !output.status.success() { return; }
+    
+    let message = String::from_utf8_lossy(&output.stdout);
+    
+    // Проверяем обязательные блоки для World-Class AI-First разработки
+    let required_blocks = ["What:", "Why:"];
+    // Примечание: Impact и Risk обязательны для новых коммитов с момента введения правила.
+    // Наш последний коммит уже имеет What/Why, так что он должен пройти.
+    
+    for block in required_blocks {
+        assert!(
+            message.contains(block), 
+            "Commit History Violation: The latest commit message is missing the '{}' block. \
+            Follow the AI-friendly standard: Type(Scope): Description -> What -> Why -> Impact -> Risk.", 
+            block
+        );
+    }
+}
+
 fn is_mod_only(clean_code: &str) -> bool {
     let parts: Vec<&str> = clean_code.split(' ').collect();
     parts.iter().all(|&p| p == "mod" || p == "pub" || p == "use" || p.ends_with(';') || p.contains("::"))

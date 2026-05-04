@@ -17,11 +17,16 @@ pub struct Hungry; // Состояние: нуждается в пище
 #[derive(Component)]
 pub struct Hunger(pub f32); // Уровень голода
 
+#[derive(Component)]
+pub struct Sanity(pub f32); // Уровень рассудка: 100.0 (стабилен) -> 0.0 (паника)
+
 #[derive(Bundle)]
 pub struct SettlerBundle {
     pub settler: Settler,
     pub pioneer: Pioneer,
     pub hunger: Hunger,
+    pub sanity: Sanity,
+    pub name: Name,
     pub mesh: Mesh3d,
     pub material: MeshMaterial3d<StandardMaterial>,
     pub transform: Transform,
@@ -43,15 +48,18 @@ fn spawn_starting_settler(
     mut commands: Commands,
     assets: Res<GameAssets>, // Используем кэш ассетов
 ) {
-    // Спавним первого выжившего, используя предзагруженные ресурсы
+    // Спавним Эрика Рыжего - первого выжившего
     commands.spawn(SettlerBundle {
         settler: Settler,
         pioneer: Pioneer,
         hunger: Hunger(0.0),
+        sanity: Sanity(100.0),
+        name: Name::new("Erik the Red"),
         mesh: Mesh3d(assets.settler_mesh.clone()),
         material: MeshMaterial3d(assets.settler_material.clone()),
         transform: Transform::from_xyz(0.0, 0.5, 0.0),
     })
+
     .observe(|event: On<Pointer<Click>>, mut commands: Commands, selected: Query<Entity, With<Selected>>, mut messages: MessageWriter<GameLogMessage>| {
         for entity in &selected {
             commands.entity(entity).remove::<Selected>();

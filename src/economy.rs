@@ -29,6 +29,7 @@ impl Plugin for EconomyPlugin {
 pub struct LightBundle {
     pub light: PointLight,
     pub transform: Transform,
+    pub source: crate::map::atmosphere::LightSource,
 }
 
 fn setup_assets(
@@ -54,11 +55,14 @@ fn setup_economy(
 ) {
     resources.food = 10.0;
 
+    // "The Great Campfire" - Our only hope
     commands.spawn(LightBundle {
         light: PointLight {
             shadows_enabled: false,
+            intensity: 100_000.0,
             ..default()
         },
-        transform: Transform::from_xyz(4.0, 8.0, 4.0),
+        transform: Transform::from_xyz(0.0, 4.0, 0.0),
+        source: crate::map::atmosphere::LightSource { radius: 8.0 },
     });
 }

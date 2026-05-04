@@ -19,3 +19,13 @@
 
 ## Context Efficiency
 - Do not read the entire documentation. Use the index to target specific files (e.g., `migration-guides/0.17-to-0.18.md`) relevant to the current task.
+
+## Development Standards (World-Class)
+- **Atomic Commits**: Each commit should focus on a single logical change or feature.
+- **AI-Friendly Commit Messages**: Use the Conventional Commits format with a structured body:
+  - `What`: Technical changes summary.
+  - `Why`: Rationale or architectural intent.
+  - `Impact`: Observable effect on the system/user.
+  - `Risk`: Potential regressions or edge cases.
+- **Surgical Edits**: Prefer the `replace` tool over `write_file` for existing files to maintain context and logic integrity.
+- **Guard-Driven Development**: Every architectural rule MUST have a corresponding test in `tests/architecture.rs`.
