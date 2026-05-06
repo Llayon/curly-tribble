@@ -18,3 +18,6 @@ mod metadata;
 
 #[path = "architecture_mod/encapsulation.rs"]
 mod encapsulation;
+
+#[path = "architecture_mod/stability.rs"]
+mod stability;
