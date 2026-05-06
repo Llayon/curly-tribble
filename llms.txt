@@ -1,0 +1,24 @@
+# Ant Farm: Dark Narrative
+
+> A world-class colony simulation built on Bevy 0.18.1, featuring reactive systems, deterministic simulation, and high architectural integrity.
+
+## Project Intelligence (Core Rules & Guards)
+- [Project Rules (GEMINI.md)](GEMINI.md): Foundation mandates for architecture, style, and AI interaction.
+- [Architectural Guards (tests/architecture.rs)](tests/architecture.rs): 21 automated tests enforcing World-Class standards.
+- [Modular Logic (src/)](src/): Encapsulated systems (UI, Economy, Pawn, Map) with < 300 lines per file.
+
+## Narrative & Design Docs
+- [Dark Narrative Design](docs/superpowers/specs/2026-05-02-the-dark-narrative-design.md): Vision and atmosphere specifications.
+- [Foundations & Technical Plan](docs/superpowers/plans/2026-05-02-foundations-and-ant-farm.md): Initial project setup and core systems.
+- [Pawn Details](docs/superpowers/plans/2026-05-03-pawn-details.md): Internal logic for settlers (Hunger, Morale).
+- [Interaction & UI Plan](docs/superpowers/plans/2026-05-03-ui-and-interaction.md): Reactive interface and user feedback systems.
+
+## External Intelligence (Bevy 0.18.1)
+- [Bevy Documentation Index](https://bevyengine.org/llms.txt): Primary map for Bevy docs.
+- [Bevy ECS Guide](https://bevyengine.org/learn/book/introduction): Essential entity-component-system concepts.
+- [Bevy Migration 0.17 to 0.18](https://bevyengine.org/learn/migration-guides/0.17-to-0.18/): Critical API changes and breaking updates.
+- [Bevy Observers & Events](https://bevyengine.org/news/bevy-0-15/#observers): Documentation for the reactive picking and event system.
+
+## Optional & Metadata
+- [Project Commit History](.git): Historical context for architectural decisions.
+- [Architecture Details (tests/architecture_mod/)](tests/architecture_mod/): Deep dive into modular guard implementations.
