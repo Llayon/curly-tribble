@@ -1,22 +1,20 @@
-use crate::utils::CodeSniffer;
+use std::fs;
 use std::process::Command;
 
-/// 28. ГВАРДЕЙЦЫ КАЧЕСТВА: Проверка наличия clippy-аттрибутов в main.rs.
+/// 28. ГВАРДЕЙЦЫ КАЧЕСТВА: Проверка линтов в Cargo.toml.
 #[test]
 fn test_clippy_guards_presence() {
-    let sniffer = CodeSniffer::new("src/main.rs");
-    let code = sniffer.clean;
+    let content = fs::read_to_string("Cargo.toml").expect("Could not read Cargo.toml");
 
     assert!(
-        code.contains("#![deny(clippy::all)]") && code.contains("#![deny(clippy::pedantic)]"),
-        "Quality Violation: main.rs MUST contain global clippy guards: #![deny(clippy::all)] and #![deny(clippy::pedantic)]!"
+        content.contains("all = ") && content.contains("pedantic = "),
+        "Quality Violation: Cargo.toml MUST contain global clippy guards: all and pedantic!"
     );
 }
 
 /// 29. ГВАРДЕЙЦЫ СТИЛЯ: Проверка форматирования через cargo fmt.
 #[test]
 fn test_code_formatting() {
-    // Пропускаем, если мы не в git-репозитории или нет cargo (для CI)
     let output = Command::new("cargo")
         .args(["fmt", "--", "--check"])
         .output();

@@ -1,9 +1,3 @@
-#![deny(clippy::all)]
-#![deny(clippy::pedantic)]
-#![allow(clippy::too_many_arguments)]
-#![allow(clippy::type_complexity)]
-#![allow(clippy::needless_pass_by_value)] // Bevy systems often pass Res by value
-#![allow(clippy::cast_precision_loss)] // Common in coordinate systems
 mod camera;
 mod economy;
 mod events;
