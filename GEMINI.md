@@ -1,4 +1,4 @@
-# Bevy 0.18.1 Development Constitution
+# Savage Fantasy Development Constitution
 
 ## AI Entry & Loop Prevention (Mandatory)
 - **First Step**: Every session MUST start by reading `llms.txt`.
@@ -17,7 +17,7 @@
 - **Modularity**: Everything is a Plugin. `main.rs` is for init only.
 - **Encapsulation**: Max 300 lines per file (Guard #21). Logic in sub-modules.
 - **Reactivity**: Prefer `Observer` for picking. No polling in `Update` for state changes.
-- **Verification**: 21+ Architectural Guards in `tests/architecture.rs`.
+- **Verification**: 29+ Architectural Guards in `tests/architecture.rs`.
 
 ## Architectural Guardrails (Mandatory)
 - **Zero Warnings**: Production code MUST be warning-free. Use `#[deny(clippy::all)]` and `#[deny(clippy::pedantic)]`.

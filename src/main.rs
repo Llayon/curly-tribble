@@ -11,7 +11,7 @@ use bevy::prelude::*;
 use bevy_ai_remote::BevyAiRemotePlugin;
 
 // --- CONSTANTS ---
-const WINDOW_TITLE: &str = "Ant Farm: Dark Narrative";
+const WINDOW_TITLE: &str = "Savage Fantasy";
 const WINDOW_WIDTH: u32 = 1280;
 const WINDOW_HEIGHT: u32 = 720;
 

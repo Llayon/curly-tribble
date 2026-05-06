@@ -1,6 +1,6 @@
-# Ant Farm: Dark Narrative
+# Savage Fantasy
 
-> A world-class colony simulation built on Bevy 0.18.1, featuring reactive systems, deterministic simulation, and high architectural integrity.
+> A world-class gritty fantasy colony simulation built on Bevy 0.18.1, featuring reactive systems, mysterious exploration, and high architectural integrity.
 
 ## Project Intelligence (Core Rules & Guards)
 - [Constitution (GEMINI.md)](GEMINI.md): Foundation mandates and AI protocols.

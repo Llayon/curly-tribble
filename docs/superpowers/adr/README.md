@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADR)
 
-Index of architectural decisions for "Ant Farm: Dark Narrative".
+Index of architectural decisions for "Savage Fantasy".
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
