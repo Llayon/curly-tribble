@@ -5,7 +5,8 @@
 ## Project Intelligence (Core Rules & Guards)
 - [Constitution (GEMINI.md)](GEMINI.md): Foundation mandates and AI protocols.
 - [Architecture Decision Records (ADR)](docs/superpowers/adr/README.md): Records of significant architectural choices and their rationales.
-- [Architectural Guards (tests/architecture.rs)](tests/architecture.rs): 29 automated tests enforcing World-Class standards.
+- [Architectural Guards Registry](docs/superpowers/ARCHITECTURE_GUARDS.md): Detailed map of 29 automated patterns and tests.
+- [Architectural Guards (tests/architecture.rs)](tests/architecture.rs): Entry point for the 29 automated tests.
 - [SOP: Bevy 0.18.1 Patterns](docs/superpowers/patterns/bevy_018_standards.md): Standards for Hooks, Hierarchy, and Reactivity.
 
 ## Narrative & Design Docs
