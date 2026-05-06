@@ -1,22 +1,21 @@
 use bevy::prelude::*;
-use crate::game_state::GameState;
 use super::{Hunger, Settler, Hungry};
 
 pub struct NeedsPlugin;
 
 impl Plugin for NeedsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (
+        app.add_systems(FixedUpdate, (
             update_hunger,
             manage_hungry_marker,
         )
-            .run_if(in_state(GameState::Playing))
             .in_set(crate::sets::GameSet::Logic)
         );
     }
 }
 
-fn update_hunger(time: Res<Time>, mut query: Query<&mut Hunger, With<Settler>>) {
+fn update_hunger(time: Res<Time<Fixed>>, mut query: Query<&mut Hunger, With<Settler>>) {
+    // В FixedUpdate используем Time<Fixed> для абсолютной точности
     for mut hunger in &mut query {
         hunger.0 += 1.0 * time.delta_secs();
     }
@@ -24,8 +23,9 @@ fn update_hunger(time: Res<Time>, mut query: Query<&mut Hunger, With<Settler>>) 
 
 fn manage_hungry_marker(
     mut commands: Commands,
-    query: Query<(Entity, &Hunger), Without<Hungry>>,
-    hungry_query: Query<(Entity, &Hunger), With<Hungry>>,
+    // Проверяем только тех, чей уровень голода изменился
+    query: Query<(Entity, &Hunger), (Without<Hungry>, Changed<Hunger>)>,
+    hungry_query: Query<(Entity, &Hunger), (With<Hungry>, Changed<Hunger>)>,
 ) {
     for (entity, hunger) in &query {
         if hunger.0 > 50.0 {

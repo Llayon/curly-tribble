@@ -1,4 +1,5 @@
 use bevy::prelude::*;
+use crate::sets::StartupSet;
 pub mod zoning;
 pub mod atmosphere;
 
@@ -7,7 +8,7 @@ pub struct MapPlugin;
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.add_plugins(zoning::ZoningPlugin)
-           .add_systems(Startup, spawn_map);
+           .add_systems(Startup, spawn_map.in_set(StartupSet::SpawnEntities));
     }
 }
 
@@ -21,7 +22,7 @@ pub struct MapTileBundle {
 
 fn spawn_map(
     mut commands: Commands,
-    assets: Res<crate::economy::GameAssets>, // Используем кэш ассетов
+    assets: Res<crate::economy::GameAssets>,
 ) {
     for x in -5..5 {
         for z in -5..5 {

@@ -1,13 +1,16 @@
 use bevy::prelude::*;
-
-use crate::sets::GameSet;
+use crate::sets::{GameSet, StartupSet};
+use crate::game_state::GameState;
 
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_camera)
-           .add_systems(Update, move_camera.in_set(GameSet::Input));
+        app.add_systems(Startup, setup_camera.in_set(StartupSet::SpawnEntities))
+           .add_systems(Update, move_camera
+               .run_if(in_state(GameState::Playing))
+               .in_set(GameSet::Input)
+           );
     }
 }
 

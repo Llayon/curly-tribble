@@ -8,7 +8,9 @@ pub struct BrainPlugin;
 
 impl Plugin for BrainPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, think.in_set(GameSet::Logic));
+        app.add_systems(FixedUpdate, 
+            think.in_set(GameSet::Logic)
+        );
     }
 }
 
