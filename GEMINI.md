@@ -8,7 +8,8 @@
   3. Propose an alternative strategy to the user.
 - **Self-Evolution**: Upon establishing a new high-level pattern, agent MUST:
   1. Create/Update a Satellite SOP in `docs/superpowers/patterns/`.
-  2. Update `llms.txt`. Keep `GEMINI.md` lean.
+  2. Document the decision in a new ADR in `docs/superpowers/adr/`.
+  3. Update `llms.txt`. Keep `GEMINI.md` lean.
 
 ## Core Mandates
 - **Stability**: Zero tolerance for `.unwrap()` or `.expect()` in production code. Use `if let`, `match`, or `get_single_mut().ok()`. (Guard #22).
