@@ -17,6 +17,10 @@
 - **Reactivity**: Prefer `Observer` for picking. No polling in `Update` for state changes.
 - **Verification**: 21+ Architectural Guards in `tests/architecture.rs`.
 
-## Context Management
-- **SOPs**: Use `llms.txt` to find specific technical standards (SOPs).
-- **Efficiency**: Use `replace` (Surgical Edits) for large files (>100 lines). Perform a surgical read first.
+## Context Efficiency & Compression (Mandatory)
+- **Summarization**: Always summarize tool outputs exceeding 20 lines. Focus on: Status, Key Error/Change, and Conclusion.
+- **Reporting Deltas**: For every file modification, explicitly report the number of lines added (+) and removed (-).
+- **Silent Tools**: Use quiet flags (e.g., `cargo test -q`).
+- **Surgical Actions**: Use `grep_search` and targeted `read_file` (line ranges). Never read full files > 100 lines.
+- **Efficiency**: Use `replace` (Surgical Edits) for large files. Perform a surgical read first.
+- **SOPs**: Use `llms.txt` to find specific technical standards (SOPs). Load them only when needed.
