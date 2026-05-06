@@ -3,9 +3,9 @@
 > A world-class colony simulation built on Bevy 0.18.1, featuring reactive systems, deterministic simulation, and high architectural integrity.
 
 ## Project Intelligence (Core Rules & Guards)
-- [Project Rules (GEMINI.md)](GEMINI.md): Foundation mandates for architecture, style, and AI interaction.
+- [Constitution (GEMINI.md)](GEMINI.md): Foundation mandates and AI protocols.
 - [Architectural Guards (tests/architecture.rs)](tests/architecture.rs): 21 automated tests enforcing World-Class standards.
-- [Modular Logic (src/)](src/): Encapsulated systems (UI, Economy, Pawn, Map) with < 300 lines per file.
+- [SOP: Bevy 0.18.1 Patterns](docs/superpowers/patterns/bevy_018_standards.md): Standards for Hooks, Hierarchy, and Reactivity.
 
 ## Narrative & Design Docs
 - [Dark Narrative Design](docs/superpowers/specs/2026-05-02-the-dark-narrative-design.md): Vision and atmosphere specifications.
@@ -15,9 +15,7 @@
 
 ## External Intelligence (Bevy 0.18.1)
 - [Bevy Documentation Index](https://bevyengine.org/llms.txt): Primary map for Bevy docs.
-- [Bevy ECS Guide](https://bevyengine.org/learn/book/introduction): Essential entity-component-system concepts.
-- [Bevy Migration 0.17 to 0.18](https://bevyengine.org/learn/migration-guides/0.17-to-0.18/): Critical API changes and breaking updates.
-- [Bevy Observers & Events](https://bevyengine.org/news/bevy-0-15/#observers): Documentation for the reactive picking and event system.
+- [Bevy Migration 0.17 to 0.18](https://bevyengine.org/learn/migration-guides/0.17-to-0.18/): Critical API changes.
 
 ## Optional & Metadata
 - [Project Commit History](.git): Historical context for architectural decisions.

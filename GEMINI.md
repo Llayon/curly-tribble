@@ -1,31 +1,22 @@
-# Bevy 0.18.1 Development Rules
+# Bevy 0.18.1 Development Constitution
 
-## Documentation & API Discovery
-- **Primary Reference**: Always refer to the Bevy 0.18.1 documentation.
-- **LLM Index**: Use `https://bevyengine.org/llms.txt` as a starting point to find relevant documentation modules.
-- **Just-in-Time Research**: Before implementing new features or refactoring systems (especially Rendering, UI, or ECS), use `web_fetch` to retrieve the latest raw markdown guides from the Bevy website.
+## AI Entry & Loop Prevention (Mandatory)
+- **First Step**: Every session MUST start by reading `llms.txt`.
+- **Loop Prevention**: If any operation fails 3 times, agent MUST:
+  1. Announce "LOOP DETECTED".
+  2. Perform `read_file` on the target file.
+  3. Propose an alternative strategy to the user.
+- **Self-Evolution**: Upon establishing a new high-level pattern, agent MUST:
+  1. Create/Update a Satellite SOP in `docs/superpowers/patterns/`.
+  2. Update `llms.txt`. Keep `GEMINI.md` lean.
 
-## Stability & Environment (Windows)
-- **Graphics Backend**: Use `WGPU_BACKEND="dx12"` when running the application to avoid "swap chain" errors and CLI crashes on Windows.
-- **Power Management**: Be aware that laptop GPUs (like the RTX 3050) may require explicit backend selection for stability.
+## Core Mandates
+- **Stability**: Windows DX12 (`WGPU_BACKEND="dx12"`). No `unwrap()` on queries.
+- **Modularity**: Everything is a Plugin. `main.rs` is for init only.
+- **Encapsulation**: Max 300 lines per file (Guard #21). Logic in sub-modules.
+- **Reactivity**: Prefer `Observer` for picking. No polling in `Update` for state changes.
+- **Verification**: 21+ Architectural Guards in `tests/architecture.rs`.
 
-## Architectural Patterns (0.18.1 specific)
-- **Everything is a Plugin**: Every new functional block must be encapsulated in a `pub struct XPlugin; impl Plugin for XPlugin { ... }`.
-- **Main.rs Restriction**: `main.rs` should only contain `App` initialization and `.add_plugins(...)` calls. No business logic or complex system definitions are allowed in `main.rs`.
-- **UI & Text**: `LineHeight` is a separate component; do not look for it in `TextFont`.
-- **Observers**: Prefer using `Observer` for UI interactions and text-picking where applicable.
-- **Camera**: Check for built-in `FlyCamera` or `PanCamera` controllers before implementing custom movement boilerplate.
-- **Safety**: Avoid `unwrap()` on queries; use `get_single_mut()` or `iter_mut().next()` to handle potential multi-camera scenarios gracefully.
-
-## Context Efficiency
-- Do not read the entire documentation. Use the index to target specific files (e.g., `migration-guides/0.17-to-0.18.md`) relevant to the current task.
-
-## Development Standards (World-Class)
-- **Atomic Commits**: Each commit should focus on a single logical change or feature.
-- **AI-Friendly Commit Messages**: Use the Conventional Commits format with a structured body:
-  - `What`: Technical changes summary.
-  - `Why`: Rationale or architectural intent.
-  - `Impact`: Observable effect on the system/user.
-  - `Risk`: Potential regressions or edge cases.
-- **Surgical Edits**: Prefer the `replace` tool over `write_file` for existing files to maintain context and logic integrity.
-- **Guard-Driven Development**: Every architectural rule MUST have a corresponding test in `tests/architecture.rs`.
+## Context Management
+- **SOPs**: Use `llms.txt` to find specific technical standards (SOPs).
+- **Efficiency**: Use `replace` (Surgical Edits) for large files (>100 lines). Perform a surgical read first.
