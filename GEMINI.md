@@ -18,6 +18,11 @@
 - **Reactivity**: Prefer `Observer` for picking. No polling in `Update` for state changes.
 - **Verification**: 21+ Architectural Guards in `tests/architecture.rs`.
 
+## Architectural Guardrails (Mandatory)
+- **Zero Warnings**: Production code MUST be warning-free. Use `#[deny(clippy::all)]` and `#[deny(clippy::pedantic)]`.
+- **Auto-Formatting**: Run `cargo fmt` before every commit.
+- **Verification**: Run `cargo clippy` and `cargo test` before claiming success.
+
 ## Context Efficiency & Compression (Mandatory)
 - **Summarization**: Always summarize tool outputs exceeding 20 lines. Focus on: Status, Key Error/Change, and Conclusion.
 - **Reporting Deltas**: For every file modification, explicitly report the number of lines added (+) and removed (-).

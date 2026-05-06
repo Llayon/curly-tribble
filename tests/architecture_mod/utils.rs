@@ -1,22 +1,23 @@
 use std::fs;
 
 pub struct CodeSniffer {
-    pub raw: String,
     pub clean: String,
 }
 
 impl CodeSniffer {
     pub fn new(path: &str) -> Self {
-        let raw = fs::read_to_string(path).expect(&format!("Critical Error: Could not read file at {}", path));
-        
+        let raw = fs::read_to_string(path)
+            .expect(&format!("Critical Error: Could not read file at {}", path));
+
         // Очищаем код для анализа
-        let clean = raw.lines()
+        let clean = raw
+            .lines()
             .map(|line| line.split("//").next().unwrap_or("").trim())
             .filter(|line| !line.is_empty())
             .collect::<Vec<_>>()
             .join(" ");
-            
-        Self { raw, clean }
+
+        Self { clean }
     }
 
     pub fn contains_call(&self, pattern: &str) -> bool {

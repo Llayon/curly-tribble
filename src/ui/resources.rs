@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use crate::economy::GlobalResources;
+use bevy::prelude::*;
 
 #[derive(Component)]
 pub struct ResourceText;
@@ -8,7 +8,10 @@ pub fn setup_resource_ui(parent: &mut EntityCommands) {
     parent.with_children(|builder| {
         builder.spawn((
             Text::new("Resources: 0"),
-            TextFont { font_size: 20.0, ..default() },
+            TextFont {
+                font_size: 20.0,
+                ..default()
+            },
             TextColor(Color::WHITE),
             ResourceText,
         ));

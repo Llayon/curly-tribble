@@ -1,15 +1,13 @@
+use super::{Hunger, Hungry, Settler};
 use bevy::prelude::*;
-use super::{Hunger, Settler, Hungry};
 
 pub struct NeedsPlugin;
 
 impl Plugin for NeedsPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(FixedUpdate, (
-            update_hunger,
-            manage_hungry_marker,
-        )
-            .in_set(crate::sets::GameSet::Logic)
+        app.add_systems(
+            FixedUpdate,
+            (update_hunger, manage_hungry_marker).in_set(crate::sets::GameSet::Logic),
         );
     }
 }

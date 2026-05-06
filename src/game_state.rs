@@ -5,6 +5,7 @@ pub enum GameState {
     #[default]
     Loading,
     Playing,
+    #[allow(dead_code)]
     Paused,
 }
 
@@ -13,7 +14,7 @@ pub struct GameStatePlugin;
 impl Plugin for GameStatePlugin {
     fn build(&self, app: &mut App) {
         app.init_state::<GameState>()
-           .add_systems(PostStartup, start_game);
+            .add_systems(PostStartup, start_game);
     }
 }
 

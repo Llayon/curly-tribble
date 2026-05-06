@@ -1,6 +1,6 @@
-use std::path::Path;
-use std::fs;
 use crate::utils::CodeSniffer;
+use std::fs;
+use std::path::Path;
 
 /// 24. СТРОГАЯ ТИПИЗАЦИЯХарактеристик: Запрет на использование f32 в игровых параметрах.
 /// Требует использования инкапсулированных Newtypes.
@@ -18,11 +18,11 @@ fn check_stat_types_recursive(dir: &Path) {
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let sniffer = CodeSniffer::new(path.to_str().unwrap());
             let code = sniffer.clean;
-            
+
             // Паттерн: публичная структура-кортеж с публичным примитивом
             // Например: pub struct Hunger(pub f32);
             let primitives = ["f32", "f64", "u32", "i32", "u64", "i64", "usize", "isize"];
-            
+
             for primitive in primitives {
                 let pattern = format!("(pub {})", primitive);
                 if code.contains("pub struct") && code.contains(&pattern) {

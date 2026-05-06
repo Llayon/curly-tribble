@@ -33,10 +33,10 @@ pub trait BehaviorExt {
     fn switch_behavior<T: Component + Default>(&mut self);
 }
 
-impl<'a> BehaviorExt for EntityCommands<'a> {
+impl BehaviorExt for EntityCommands<'_> {
     fn switch_behavior<T: Component + Default>(&mut self) {
         self.remove::<AllBehaviors>();
-        // При смене задачи мы атомарно сбрасываем старую цель, 
+        // При смене задачи мы атомарно сбрасываем старую цель,
         // чтобы граф всегда соответствовал текущему состоянию ИИ.
         self.remove::<Targeting>();
         self.insert(T::default());

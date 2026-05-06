@@ -1,12 +1,12 @@
-use bevy::prelude::*;
 use crate::sets::StartupSet;
+use bevy::prelude::*;
 
 pub struct GlobalEconomyPlugin;
 
 impl Plugin for GlobalEconomyPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GlobalResources>()
-           .add_systems(Startup, setup_economy.in_set(StartupSet::LoadAssets));
+            .add_systems(Startup, setup_economy.in_set(StartupSet::LoadAssets));
     }
 }
 
@@ -15,10 +15,7 @@ pub struct GlobalResources {
     pub food: f32,
 }
 
-fn setup_economy(
-    mut commands: Commands,
-    mut resources: ResMut<GlobalResources>,
-) {
+fn setup_economy(mut commands: Commands, mut resources: ResMut<GlobalResources>) {
     resources.food = 10.0;
 
     commands.spawn(AmbientLight {
@@ -39,6 +36,7 @@ fn setup_economy(
 // ============================================================================
 
 /// Команда: Потребление ресурсов
+#[allow(dead_code)]
 pub struct ConsumeFood {
     pub amount: f32,
 }
@@ -65,6 +63,7 @@ impl Command for AddFood {
 }
 
 pub trait EconomyCommandsExt {
+    #[allow(dead_code)]
     fn consume_food(&mut self, amount: f32) -> &mut Self;
     fn add_food(&mut self, amount: f32) -> &mut Self;
 }

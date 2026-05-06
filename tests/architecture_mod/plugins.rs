@@ -1,6 +1,6 @@
-use std::path::Path;
-use std::fs;
 use crate::utils::CodeSniffer;
+use std::fs;
+use std::path::Path;
 
 /// 27. ЗАПРЕТ АНОНИМНЫХ ОЧЕРЕДЕЙ: Запрет на использование анонимных замыканий в .queue().
 /// Требует создания именованных структур Command (Plugins 2.0 Optimal).

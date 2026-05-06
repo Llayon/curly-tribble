@@ -1,14 +1,20 @@
+#![deny(clippy::all)]
+#![deny(clippy::pedantic)]
+#![allow(clippy::too_many_arguments)]
+#![allow(clippy::type_complexity)]
+#![allow(clippy::needless_pass_by_value)] // Bevy systems often pass Res by value
+#![allow(clippy::cast_precision_loss)] // Common in coordinate systems
 mod camera;
+mod economy;
+mod events;
+mod game_state;
 mod map;
 mod pawn;
-mod economy;
-mod ui;
-mod game_state;
-mod events;
 mod sets;
+mod ui;
 
-use bevy_ai_remote::BevyAiRemotePlugin;
 use bevy::prelude::*;
+use bevy_ai_remote::BevyAiRemotePlugin;
 
 // --- CONSTANTS ---
 const WINDOW_TITLE: &str = "Ant Farm: Dark Narrative";
@@ -23,27 +29,27 @@ fn main() {
 
     App::new()
         // 1. Plugins Configuration via .set()
-        .add_plugins(DefaultPlugins.set(WindowPlugin {
-            primary_window: Some(Window {
-                title: WINDOW_TITLE.into(),
-                resolution: (WINDOW_WIDTH, WINDOW_HEIGHT).into(),
-                present_mode: bevy::window::PresentMode::AutoVsync,
-                ..default()
-            }),
-            ..default()
-        }).set(bevy::log::LogPlugin {
-            filter: "info,wgpu_core=warn,wgpu_hal=warn,bevy_ai_remote=debug".into(),
-            level: bevy::log::Level::INFO,
-            ..default()
-        }).set(AssetPlugin {
-            ..default()
-        }))
+        .add_plugins(
+            DefaultPlugins
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: WINDOW_TITLE.into(),
+                        resolution: (WINDOW_WIDTH, WINDOW_HEIGHT).into(),
+                        present_mode: bevy::window::PresentMode::AutoVsync,
+                        ..default()
+                    }),
+                    ..default()
+                })
+                .set(bevy::log::LogPlugin {
+                    filter: "info,wgpu_core=warn,wgpu_hal=warn,bevy_ai_remote=debug".into(),
+                    level: bevy::log::Level::INFO,
+                    ..default()
+                })
+                .set(AssetPlugin { ..default() }),
+        )
         // 2. Grouped Registration
         // External/Integration Plugins
-        .add_plugins((
-            BevyAiRemotePlugin,
-            MeshPickingPlugin,
-        ))
+        .add_plugins((BevyAiRemotePlugin, MeshPickingPlugin))
         // Internal Game Plugins
         .add_plugins((
             sets::SetsPlugin,

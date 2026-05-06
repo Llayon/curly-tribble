@@ -16,6 +16,9 @@ mod decoupling;
 #[path = "architecture_mod/metadata.rs"]
 mod metadata;
 
+#[path = "architecture_mod/linting.rs"]
+mod linting;
+
 #[path = "architecture_mod/encapsulation.rs"]
 mod encapsulation;
 

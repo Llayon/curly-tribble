@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum ZoneType {
     Empty,
     FoodStockpile,
@@ -11,6 +12,7 @@ pub enum ZoneType {
 pub struct Tile;
 
 #[derive(Component)]
+#[allow(dead_code)]
 pub struct Zone(pub ZoneType);
 
 pub struct ZoningPlugin;

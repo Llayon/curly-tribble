@@ -1,6 +1,6 @@
-use std::path::Path;
+use crate::utils::{is_data_only, CodeSniffer};
 use std::fs;
-use crate::utils::{CodeSniffer, is_data_only};
+use std::path::Path;
 
 /// 6. Проверка "Все есть Плагин": каждый файл с логикой должен быть модульным.
 #[test]
@@ -16,10 +16,19 @@ fn check_dir_recursive_plugins(dir: &Path) {
             check_dir_recursive_plugins(&path);
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let file_name = path.file_name().unwrap().to_str().unwrap();
-            if file_name == "main.rs" || file_name == "architecture.rs" { continue; }
+            if file_name == "main.rs" || file_name == "architecture.rs" {
+                continue;
+            }
             let sniffer = CodeSniffer::new(path.to_str().unwrap());
-            if is_data_only(&sniffer.clean) { continue; }
-            assert!(sniffer.clean.contains("impl Plugin for") || sniffer.clean.contains("app.add_plugins"), "Modularity Violation in {:?}", path);
+            if is_data_only(&sniffer.clean) {
+                continue;
+            }
+            assert!(
+                sniffer.clean.contains("impl Plugin for")
+                    || sniffer.clean.contains("app.add_plugins"),
+                "Modularity Violation in {:?}",
+                path
+            );
         }
     }
 }
@@ -28,14 +37,20 @@ fn check_dir_recursive_plugins(dir: &Path) {
 #[test]
 fn test_pawn_selection_uses_observers() {
     let sniffer = CodeSniffer::new("src/pawn/mod.rs");
-    assert!(sniffer.contains_call(".observe("), "Selection logic must use .observe()");
+    assert!(
+        sniffer.contains_call(".observe("),
+        "Selection logic must use .observe()"
+    );
 }
 
 /// 8. Проверка реализации и интеграции GameState.
 #[test]
 fn test_game_state_is_implemented() {
     let sniffer_main = CodeSniffer::new("src/main.rs");
-    assert!(sniffer_main.clean.contains("GameStatePlugin"), "GameStatePlugin must be registered");
+    assert!(
+        sniffer_main.clean.contains("GameStatePlugin"),
+        "GameStatePlugin must be registered"
+    );
 }
 
 /// 9. Запрет на использование "ручных" булевых флагов паузы/состояния.
@@ -45,7 +60,12 @@ fn test_no_boolean_state_flags() {
 }
 
 fn check_for_forbidden_state_flags(dir: &Path) {
-    let forbidden = ["is_paused: bool", "paused: bool", "is_loading: bool", "game_over: bool"];
+    let forbidden = [
+        "is_paused: bool",
+        "paused: bool",
+        "is_loading: bool",
+        "game_over: bool",
+    ];
     for entry in fs::read_dir(dir).unwrap() {
         let entry = entry.unwrap();
         let path = entry.path();
@@ -76,20 +96,26 @@ fn check_no_world_access(dir: &Path) {
             check_no_world_access(&path);
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let path_str = path.to_str().unwrap();
-            if path_str.contains("main.rs") || path_str.contains("architecture.rs") { continue; }
+            if path_str.contains("main.rs") || path_str.contains("architecture.rs") {
+                continue;
+            }
             let sniffer = CodeSniffer::new(path_str);
             let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
-            
+
             let forbidden = ["&mut World", ".world_mut()", "world: &mut"];
             for pattern in forbidden {
                 if code_no_tests.contains(pattern) {
                     // ИСКЛЮЧЕНИЕ: Разрешаем доступ к World внутри реализаций кастомных команд.
                     // Это легальный паттерн Bevy 0.18 для расширения API (Plugins 2.0).
-                    if code_no_tests.contains("impl") && (code_no_tests.contains("Commands") || code_no_tests.contains("Command")) {
+                    if code_no_tests.contains("impl")
+                        && (code_no_tests.contains("Commands") || code_no_tests.contains("Command"))
+                    {
                         continue;
                     }
-                    
-                    if code_no_tests.contains("impl Plugin for") && pattern == ".world_mut()" { continue; }
+
+                    if code_no_tests.contains("impl Plugin for") && pattern == ".world_mut()" {
+                        continue;
+                    }
                     panic!("Forbidden World access '{}' in {:?}", pattern, path);
                 }
             }
@@ -112,7 +138,9 @@ fn check_for_classification_flags(dir: &Path) {
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let sniffer = CodeSniffer::new(path.to_str().unwrap());
             let path_str = path.to_str().unwrap().replace("\\", "/");
-            if path_str.contains("main.rs") || path_str.contains("events.rs") { continue; }
+            if path_str.contains("main.rs") || path_str.contains("events.rs") {
+                continue;
+            }
             for line in sniffer.clean.split(";") {
                 let trimmed = line.trim();
                 if trimmed.contains(": bool") {
@@ -140,14 +168,24 @@ fn check_bundles_recursive(dir: &Path) {
             check_bundles_recursive(&path);
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let path_str = path.to_str().unwrap().replace("\\", "/");
-            let output_layer = ["src/main.rs", "src/ui", "src/events.rs", "src/game_state.rs"];
-            if output_layer.iter().any(|&p| path_str.contains(p)) { continue; }
+            let output_layer = [
+                "src/main.rs",
+                "src/ui",
+                "src/events.rs",
+                "src/game_state.rs",
+            ];
+            if output_layer.iter().any(|&p| path_str.contains(p)) {
+                continue;
+            }
             let sniffer = CodeSniffer::new(&path_str);
             let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
             let forbidden_patterns = ["spawn((", "insert(("];
             for pattern in forbidden_patterns {
                 if code_no_tests.contains(pattern) {
-                     panic!("Integrity Violation in {:?}: Found anonymous component tuple in '{}'.", path, pattern);
+                    panic!(
+                        "Integrity Violation in {:?}: Found anonymous component tuple in '{}'.",
+                        path, pattern
+                    );
                 }
             }
         }
@@ -168,17 +206,31 @@ fn check_sets_recursive(dir: &Path) {
             check_sets_recursive(&path);
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let path_str = path.to_str().unwrap();
-            if path_str.contains("main.rs") || path_str.contains("sets.rs") || path_str.contains("architecture.rs") { continue; }
+            if path_str.contains("main.rs")
+                || path_str.contains("sets.rs")
+                || path_str.contains("architecture.rs")
+            {
+                continue;
+            }
             let sniffer = CodeSniffer::new(path_str);
             let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
-            let schedules = ["Update", "Startup", "PreUpdate", "PostUpdate", "FixedUpdate"];
+            let schedules = [
+                "Update",
+                "Startup",
+                "PreUpdate",
+                "PostUpdate",
+                "FixedUpdate",
+            ];
             for schedule in schedules {
                 let pattern = format!("add_systems({},", schedule);
                 if code_no_tests.contains(&pattern) {
                     let registrations = code_no_tests.split(&pattern).count() - 1;
                     let sets_count = code_no_tests.split(".in_set(").count() - 1;
                     if registrations > sets_count {
-                        panic!("Orchestration Violation in {:?}: missing .in_set() for some systems.", path);
+                        panic!(
+                            "Orchestration Violation in {:?}: missing .in_set() for some systems.",
+                            path
+                        );
                     }
                 }
             }
@@ -206,7 +258,10 @@ fn check_logic_assignment_recursive(dir: &Path) {
             check_logic_assignment_recursive(&path);
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let path_str = path.to_str().unwrap();
-            if path_str.contains("needs.rs") || path_str.contains("brain.rs") || path_str.contains("atmosphere.rs") {
+            if path_str.contains("needs.rs")
+                || path_str.contains("brain.rs")
+                || path_str.contains("atmosphere.rs")
+            {
                 let sniffer = CodeSniffer::new(path_str);
                 let registrations = sniffer.count_occurrences("add_systems(");
                 let logic_set_usage = sniffer.count_occurrences("GameSet::Logic");
@@ -232,33 +287,46 @@ fn check_filters_recursive(dir: &Path) {
             check_filters_recursive(&path);
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let path_str = path.to_str().unwrap().replace("\\", "/");
-            if path_str.contains("main.rs") || path_str.contains("ui") || path_str.contains("camera.rs") || path_str.contains("architecture") {
+            if path_str.contains("main.rs")
+                || path_str.contains("ui")
+                || path_str.contains("camera.rs")
+                || path_str.contains("architecture")
+            {
                 continue;
             }
 
             let sniffer = CodeSniffer::new(&path_str);
             let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
             let mut search_str = code_no_tests;
-            
+
             while let Some(start_idx) = search_str.find("Query<") {
                 let content_start = start_idx + 6;
                 let mut depth = 1;
                 let mut end_idx = content_start;
                 let bytes = search_str.as_bytes();
                 while depth > 0 && end_idx < bytes.len() {
-                    if bytes[end_idx] == b'<' { depth += 1; }
-                    else if bytes[end_idx] == b'>' { depth -= 1; }
+                    if bytes[end_idx] == b'<' {
+                        depth += 1;
+                    } else if bytes[end_idx] == b'>' {
+                        depth -= 1;
+                    }
                     end_idx += 1;
                 }
-                if end_idx > bytes.len() { break; }
-                let inside_query = &search_str[content_start..end_idx-1];
+                if end_idx > bytes.len() {
+                    break;
+                }
+                let inside_query = &search_str[content_start..end_idx - 1];
                 if inside_query.contains("&mut") {
-                    let is_filtered = inside_query.contains(",") && (
-                        inside_query.contains("With") || inside_query.contains("Without") || 
-                        inside_query.contains("Added") || inside_query.contains("Changed")
-                    );
+                    let is_filtered = inside_query.contains(",")
+                        && (inside_query.contains("With")
+                            || inside_query.contains("Without")
+                            || inside_query.contains("Added")
+                            || inside_query.contains("Changed"));
                     if !is_filtered {
-                        panic!("Performance Violation in {:?}: Found broad mutable query 'Query<{}>'.", path, inside_query);
+                        panic!(
+                            "Performance Violation in {:?}: Found broad mutable query 'Query<{}>'.",
+                            path, inside_query
+                        );
                     }
                 }
                 search_str = &search_str[end_idx..];
@@ -281,11 +349,18 @@ fn check_assets_recursive(dir: &Path) {
             check_assets_recursive(&path);
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let path_str = path.to_str().unwrap().replace("\\", "/");
-            if path_str.contains("economy") || path_str.contains("architecture") { continue; }
+            if path_str.contains("economy") || path_str.contains("architecture") {
+                continue;
+            }
             let sniffer = CodeSniffer::new(&path_str);
             let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
-            if code_no_tests.contains(".add(") && (code_no_tests.contains("meshes") || code_no_tests.contains("materials")) {
-                panic!("Asset Violation in {:?}: Found direct asset creation using '.add(...)'.", path);
+            if code_no_tests.contains(".add(")
+                && (code_no_tests.contains("meshes") || code_no_tests.contains("materials"))
+            {
+                panic!(
+                    "Asset Violation in {:?}: Found direct asset creation using '.add(...)'.",
+                    path
+                );
             }
         }
     }

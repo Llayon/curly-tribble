@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use crate::game_state::GameState;
+use bevy::prelude::*;
 
 /// Наборы систем для игрового цикла (Update).
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -23,33 +23,31 @@ pub struct SetsPlugin;
 impl Plugin for SetsPlugin {
     fn build(&self, app: &mut App) {
         // 1. Конфигурация для расписания Update (Рендеринг/Ввод)
-        app.configure_sets(Update, (
-            GameSet::Input,
-            GameSet::Logic,
-            GameSet::Visuals,
-        ).chain());
-        
-        app.configure_sets(Update, (
-            GameSet::Input,
-            GameSet::Logic,
-        ).run_if(in_state(GameState::Playing)));
+        app.configure_sets(
+            Update,
+            (GameSet::Input, GameSet::Logic, GameSet::Visuals).chain(),
+        );
+
+        app.configure_sets(
+            Update,
+            (GameSet::Input, GameSet::Logic).run_if(in_state(GameState::Playing)),
+        );
 
         // 2. Конфигурация для расписания FixedUpdate (Симуляция)
-        app.configure_sets(FixedUpdate, (
-            GameSet::Input,
-            GameSet::Logic,
-            GameSet::Visuals,
-        ).chain());
+        app.configure_sets(
+            FixedUpdate,
+            (GameSet::Input, GameSet::Logic, GameSet::Visuals).chain(),
+        );
 
-        app.configure_sets(FixedUpdate, (
-            GameSet::Input,
-            GameSet::Logic,
-        ).run_if(in_state(GameState::Playing)));
+        app.configure_sets(
+            FixedUpdate,
+            (GameSet::Input, GameSet::Logic).run_if(in_state(GameState::Playing)),
+        );
 
         // 3. Упорядочиваем фазу запуска (Startup)
-        app.configure_sets(Startup, (
-            StartupSet::LoadAssets,
-            StartupSet::SpawnEntities,
-        ).chain());
+        app.configure_sets(
+            Startup,
+            (StartupSet::LoadAssets, StartupSet::SpawnEntities).chain(),
+        );
     }
 }

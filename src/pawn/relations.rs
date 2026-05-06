@@ -22,6 +22,7 @@ pub struct Targeting(pub Entity);
 pub struct TargetedBy(Vec<Entity>);
 
 impl TargetedBy {
+    #[allow(dead_code)]
     pub fn entities(&self) -> &[Entity] {
         &self.0
     }
@@ -32,12 +33,13 @@ impl TargetedBy {
 #[relationship(relationship_target = Illuminating)]
 pub struct InsideLightOf(pub Entity);
 
-/// Обратная ссылка для InsideLightOf
+/// Обратная ссылка для `InsideLightOf`
 #[derive(Component, Debug, Clone, Reflect)]
 #[relationship_target(relationship = InsideLightOf)]
 pub struct Illuminating(Vec<Entity>);
 
 impl Illuminating {
+    #[allow(dead_code)]
     pub fn entities(&self) -> &[Entity] {
         &self.0
     }

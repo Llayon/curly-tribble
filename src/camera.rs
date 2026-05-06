@@ -1,16 +1,18 @@
-use bevy::prelude::*;
-use crate::sets::{GameSet, StartupSet};
 use crate::game_state::GameState;
+use crate::sets::{GameSet, StartupSet};
+use bevy::prelude::*;
 
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup_camera.in_set(StartupSet::SpawnEntities))
-           .add_systems(Update, move_camera
-               .run_if(in_state(GameState::Playing))
-               .in_set(GameSet::Input)
-           );
+            .add_systems(
+                Update,
+                move_camera
+                    .run_if(in_state(GameState::Playing))
+                    .in_set(GameSet::Input),
+            );
     }
 }
 
@@ -32,13 +34,23 @@ fn move_camera(
     mut query: Query<&mut Transform, With<Camera>>,
     time: Res<Time>,
 ) {
-    let mut transform = if let Some(t) = query.iter_mut().next() { t } else { return; };
+    let Some(mut transform) = query.iter_mut().next() else {
+        return;
+    };
     let speed = 10.0;
     let mut direction = Vec3::ZERO;
-    if keyboard.pressed(KeyCode::KeyW) { direction.z -= 1.0; }
-    if keyboard.pressed(KeyCode::KeyS) { direction.z += 1.0; }
-    if keyboard.pressed(KeyCode::KeyA) { direction.x -= 1.0; }
-    if keyboard.pressed(KeyCode::KeyD) { direction.x += 1.0; }
+    if keyboard.pressed(KeyCode::KeyW) {
+        direction.z -= 1.0;
+    }
+    if keyboard.pressed(KeyCode::KeyS) {
+        direction.z += 1.0;
+    }
+    if keyboard.pressed(KeyCode::KeyA) {
+        direction.x -= 1.0;
+    }
+    if keyboard.pressed(KeyCode::KeyD) {
+        direction.x += 1.0;
+    }
     transform.translation += direction.normalize_or_zero() * speed * time.delta_secs();
 }
 
@@ -52,23 +64,23 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.insert_resource(ButtonInput::<KeyCode>::default());
         app.insert_resource(Time::<Real>::default());
-        
-        let entity = app.world_mut().spawn((
-            Camera3d::default(),
-            Transform::from_xyz(0.0, 0.0, 0.0),
-        )).id();
-        
+
+        let entity = app
+            .world_mut()
+            .spawn((Camera3d::default(), Transform::from_xyz(0.0, 0.0, 0.0)))
+            .id();
+
         // Mock pressing W
         let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
         input.press(KeyCode::KeyW);
-        
+
         // Mock time delta
         let mut time = app.world_mut().resource_mut::<Time<Real>>();
         time.advance_by(std::time::Duration::from_secs_f32(0.1));
 
         app.add_systems(Update, move_camera);
         app.update();
-        
+
         let transform = app.world().get::<Transform>(entity).unwrap();
         // Speed is 10.0, time is 0.1, direction is -Z
         assert_eq!(transform.translation.z, -1.0);

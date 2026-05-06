@@ -10,9 +10,6 @@ pub struct EconomyPlugin;
 
 impl Plugin for EconomyPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            assets::AssetsPlugin,
-            global::GlobalEconomyPlugin,
-        ));
+        app.add_plugins((assets::AssetsPlugin, global::GlobalEconomyPlugin));
     }
 }

@@ -1,6 +1,6 @@
-use std::path::Path;
+use crate::utils::CodeSniffer;
 use std::fs;
-use crate::utils::{CodeSniffer};
+use std::path::Path;
 
 /// 11. Архитектурная развязка: Логика не должна знать о выводе (UI/Logs).
 #[test]
@@ -16,19 +16,33 @@ fn check_decoupling_recursive(dir: &Path) {
             check_decoupling_recursive(&path);
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let path_str = path.to_str().unwrap().replace("\\", "/");
-            let allowed_to_log = ["src/main.rs", "src/ui", "src/events.rs", "src/game_state.rs", "src/sets.rs"];
-            if allowed_to_log.iter().any(|&p| path_str.contains(p)) { continue; }
+            let allowed_to_log = [
+                "src/main.rs",
+                "src/ui",
+                "src/events.rs",
+                "src/game_state.rs",
+                "src/sets.rs",
+            ];
+            if allowed_to_log.iter().any(|&p| path_str.contains(p)) {
+                continue;
+            }
 
             let sniffer = CodeSniffer::new(&path_str);
             let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
             let forbidden_macros = ["info!", "warn!", "error!", "println!"];
             for macro_name in forbidden_macros {
                 if code_no_tests.contains(macro_name) {
-                    panic!("Decoupling Violation: Core logic file {:?} uses direct logging '{}'.", path, macro_name);
+                    panic!(
+                        "Decoupling Violation: Core logic file {:?} uses direct logging '{}'.",
+                        path, macro_name
+                    );
                 }
             }
             if code_no_tests.contains("bevy::ui") || code_no_tests.contains("Interaction") {
-                 panic!("Dependency Violation: Core logic file {:?} depends on UI types.", path);
+                panic!(
+                    "Dependency Violation: Core logic file {:?} depends on UI types.",
+                    path
+                );
             }
         }
     }

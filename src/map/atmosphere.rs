@@ -1,5 +1,5 @@
+use crate::pawn::{Morale, Settler};
 use bevy::prelude::*;
-use crate::pawn::{Settler, Morale}; 
 
 #[derive(Component)]
 pub struct LightSource {
@@ -30,7 +30,8 @@ pub struct AtmospherePlugin;
 impl Plugin for AtmospherePlugin {
     fn build(&self, app: &mut App) {
         // Регистрация хуков через World (Bevy 0.18.1)
-        app.world_mut().register_component_hooks::<Campfire>()
+        app.world_mut()
+            .register_component_hooks::<Campfire>()
             .on_add(|mut world, context| {
                 let entity = context.entity;
                 // Используем именованный Bundle вместо кортежа
@@ -46,11 +47,9 @@ impl Plugin for AtmospherePlugin {
                 });
             });
 
-        app.add_systems(FixedUpdate, (
-            detect_darkness,
-            apply_darkness_effects,
-        )
-            .in_set(crate::sets::GameSet::Logic)
+        app.add_systems(
+            FixedUpdate,
+            (detect_darkness, apply_darkness_effects).in_set(crate::sets::GameSet::Logic),
         );
     }
 }
@@ -63,9 +62,11 @@ fn detect_darkness(
 ) {
     for (settler_entity, settler_transform) in &settlers {
         let mut illuminated = false;
-        
+
         for (light_transform, light_source) in &lights {
-            let distance = settler_transform.translation.distance(light_transform.translation);
+            let distance = settler_transform
+                .translation
+                .distance(light_transform.translation);
             if distance < light_source.radius {
                 illuminated = true;
                 break;

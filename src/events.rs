@@ -8,6 +8,7 @@ pub struct GameLogMessage {
     pub severity: LogSeverity,
 }
 
+#[allow(dead_code)]
 pub enum LogSeverity {
     Info,
     Warning,

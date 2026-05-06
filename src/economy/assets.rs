@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use crate::sets::StartupSet;
+use bevy::prelude::*;
 
 pub struct AssetsPlugin;
 
@@ -19,9 +19,11 @@ pub struct GameAssets {
     pub ground_material: Handle<StandardMaterial>,
     pub lantern_mesh: Handle<Mesh>,
     pub lantern_material: Handle<StandardMaterial>,
+    pub bush_mesh: Handle<Mesh>,
+    pub bush_material: Handle<StandardMaterial>,
 }
 
-fn setup_assets(
+pub fn setup_assets(
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut commands: Commands,
@@ -38,7 +40,14 @@ fn setup_assets(
             emissive: LinearRgba::from(Color::srgb(1.0, 0.8, 0.2)) * 5.0,
             ..default()
         }),
+        // Таинственный ягодный куст: фиолетовый с золотым свечением
+        bush_mesh: meshes.add(Sphere::new(0.4)),
+        bush_material: materials.add(StandardMaterial {
+            base_color: Color::srgb(0.4, 0.2, 0.6),
+            emissive: LinearRgba::from(Color::srgb(0.8, 0.6, 0.1)) * 2.0,
+            ..default()
+        }),
     };
-    
+
     commands.insert_resource(assets);
 }

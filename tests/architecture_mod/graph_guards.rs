@@ -1,6 +1,6 @@
-use std::path::Path;
-use std::fs;
 use crate::utils::CodeSniffer;
+use std::fs;
+use std::path::Path;
 
 /// 26. ГРАФОВАЯ АРХИТЕКТУРА (Relations Guard): Запрет на хранение Entity в компонентах.
 /// Требует использования системы отношений Bevy 0.18.1.
@@ -18,9 +18,11 @@ fn check_entity_refs_recursive(dir: &Path) {
             check_entity_refs_recursive(&path);
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let path_str = path.to_str().unwrap();
-            
+
             // Исключения: Файлы определений отношений и мета-файлы
-            if path_str.contains("relations.rs") || path_str.contains("main.rs") { continue; }
+            if path_str.contains("relations.rs") || path_str.contains("main.rs") {
+                continue;
+            }
 
             let sniffer = CodeSniffer::new(path_str);
             let code = sniffer.clean;

@@ -1,26 +1,28 @@
-use bevy::prelude::*;
 use crate::economy::GlobalResources;
 use crate::events::{GameLogMessage, LogSeverity};
 use crate::sets::{GameSet, StartupSet};
+use bevy::prelude::*;
 
-pub mod resources;
 pub mod details;
+pub mod resources;
 
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            resources::ResourceUiPlugin,
-            details::DetailUiPlugin,
-        ));
+        app.add_plugins((resources::ResourceUiPlugin, details::DetailUiPlugin));
 
         app.add_systems(Startup, setup_ui.in_set(StartupSet::SpawnEntities))
-           .add_systems(Update, (
-               resources::update_resource_ui.run_if(resource_changed::<GlobalResources>).in_set(GameSet::Visuals), 
-               handle_game_logs.in_set(GameSet::Visuals),
-               details::update_settler_detail_ui.in_set(GameSet::Visuals),
-           ));
+            .add_systems(
+                Update,
+                (
+                    resources::update_resource_ui
+                        .run_if(resource_changed::<GlobalResources>)
+                        .in_set(GameSet::Visuals),
+                    handle_game_logs.in_set(GameSet::Visuals),
+                    details::update_settler_detail_ui.in_set(GameSet::Visuals),
+                ),
+            );
     }
 }
 
