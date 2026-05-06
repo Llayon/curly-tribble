@@ -5,6 +5,11 @@ use crate::sets::StartupSet;
 
 pub mod needs;
 pub mod brain;
+pub mod behaviors;
+pub mod relations;
+
+use behaviors::{BehaviorExt, Idle};
+use relations::RelationsPlugin;
 
 #[derive(Component)]
 pub struct Settler; // Метка человека-поселенца
@@ -56,7 +61,12 @@ impl Plugin for PawnPlugin {
                 });
             });
 
-        app.add_plugins((needs::NeedsPlugin, brain::BrainPlugin))
+        app.add_plugins((
+            needs::NeedsPlugin, 
+            brain::BrainPlugin, 
+            behaviors::BehaviorsPlugin,
+            RelationsPlugin,
+        ))
            .add_systems(Startup, spawn_starting_settler.in_set(StartupSet::SpawnEntities));
     }
 }
@@ -64,11 +74,26 @@ impl Plugin for PawnPlugin {
 #[derive(Component)]
 pub struct Hungry; // Состояние: нуждается в пище
 
-#[derive(Component)]
-pub struct Hunger(pub f32); // Уровень голода
+#[derive(Component, Debug, Clone, Copy)]
+pub struct Hunger(f32); // Уровень голода (0 - сыт, 100 - истощен)
 
-#[derive(Component)]
-pub struct Morale(pub f32); // Боевой дух: 100.0 (решимость) -> 0.0 (уныние)
+impl Hunger {
+    pub fn new(value: f32) -> Self { Self(value.clamp(0.0, 100.0)) }
+    pub fn value(&self) -> f32 { self.0 }
+    pub fn is_starving(&self) -> bool { self.0 >= 90.0 }
+    pub fn increase(&mut self, amount: f32) { self.0 = (self.0 + amount).min(100.0); }
+    pub fn satisfy(&mut self, amount: f32) { self.0 = (self.0 - amount).max(0.0); }
+}
+
+#[derive(Component, Debug, Clone, Copy)]
+pub struct Morale(f32); // Боевой дух (100 - решимость, 0 - уныние)
+
+impl Morale {
+    pub fn new(value: f32) -> Self { Self(value.clamp(0.0, 100.0)) }
+    pub fn value(&self) -> f32 { self.0 }
+    pub fn add(&mut self, amount: f32) { self.0 = (self.0 + amount).min(100.0); }
+    pub fn reduce(&mut self, amount: f32) { self.0 = (self.0 - amount).max(0.0); }
+}
 
 #[derive(Bundle)]
 pub struct SettlerBundle {
@@ -86,17 +111,21 @@ fn spawn_starting_settler(
     mut commands: Commands,
     assets: Res<GameAssets>,
 ) {
-    commands.spawn(SettlerBundle {
+    let mut settler = commands.spawn(SettlerBundle {
         settler: Settler,
         pioneer: Pioneer,
-        hunger: Hunger(0.0),
-        morale: Morale(100.0),
+        hunger: Hunger::new(0.0),
+        morale: Morale::new(100.0),
         name: Name::new("Erik the Red"),
         mesh: Mesh3d(assets.settler_mesh.clone()),
         material: MeshMaterial3d(assets.settler_material.clone()),
         transform: Transform::from_xyz(0.0, 0.5, 0.0),
-    })
-    .observe(|event: On<Pointer<Click>>, mut commands: Commands, selected: Query<Entity, With<Selected>>, mut messages: MessageWriter<GameLogMessage>| {
+    });
+
+    // Инициализируем стартовое поведение через безопасный переключатель
+    settler.switch_behavior::<Idle>();
+
+    settler.observe(|event: On<Pointer<Click>>, mut commands: Commands, selected: Query<Entity, With<Selected>>, mut messages: MessageWriter<GameLogMessage>| {
         for entity in &selected {
             commands.entity(entity).remove::<Selected>();
         }

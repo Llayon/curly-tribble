@@ -87,11 +87,11 @@ fn apply_darkness_effects(
 ) {
     // Тьма вызывает беспокойство и снижает мораль
     for mut morale in &mut query {
-        morale.0 = (morale.0 - 1.0 * time.delta_secs()).max(0.0);
+        morale.reduce(1.0 * time.delta_secs());
     }
 
     // Близость к костру возвращает уверенность
     for mut morale in &mut light_query {
-        morale.0 = (morale.0 + 0.5 * time.delta_secs()).min(100.0);
+        morale.add(0.5 * time.delta_secs());
     }
 }

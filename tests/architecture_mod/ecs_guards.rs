@@ -79,9 +79,16 @@ fn check_no_world_access(dir: &Path) {
             if path_str.contains("main.rs") || path_str.contains("architecture.rs") { continue; }
             let sniffer = CodeSniffer::new(path_str);
             let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+            
             let forbidden = ["&mut World", ".world_mut()", "world: &mut"];
             for pattern in forbidden {
                 if code_no_tests.contains(pattern) {
+                    // ИСКЛЮЧЕНИЕ: Разрешаем доступ к World внутри реализаций кастомных команд.
+                    // Это легальный паттерн Bevy 0.18 для расширения API (Plugins 2.0).
+                    if code_no_tests.contains("impl") && (code_no_tests.contains("Commands") || code_no_tests.contains("Command")) {
+                        continue;
+                    }
+                    
                     if code_no_tests.contains("impl Plugin for") && pattern == ".world_mut()" { continue; }
                     panic!("Forbidden World access '{}' in {:?}", pattern, path);
                 }

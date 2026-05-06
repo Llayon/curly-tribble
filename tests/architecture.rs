@@ -21,3 +21,18 @@ mod encapsulation;
 
 #[path = "architecture_mod/stability.rs"]
 mod stability;
+
+#[path = "architecture_mod/dependency.rs"]
+mod dependency;
+
+#[path = "architecture_mod/type_safety.rs"]
+mod type_safety;
+
+#[path = "architecture_mod/behavior_guards.rs"]
+mod behavior_guards;
+
+#[path = "architecture_mod/graph_guards.rs"]
+mod graph_guards;
+
+#[path = "architecture_mod/plugins.rs"]
+mod plugins;

@@ -12,6 +12,7 @@
 
 ## Core Mandates
 - **Stability**: Zero tolerance for `.unwrap()` or `.expect()` in production code. Use `if let`, `match`, or `get_single_mut().ok()`. (Guard #22).
+- **Explicit DI**: No hidden states (Singletons, `static mut`, `lazy_static`). Systems must depend ONLY on their parameters (`Query`, `Res`, `Commands`). (Guard #23).
 - **Modularity**: Everything is a Plugin. `main.rs` is for init only.
 - **Encapsulation**: Max 300 lines per file (Guard #21). Logic in sub-modules.
 - **Reactivity**: Prefer `Observer` for picking. No polling in `Update` for state changes.

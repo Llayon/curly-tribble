@@ -1,12 +1,6 @@
 use bevy::prelude::*;
 use crate::pawn::{Hunger, Morale, Settler, Selected};
 
-pub struct DetailUiPlugin;
-
-impl Plugin for DetailUiPlugin {
-    fn build(&self, _app: &mut App) {}
-}
-
 #[derive(Component)]
 pub struct SettlerDetailText;
 
@@ -32,10 +26,15 @@ pub fn update_settler_detail_ui(
         text.0 = format!(
             "PIONEER: {}\n\nHUNGER: {:.1}%\nMORALE: {:.1}%", 
             name.to_uppercase(), 
-            hunger.0, 
-            morale.0
+            hunger.value(), 
+            morale.value()
         );
     } else if removed_selected.read().next().is_some() {
         text.0 = "NO SURVIVOR SELECTED".to_string();
     }
+}
+
+pub struct DetailUiPlugin;
+impl Plugin for DetailUiPlugin {
+    fn build(&self, _app: &mut App) {}
 }
