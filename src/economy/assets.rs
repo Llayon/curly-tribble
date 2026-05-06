@@ -21,6 +21,10 @@ pub struct GameAssets {
     pub lantern_material: Handle<StandardMaterial>,
     pub bush_mesh: Handle<Mesh>,
     pub bush_material: Handle<StandardMaterial>,
+    #[allow(dead_code)]
+    pub stone_mesh: Handle<Mesh>,
+    #[allow(dead_code)]
+    pub stone_material: Handle<StandardMaterial>,
 }
 
 pub fn setup_assets(
@@ -45,6 +49,13 @@ pub fn setup_assets(
         bush_material: materials.add(StandardMaterial {
             base_color: Color::srgb(0.4, 0.2, 0.6),
             emissive: LinearRgba::from(Color::srgb(0.8, 0.6, 0.1)) * 2.0,
+            ..default()
+        }),
+        // Обережный камень: высокий узкий кристалл (конус)
+        stone_mesh: meshes.add(Cone::new(0.2, 0.8)),
+        stone_material: materials.add(StandardMaterial {
+            base_color: Color::srgb(0.2, 0.4, 0.8), // Синее свечение (защита)
+            emissive: LinearRgba::from(Color::srgb(0.3, 0.6, 1.0)) * 4.0,
             ..default()
         }),
     };

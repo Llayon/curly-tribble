@@ -62,10 +62,47 @@ impl Command for AddFood {
     }
 }
 
+use crate::map::construction::{WardingStone, WardingStoneBundle};
+
+/// Команда: Строительство Обережного Камня
+pub struct BuildWardingStone {
+    pub position: Vec3,
+}
+
+impl Command for BuildWardingStone {
+    fn apply(self, world: &mut World) {
+        // 1. Проверяем ресурсы и списываем (Стоимость: 5.0 ягод)
+        let cost = 5.0;
+        let mut enough_resources = false;
+        if let Some(mut resources) = world.get_resource_mut::<GlobalResources>() {
+            if resources.food >= cost {
+                resources.food -= cost;
+                enough_resources = true;
+            }
+        }
+
+        // 2. Если ресурсов хватило - спавним камень
+        if enough_resources {
+            if let Some(assets) = world.get_resource::<crate::economy::assets::GameAssets>() {
+                let mesh = assets.stone_mesh.clone();
+                let material = assets.stone_material.clone();
+
+                world.commands().spawn(WardingStoneBundle {
+                    stone: WardingStone,
+                    mesh: Mesh3d(mesh),
+                    material: MeshMaterial3d(material),
+                    transform: Transform::from_translation(self.position),
+                });
+            }
+        }
+    }
+}
+
 pub trait EconomyCommandsExt {
     #[allow(dead_code)]
     fn consume_food(&mut self, amount: f32) -> &mut Self;
     fn add_food(&mut self, amount: f32) -> &mut Self;
+    fn build_warding_stone(&mut self, position: Vec3) -> &mut Self;
 }
 
 impl EconomyCommandsExt for Commands<'_, '_> {
@@ -76,6 +113,11 @@ impl EconomyCommandsExt for Commands<'_, '_> {
 
     fn add_food(&mut self, amount: f32) -> &mut Self {
         self.queue(AddFood { amount });
+        self
+    }
+
+    fn build_warding_stone(&mut self, position: Vec3) -> &mut Self {
+        self.queue(BuildWardingStone { position });
         self
     }
 }

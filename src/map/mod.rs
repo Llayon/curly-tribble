@@ -1,8 +1,10 @@
 use crate::sets::StartupSet;
 use bevy::prelude::*;
+use construction::ConstructionPlugin;
 use resources::ResourcesPlugin;
 
 pub mod atmosphere;
+pub mod construction;
 pub mod resources;
 pub mod zoning;
 
@@ -10,7 +12,7 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((zoning::ZoningPlugin, ResourcesPlugin))
+        app.add_plugins((zoning::ZoningPlugin, ResourcesPlugin, ConstructionPlugin))
             .add_systems(Startup, spawn_map.in_set(StartupSet::SpawnEntities));
     }
 }

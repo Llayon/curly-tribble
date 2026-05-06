@@ -17,7 +17,8 @@ impl Plugin for RelationsPlugin {
 pub struct Targeting(pub Entity);
 
 /// Обратная ссылка для Targeting
-#[derive(Component, Debug, Clone, Reflect)]
+/// ВАЖНО: Коллекция должна быть приватной (правило Bevy 0.18.1)
+#[derive(Component, Debug, Clone, Reflect, Default)]
 #[relationship_target(relationship = Targeting)]
 pub struct TargetedBy(Vec<Entity>);
 
@@ -34,7 +35,7 @@ impl TargetedBy {
 pub struct InsideLightOf(pub Entity);
 
 /// Обратная ссылка для `InsideLightOf`
-#[derive(Component, Debug, Clone, Reflect)]
+#[derive(Component, Debug, Clone, Reflect, Default)]
 #[relationship_target(relationship = InsideLightOf)]
 pub struct Illuminating(Vec<Entity>);
 
