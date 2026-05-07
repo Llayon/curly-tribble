@@ -1,6 +1,6 @@
 # Design Spec: Advanced Interaction (Camera & UI)
 
-**Status:** Draft
+**Status:** Implemented
 **Date:** 2026-05-07
 **Topic:** UI Visibility and Enhanced Camera Controls
 
@@ -35,8 +35,8 @@ Instead of moving the camera directly, we move a "Focus Point" on the ground.
 - **New Module:** `src/ui/logs.rs` for the log widget logic.
 
 ## 4. Success Criteria
-- [ ] UI (Resources and Details) is visible immediately on startup.
-- [ ] WASD moves the camera relative to its rotation.
-- [ ] Q/E rotates the view smoothly.
-- [ ] Mouse wheel zooms in/out with pitch adjustment.
-- [ ] Console logs also appear in the bottom-left corner of the screen.
+- [x] UI (Resources and Details) is visible immediately on startup.
+- [x] WASD moves the camera relative to its rotation.
+- [x] Q/E rotates the view smoothly.
+- [x] Mouse wheel zooms in/out with pitch adjustment.
+- [x] Console logs also appear in the bottom-left corner of the screen.
