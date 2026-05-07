@@ -6,7 +6,9 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_camera.in_set(StartupSet::SpawnEntities))
+        app.register_type::<CameraFocus>()
+            .register_type::<CameraConfig>()
+            .add_systems(Startup, setup_camera.in_set(StartupSet::SpawnEntities))
             .add_systems(
                 Update,
                 move_camera
@@ -16,16 +18,42 @@ impl Plugin for CameraPlugin {
     }
 }
 
+#[derive(Component, Reflect, Default)]
+#[reflect(Component)]
+pub struct CameraFocus(pub Vec3);
+
+#[derive(Component, Reflect)]
+#[reflect(Component)]
+pub struct CameraConfig {
+    pub distance: f32,
+    pub azimuth: f32, // Rotation around Y
+    pub pitch: f32,   // Tilt angle
+}
+
+impl Default for CameraConfig {
+    fn default() -> Self {
+        Self {
+            distance: 15.0,
+            azimuth: 0.0,
+            pitch: 0.8, // Radian (~45 deg)
+        }
+    }
+}
+
 #[derive(Bundle)]
-pub struct GameCameraBundle {
+pub struct OrbitCameraBundle {
     pub camera: Camera3d,
     pub transform: Transform,
+    pub focus: CameraFocus,
+    pub config: CameraConfig,
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(GameCameraBundle {
+    commands.spawn(OrbitCameraBundle {
         camera: Camera3d::default(),
-        transform: Transform::from_xyz(0.0, 10.0, 10.0).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+        focus: CameraFocus(Vec3::ZERO),
+        config: CameraConfig::default(),
     });
 }
 
