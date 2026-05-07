@@ -42,7 +42,8 @@ impl Default for CameraConfig {
 
 #[derive(Bundle)]
 pub struct OrbitCameraBundle {
-    pub camera: Camera3d,
+    pub camera_core: Camera,
+    pub camera_3d: Camera3d,
     pub transform: Transform,
     pub focus: CameraFocus,
     pub config: CameraConfig,
@@ -50,7 +51,11 @@ pub struct OrbitCameraBundle {
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn(OrbitCameraBundle {
-        camera: Camera3d::default(),
+        camera_core: Camera {
+            order: 0,
+            ..default()
+        },
+        camera_3d: Camera3d::default(),
         transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
         focus: CameraFocus(Vec3::ZERO),
         config: CameraConfig::default(),
@@ -132,7 +137,8 @@ mod tests {
         let entity = app
             .world_mut()
             .spawn(OrbitCameraBundle {
-                camera: Camera3d::default(),
+                camera_core: Camera::default(),
+                camera_3d: Camera3d::default(),
                 transform: Transform::from_xyz(0.0, 0.0, 0.0),
                 focus: CameraFocus(Vec3::ZERO),
                 config: CameraConfig::default(),

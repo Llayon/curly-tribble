@@ -30,8 +30,14 @@ impl Plugin for UiPlugin {
 }
 
 fn setup_ui(mut commands: Commands) {
-    // 0. Explicit 2D Camera for UI
-    commands.spawn(Camera2d);
+    // 0. Explicit 2D Camera for UI with higher order to render on top
+    commands.spawn((
+        Camera2d,
+        Camera {
+            order: 1,
+            ..default()
+        },
+    ));
 
     // 1. Top-left: Global Resources
     let mut resources_node = commands.spawn((
@@ -77,6 +83,8 @@ mod tests {
     #[test]
     fn test_ui_spawns_camera2d() {
         let mut app = App::new();
+        app.init_resource::<GlobalResources>();
+        app.add_message::<crate::events::GameLogMessage>();
         app.add_plugins(UiPlugin);
 
         // Run the app's startup systems
