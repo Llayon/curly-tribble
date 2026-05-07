@@ -1,16 +1,20 @@
 use crate::economy::GlobalResources;
-use crate::events::{GameLogMessage, LogSeverity};
 use crate::sets::{GameSet, StartupSet};
 use bevy::prelude::*;
 
 pub mod details;
+pub mod logs;
 pub mod resources;
 
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((resources::ResourceUiPlugin, details::DetailUiPlugin));
+        app.add_plugins((
+            resources::ResourceUiPlugin,
+            details::DetailUiPlugin,
+            logs::GameLogPlugin,
+        ));
 
         app.add_systems(Startup, setup_ui.in_set(StartupSet::SpawnEntities))
             .add_systems(
@@ -19,20 +23,9 @@ impl Plugin for UiPlugin {
                     resources::update_resource_ui
                         .run_if(resource_changed::<GlobalResources>)
                         .in_set(GameSet::Visuals),
-                    handle_game_logs.in_set(GameSet::Visuals),
                     details::update_settler_detail_ui.in_set(GameSet::Visuals),
                 ),
             );
-    }
-}
-
-fn handle_game_logs(mut messages: MessageReader<GameLogMessage>) {
-    for message in messages.read() {
-        match message.severity {
-            LogSeverity::Info => info!("[LOG] {}", message.message),
-            LogSeverity::Warning => warn!("[WARN] {}", message.message),
-            LogSeverity::DarkEvent => error!("[MYSTERY] {}", message.message),
-        }
     }
 }
 
@@ -66,6 +59,15 @@ fn setup_ui(mut commands: Commands) {
         BackgroundColor(Color::srgba(0.1, 0.1, 0.2, 0.9)),
     ));
     details::setup_detail_ui(&mut details_node);
+
+    // 3. Bottom-left: Game Log
+    let mut log_node = commands.spawn(Node {
+        position_type: PositionType::Absolute,
+        bottom: Val::Px(10.0),
+        left: Val::Px(10.0),
+        ..default()
+    });
+    logs::setup_log_ui(&mut log_node);
 }
 
 #[cfg(test)]

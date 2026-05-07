@@ -8,11 +8,12 @@ pub struct GameLogMessage {
     pub severity: LogSeverity,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
 pub enum LogSeverity {
     Info,
-    Warning,
-    DarkEvent,
+    _Warning,
+    _DarkEvent,
 }
 
 pub struct EventsPlugin;
