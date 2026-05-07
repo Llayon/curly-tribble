@@ -59,27 +59,62 @@ fn setup_camera(mut commands: Commands) {
 
 fn move_camera(
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut Transform, With<Camera3d>>,
+    mut mouse_wheel: MessageReader<bevy::input::mouse::MouseWheel>,
+    mut query: Query<(&mut Transform, &mut CameraFocus, &mut CameraConfig), With<Camera3d>>,
     time: Res<Time>,
 ) {
-    let Some(mut transform) = query.iter_mut().next() else {
+    let Some((mut transform, mut focus, mut config)) = query.iter_mut().next() else {
         return;
     };
-    let speed = 10.0;
-    let mut direction = Vec3::ZERO;
+
+    // 1. Rotation (Q/E)
+    let rot_speed = 2.0;
+    if keyboard.pressed(KeyCode::KeyQ) {
+        config.azimuth += rot_speed * time.delta_secs();
+    }
+    if keyboard.pressed(KeyCode::KeyE) {
+        config.azimuth -= rot_speed * time.delta_secs();
+    }
+
+    // 2. Zoom (Mouse Wheel)
+    for event in mouse_wheel.read() {
+        config.distance -= event.y * 2.0;
+        config.distance = config.distance.clamp(5.0, 40.0);
+        // Adjust pitch based on zoom (higher zoom = steeper angle)
+        // config.pitch: 0.5 (near) to 1.2 (far)
+        config.pitch = (config.distance / 40.0 * 0.7 + 0.5).clamp(0.5, 1.2);
+    }
+
+    // 3. Movement (WASD) - Relative to camera rotation
+    let move_speed = 15.0;
+    let mut move_dir = Vec3::ZERO;
+
+    // Calculate forward/right based on azimuth
+    let forward = Vec3::new(config.azimuth.sin(), 0.0, config.azimuth.cos()).normalize_or_zero();
+    let right = Vec3::new(forward.z, 0.0, -forward.x); // Perpendicular
+
     if keyboard.pressed(KeyCode::KeyW) {
-        direction.z -= 1.0;
+        move_dir -= forward;
     }
     if keyboard.pressed(KeyCode::KeyS) {
-        direction.z += 1.0;
+        move_dir += forward;
     }
     if keyboard.pressed(KeyCode::KeyA) {
-        direction.x -= 1.0;
+        move_dir -= right;
     }
     if keyboard.pressed(KeyCode::KeyD) {
-        direction.x += 1.0;
+        move_dir += right;
     }
-    transform.translation += direction.normalize_or_zero() * speed * time.delta_secs();
+
+    focus.0 += move_dir.normalize_or_zero() * move_speed * time.delta_secs();
+
+    // 4. Update Transform (Orbit math)
+    let x = config.distance * config.azimuth.sin() * config.pitch.cos();
+    let y = config.distance * config.pitch.sin();
+    let z = config.distance * config.azimuth.cos() * config.pitch.cos();
+
+    transform.translation = focus.0 + Vec3::new(x, y, z);
+    transform.look_at(focus.0, Vec3::Y);
 }
 
 #[cfg(test)]
@@ -92,10 +127,16 @@ mod tests {
         app.add_plugins(MinimalPlugins);
         app.insert_resource(ButtonInput::<KeyCode>::default());
         app.insert_resource(Time::<Real>::default());
+        app.add_message::<bevy::input::mouse::MouseWheel>();
 
         let entity = app
             .world_mut()
-            .spawn((Camera3d::default(), Transform::from_xyz(0.0, 0.0, 0.0)))
+            .spawn(OrbitCameraBundle {
+                camera: Camera3d::default(),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                focus: CameraFocus(Vec3::ZERO),
+                config: CameraConfig::default(),
+            })
             .id();
 
         // Mock pressing W
@@ -109,8 +150,9 @@ mod tests {
         app.add_systems(Update, move_camera);
         app.update();
 
-        let transform = app.world().get::<Transform>(entity).unwrap();
-        // Speed is 10.0, time is 0.1, direction is -Z
-        assert_eq!(transform.translation.z, -1.0);
+        let focus = app.world().get::<CameraFocus>(entity).unwrap();
+        // move_speed is 15.0, time is 0.1, direction is -forward (0,0,1)
+        // focus.0.z should be -1.5
+        assert!((focus.0.z - (-1.5)).abs() < 0.001);
     }
 }
