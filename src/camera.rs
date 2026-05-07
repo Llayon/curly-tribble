@@ -31,7 +31,7 @@ fn setup_camera(mut commands: Commands) {
 
 fn move_camera(
     keyboard: Res<ButtonInput<KeyCode>>,
-    mut query: Query<&mut Transform, With<Camera>>,
+    mut query: Query<&mut Transform, With<Camera3d>>,
     time: Res<Time>,
 ) {
     let Some(mut transform) = query.iter_mut().next() else {

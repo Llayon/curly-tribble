@@ -38,7 +38,7 @@ fn handle_game_logs(mut messages: MessageReader<GameLogMessage>) {
 
 fn setup_ui(mut commands: Commands) {
     // 0. Explicit 2D Camera for UI
-    commands.spawn(Camera2d::default());
+    commands.spawn(Camera2d);
 
     // 1. Top-left: Global Resources
     let mut resources_node = commands.spawn((
@@ -77,16 +77,14 @@ mod tests {
         let mut app = App::new();
         app.add_plugins(UiPlugin);
 
-        // Setup startup systems manually since MinimalPlugins/DefaultPlugins aren't added
-        // Alternatively, just call the startup system directly if we want to be minimal
-        let mut world = World::new();
-        let mut schedule = Schedule::new(Startup);
-        schedule.add_systems(setup_ui);
-        schedule.run(&mut world);
+        // Run the app's startup systems
+        app.finish();
+        app.cleanup();
+        app.update();
 
-        let mut query = world.query::<&Camera2d>();
+        let mut query = app.world_mut().query::<&Camera2d>();
         assert_eq!(
-            query.iter(&world).count(),
+            query.iter(app.world()).count(),
             1,
             "UI should spawn exactly one Camera2d for rendering"
         );
