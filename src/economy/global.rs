@@ -63,6 +63,7 @@ impl Command for AddFood {
 }
 
 use crate::map::construction::{WardingStone, WardingStoneBundle};
+use crate::map::navigation::NavObstacle;
 
 /// Команда: Строительство Обережного Камня
 pub struct BuildWardingStone {
@@ -71,7 +72,6 @@ pub struct BuildWardingStone {
 
 impl Command for BuildWardingStone {
     fn apply(self, world: &mut World) {
-        // 1. Проверяем ресурсы и списываем (Стоимость: 5.0 ягод)
         let cost = 5.0;
         let mut enough_resources = false;
         if let Some(mut resources) = world.get_resource_mut::<GlobalResources>() {
@@ -81,7 +81,6 @@ impl Command for BuildWardingStone {
             }
         }
 
-        // 2. Если ресурсов хватило - спавним камень
         if enough_resources {
             if let Some(assets) = world.get_resource::<crate::economy::assets::GameAssets>() {
                 let mesh = assets.stone_mesh.clone();
@@ -92,6 +91,7 @@ impl Command for BuildWardingStone {
                     mesh: Mesh3d(mesh),
                     material: MeshMaterial3d(material),
                     transform: Transform::from_translation(self.position),
+                    obstacle: NavObstacle::default(),
                 });
             }
         }

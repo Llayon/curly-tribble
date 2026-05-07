@@ -1,3 +1,4 @@
+use crate::map::navigation::NavObstacle;
 use bevy::prelude::*;
 
 // ============================================================================
@@ -13,6 +14,7 @@ pub struct WardingStoneBundle {
     pub mesh: Mesh3d,
     pub material: MeshMaterial3d<StandardMaterial>,
     pub transform: Transform,
+    pub obstacle: NavObstacle,
 }
 
 /// Внутренний бандл для автоматизации света Обережного Камня

@@ -21,6 +21,7 @@ pub struct BerryBushBundle {
     pub mesh: Mesh3d,
     pub material: MeshMaterial3d<StandardMaterial>,
     pub transform: Transform,
+    pub obstacle: crate::map::navigation::NavObstacle,
 }
 
 fn spawn_bushes(mut commands: Commands, assets: Res<GameAssets>) {
@@ -37,6 +38,9 @@ fn spawn_bushes(mut commands: Commands, assets: Res<GameAssets>) {
             mesh: Mesh3d(assets.bush_mesh.clone()),
             material: MeshMaterial3d(assets.bush_material.clone()),
             transform: Transform::from_translation(pos),
+            obstacle: crate::map::navigation::NavObstacle {
+                cost: crate::map::navigation::COST_BLOCKER,
+            },
         });
     }
 }
