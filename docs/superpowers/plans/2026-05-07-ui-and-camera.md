@@ -18,7 +18,7 @@
 **Files:**
 - Modify: `src/ui/mod.rs`
 
-- [ ] **Step 1: Add Camera2d to setup_ui**
+- [x] **Step 1: Add Camera2d to setup_ui**
 In Bevy 0.18.1, UI often requires an explicit 2D camera to render correctly over 3D scenes.
 
 ```rust
@@ -33,10 +33,10 @@ fn setup_ui(mut commands: Commands) {
 }
 ```
 
-- [ ] **Step 2: Verify UI visibility**
+- [x] **Step 2: Verify UI visibility**
 Run the game and check if the "Resources: 0" text and "NO SURVIVOR SELECTED" panel are visible.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 ```bash
 git add src/ui/mod.rs
 git commit -m "fix(ui): add explicit Camera2d to ensure UI visibility"
@@ -50,7 +50,7 @@ git commit -m "fix(ui): add explicit Camera2d to ensure UI visibility"
 - Create: `src/ui/logs.rs`
 - Modify: `src/ui/mod.rs`
 
-- [ ] **Step 1: Create Game Log module**
+- [x] **Step 1: Create Game Log module**
 Define the log widget structure.
 
 ```rust
@@ -118,7 +118,7 @@ fn update_game_log(
 }
 ```
 
-- [ ] **Step 2: Integrate Log UI**
+- [x] **Step 2: Integrate Log UI**
 Register the plugin and call setup in `src/ui/mod.rs`.
 
 ```rust
@@ -139,10 +139,10 @@ commands.spawn(Node {
 });
 ```
 
-- [ ] **Step 3: Test log display**
+- [x] **Step 3: Test log display**
 Click on a survivor to trigger a selection message and verify it appears in the bottom-left.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 ```bash
 git add src/ui/
 git commit -m "feat(ui): implement on-screen game log"
@@ -155,7 +155,7 @@ git commit -m "feat(ui): implement on-screen game log"
 **Files:**
 - Modify: `src/camera.rs`
 
-- [ ] **Step 1: Define CameraFocus component**
+- [x] **Step 1: Define CameraFocus component**
 This will be the anchor point for the camera.
 
 ```rust
@@ -182,7 +182,7 @@ impl Default for CameraConfig {
 }
 ```
 
-- [ ] **Step 2: Update setup_camera**
+- [x] **Step 2: Update setup_camera**
 Initialize with the new components.
 
 ```rust
@@ -196,7 +196,7 @@ fn setup_camera(mut commands: Commands) {
 }
 ```
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 ```bash
 git add src/camera.rs
 git commit -m "refactor(camera): add Focus and Config components for orbit logic"
@@ -209,7 +209,7 @@ git commit -m "refactor(camera): add Focus and Config components for orbit logic
 **Files:**
 - Modify: `src/camera.rs`
 
-- [ ] **Step 1: Rewrite move_camera**
+- [x] **Step 1: Rewrite move_camera**
 Implement WASD relative movement, Q/E rotation, and Wheel zoom.
 
 ```rust
@@ -259,13 +259,13 @@ fn move_camera(
 }
 ```
 
-- [ ] **Step 2: Update camera unit tests**
+- [x] **Step 2: Update camera unit tests**
 Tests need to account for the new components.
 
-- [ ] **Step 3: Final Verification**
+- [x] **Step 3: Final Verification**
 Test all controls in game. Ensure WASD feels natural regardless of Q/E rotation.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 ```bash
 git add src/camera.rs
 git commit -m "feat(camera): implement full orbit controls (Move, Rotate, Zoom)"
