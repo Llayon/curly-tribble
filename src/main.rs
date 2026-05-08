@@ -1,14 +1,6 @@
-mod camera;
-mod economy;
-mod events;
-mod game_state;
-mod map;
-mod pawn;
-mod sets;
-mod ui;
-
 use bevy::prelude::*;
 use bevy_ai_remote::BevyAiRemotePlugin;
+use savage_fantasy::*;
 
 // --- CONSTANTS ---
 const WINDOW_TITLE: &str = "Savage Fantasy";
