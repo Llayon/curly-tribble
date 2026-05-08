@@ -1,0 +1,11 @@
+fix(ui): add explicit Camera2d to ensure UI visibility
+
+What:
+- Added `commands.spawn(Camera2d::default())` to `setup_ui` in `src/ui/mod.rs`.
+- Added unit test `test_ui_spawns_camera2d` to verify the fix.
+
+Why:
+- In Bevy 0.18.1, UI requires an explicit 2D camera to render correctly when mixed with 3D scenes.
+
+Impact:
+- UI elements (resources and details) are now visible to the user.

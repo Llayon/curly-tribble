@@ -1,0 +1,50 @@
+<h2>Camera & UI Design</h2>
+<p class="subtitle">Savage Fantasy: Enhanced Interaction</p>
+
+<div class="options" data-multiselect>
+  <div class="option" data-choice="camera_controls" onclick="toggleSelect(this)">
+    <div class="letter">1</div>
+    <div class="content">
+      <h3>Advanced Camera</h3>
+      <p>WASD (Move), Q/E (Rotate), Mouse Wheel (Zoom)</p>
+    </div>
+  </div>
+  <div class="option" data-choice="ui_2d_camera" onclick="toggleSelect(this)">
+    <div class="letter">2</div>
+    <div class="content">
+      <h3>UI Fix (2D Camera)</h3>
+      <p>Add explicit Camera2d to ensure UI is visible</p>
+    </div>
+  </div>
+  <div class="option" data-choice="game_log" onclick="toggleSelect(this)">
+    <div class="letter">3</div>
+    <div class="content">
+      <h3>Screen Game Log</h3>
+      <p>Move logs from console to bottom-left screen area</p>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <h3>Camera Logic Diagram</h3>
+  <div class="mockup">
+    <div class="mockup-body">
+      <div style="display:flex; justify-content:space-around; align-items:center; height:150px; text-align:center;">
+        <div class="card" style="width:120px;">
+          <div class="label">Input</div>
+          <p>Mouse/Key</p>
+        </div>
+        <div style="font-size:24px;">→</div>
+        <div class="card" style="width:150px; border:2px solid #4a90e2;">
+          <div class="label">Zenith Navigator</div>
+          <p>Update Transform</p>
+        </div>
+        <div style="font-size:24px;">→</div>
+        <div class="card" style="width:120px;">
+          <div class="label">View</div>
+          <p>Render Frame</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -8,8 +8,13 @@
 
 ## Implementation Standard
 - **Coordinate Conversion**: Use `world_to_grid` and `grid_to_world` helpers.
-- **Component Lifecycle**: `NavObstacle` requires `Transform`.
-- **State Management**: Characters waiting for a path will have the `ComputingPath` component. When the path is ready, it is replaced by `Path`.
+- **Pure Logic**: Core pathfinding MUST be implemented in pure functions (e.g., `compute_astar_path`) decoupled from Bevy's `World` for unit testing.
+- **Interaction Radius**: Use `NavigationCommandsExt::interact_with` to stop at a distance from targets.
+- **Finite Search**: Always implement a `search_limit` to prevent infinite loops in unreachable areas.
+
+## Testing
+- **ASCII Maps**: Use the `parse_ascii_map` helper for readable navigation tests.
+- **Regression Suite**: Every new navigation feature must include a corresponding test in `navigation_tests.rs`.
 
 ## Performance
 - **Query Filtering**: Systems iterating over paths MUST use `With<Path>` or `With<ComputingPath>` filters (Guard #16).
