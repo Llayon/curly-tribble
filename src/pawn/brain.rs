@@ -12,7 +12,7 @@ pub struct BrainPlugin;
 
 impl Plugin for BrainPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
+        app.add_plugins(NavigationCommandsPlugin).add_systems(
             FixedUpdate,
             (think, find_resources, collect_berries, decide_construction)
                 .chain()
@@ -21,7 +21,13 @@ impl Plugin for BrainPlugin {
     }
 }
 
-fn think(query: Query<&Hunger, (With<Settler>, With<Hungry>, With<Idle>)>) {
+// Заглушка для плагина команд, если он нужен в Brain
+pub struct NavigationCommandsPlugin;
+impl Plugin for NavigationCommandsPlugin {
+    fn build(&self, _app: &mut App) {}
+}
+
+fn think(query: Query<&Hunger, (With<Settler>, With<Hungry>, With<Idle>, Changed<Hunger>)>) {
     for hunger in &query {
         if hunger.value() > 50.0 {
             // Реакция на голод
@@ -31,7 +37,15 @@ fn think(query: Query<&Hunger, (With<Settler>, With<Hungry>, With<Idle>)>) {
 
 fn find_resources(
     mut commands: Commands,
-    idlers: Query<Entity, (With<Settler>, Added<Idle>, Without<Targeting>)>,
+    idlers: Query<
+        Entity,
+        (
+            With<Settler>,
+            Added<Idle>,
+            Without<Targeting>,
+            Without<ComputingPath>,
+        ),
+    >,
     bushes: Query<(Entity, &Transform), With<BerryBush>>,
 ) {
     for settler in &idlers {
@@ -39,10 +53,10 @@ fn find_resources(
             // Устанавливаем цель
             commands.entity(settler).insert(Targeting(bush_entity));
 
-            // ПРИКАЗ: Иди к цели (Зенитный Навигатор)
-            commands.move_to(settler, bush_transform.translation);
+            // ПРИКАЗ: Иди к кусту, но остановись в радиусе 1.0м
+            commands.interact_with(settler, bush_transform.translation, 1.0);
 
-            // Переключаемся в Gathering, но реально начнем собирать только по прибытии
+            // Переключаемся в Gathering
             commands.entity(settler).switch_behavior::<Gathering>();
         }
     }
@@ -81,7 +95,7 @@ fn collect_berries(
                 }
             } else {
                 // ПОТЕРЯЛИСЬ ИЛИ ПУТЬ ПЕРЕГОРОЖЕН: запрашиваем путь снова
-                commands.move_to(entity, bush_transform.translation);
+                commands.interact_with(entity, bush_transform.translation, 1.0);
             }
         } else {
             commands.entity(entity).switch_behavior::<Idle>();
