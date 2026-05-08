@@ -10,6 +10,7 @@ impl Plugin for NavigationTypesPlugin {
 pub const COST_BLOCKER: u8 = 0;
 pub const _COST_ROAD: u8 = 10;
 pub const COST_BASE: u8 = 20;
+pub const AGENT_HEIGHT: f32 = 0.4;
 
 #[derive(Resource, Default, Debug)]
 pub struct NavigationMap {
@@ -42,5 +43,5 @@ pub fn world_to_grid(pos: Vec3) -> IVec2 {
 }
 
 pub fn grid_to_world(cell: IVec2) -> Vec3 {
-    Vec3::new(cell.x as f32, 0.4, cell.y as f32)
+    Vec3::new(cell.x as f32, AGENT_HEIGHT, cell.y as f32)
 }

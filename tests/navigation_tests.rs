@@ -1,5 +1,7 @@
 use bevy::prelude::*;
-use savage_fantasy::map::navigation::{compute_astar_path, world_to_grid, COST_BASE, COST_BLOCKER};
+use savage_fantasy::map::navigation::{
+    compute_astar_path, world_to_grid, AGENT_HEIGHT, COST_BASE, COST_BLOCKER,
+};
 use std::collections::HashMap;
 
 /// Хелпер для создания карты из ASCII. Окружает карту блокерами для изоляции теста.
@@ -25,7 +27,7 @@ fn parse_ascii_map(lines: Vec<&str>) -> (HashMap<IVec2, u8>, Vec3, Vec3) {
     for (z, line) in lines.iter().enumerate() {
         for (x, char) in line.chars().enumerate() {
             let pos = IVec2::new(x as i32, z as i32);
-            let world_pos = Vec3::new(x as f32, 0.4, z as f32);
+            let world_pos = Vec3::new(x as f32, AGENT_HEIGHT, z as f32);
 
             match char {
                 'S' => {
