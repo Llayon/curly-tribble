@@ -1,4 +1,4 @@
-use crate::map::zoning::{SmoothTileBundle, Tile};
+use crate::map::zoning::{Roof, SmoothTileBundle, Tile, TileLayer};
 use bevy::prelude::*;
 
 pub struct MeshGenPlugin;
@@ -14,8 +14,10 @@ pub struct SpawnSmoothTileCommand {
     pub h_ne: f32,
     pub h_sw: f32,
     pub h_se: f32,
+    pub offset_y: f32,
     pub material: Handle<StandardMaterial>,
     pub terrain: crate::map::zoning::TerrainType,
+    pub layer: TileLayer,
 }
 
 impl Command for SpawnSmoothTileCommand {
@@ -24,14 +26,21 @@ impl Command for SpawnSmoothTileCommand {
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
         let mesh_handle = meshes.add(mesh);
 
-        world.spawn(SmoothTileBundle {
+        let mut entity = world.spawn(SmoothTileBundle {
             mesh: Mesh3d(mesh_handle),
             material: MeshMaterial3d(self.material),
-            transform: Transform::from_xyz(self.x as f32, 0.0, self.z as f32),
+            transform: Transform::from_xyz(self.x as f32, self.offset_y, self.z as f32),
             tile: Tile {
                 terrain: self.terrain,
             },
         });
+
+        match self.layer {
+            TileLayer::Roof => {
+                entity.insert(Roof);
+            }
+            TileLayer::Ground => {}
+        }
     }
 }
 

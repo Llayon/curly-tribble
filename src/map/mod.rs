@@ -147,8 +147,10 @@ fn spawn_map(
                 h_ne,
                 h_sw,
                 h_se,
+                offset_y: 0.0,
                 material,
                 terrain,
+                layer: crate::map::zoning::TileLayer::Ground,
             });
 
             let mut cost = crate::map::navigation::COST_BASE;
@@ -171,15 +173,17 @@ fn spawn_map(
             nav_map.grid.insert(IVec2::new(x, z), cost);
 
             if tile_data.roofed {
-                commands.spawn(zoning::RoofBundle {
-                    mesh: Mesh3d(assets.ground_mesh.clone()),
-                    material: MeshMaterial3d(assets.stone_material.clone()),
-                    transform: Transform::from_xyz(
-                        x as f32,
-                        tile_data.elevation * MAX_HEIGHT + 1.0,
-                        z as f32,
-                    ),
-                    roof: zoning::Roof,
+                commands.queue(crate::economy::mesh_gen::SpawnSmoothTileCommand {
+                    x,
+                    z,
+                    h_nw,
+                    h_ne,
+                    h_sw,
+                    h_se,
+                    offset_y: 1.0,
+                    material: assets.stone_material.clone(),
+                    terrain: TerrainType::Stone,
+                    layer: crate::map::zoning::TileLayer::Roof,
                 });
             }
         }

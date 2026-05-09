@@ -21,6 +21,13 @@ pub enum TerrainType {
     CaveFloor,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum TileLayer {
+    #[default]
+    Ground,
+    Roof,
+}
+
 #[derive(Clone, Copy, Debug, Default)]
 pub struct TileData {
     pub terrain: TerrainType,

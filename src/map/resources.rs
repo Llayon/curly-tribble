@@ -65,7 +65,8 @@ fn spawn_resources(
                 None => continue,
             };
 
-            let pos = Vec3::new(x as f32, 0.4, z as f32);
+            let elevation = tile.elevation * crate::map::zoning::MAX_HEIGHT;
+            let pos = Vec3::new(x as f32, elevation, z as f32);
 
             match tile.terrain {
                 TerrainType::Grass => {
