@@ -9,7 +9,7 @@
 - [Architectural Guards (tests/architecture.rs)](tests/architecture.rs): Entry point for the 29 automated tests.
 - [SOP: Bevy 0.18.1 Patterns](docs/superpowers/patterns/bevy_018_standards.md): Standards for Hooks, Hierarchy, and Reactivity.
 - [SOP: Zenith Navigator](docs/superpowers/patterns/zenith_navigator.md): Standards for asynchronous, reactive pathfinding.
-- [ADR 0004: Procedural Generation](docs/superpowers/adr/0004-procedural-world-generation.md): Rules for Noise, Scattering, and GLTF integration.
+- [ADR 0004: Procedural Generation](docs/superpowers/adr/0004-procedural-world-generation.md): Rules for Noise, Scattering, Smooth Meshes, and GLTF integration.
 
 ## Narrative & Design Docs
 - [Dark Narrative Design](docs/superpowers/specs/2026-05-02-the-dark-narrative-design.md): Vision and atmosphere specifications.
