@@ -18,6 +18,7 @@
 - [Interaction & UI Plan](docs/superpowers/plans/2026-05-03-ui-and-interaction.md): Reactive interface and user feedback systems.
 - [Design: Procedural Generation Overhaul](docs/superpowers/specs/2026-05-09-procedural-generation-overhaul-design.md): Details of the hybrid Voronoi/Whittaker/Stamp system.
 - [Plan: Procedural Generation Overhaul](docs/superpowers/plans/2026-05-09-procedural-generation-overhaul.md): Step-by-step implementation guide for the overhaul.
+- [Plan: 3D Verticality & Navigation](docs/superpowers/plans/2026-05-09-3d-verticality-and-navigation.md): Implementation of 3D heights and slope-aware 2.5D navigation.
 
 ## External Intelligence (Bevy 0.18.1)
 - [Bevy Documentation Index](https://bevyengine.org/llms.txt): Primary map for Bevy docs.
