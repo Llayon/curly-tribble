@@ -11,6 +11,7 @@ pub mod atmosphere;
 pub mod construction;
 pub mod navigation;
 pub mod resources;
+pub mod visibility;
 pub mod zoning;
 
 pub struct MapPlugin;
@@ -24,6 +25,7 @@ impl Plugin for MapPlugin {
                 ResourcesPlugin,
                 ConstructionPlugin,
                 NavigationPlugin,
+                visibility::VisibilityPlugin,
             ))
             .add_systems(Startup, spawn_map.in_set(StartupSet::SpawnEntities));
     }
@@ -148,7 +150,27 @@ fn spawn_map(
                 tile_data.elevation = combined_elevation;
                 tile_data.temperature = temp_val;
                 tile_data.humidity = humid_val;
+                tile_data.roofed = false;
             }
+        }
+    }
+
+    // Apply cave stamps
+    let mut rng = StdRng::seed_from_u64(u64::from(seed.value()) + 100);
+    for x in 0..width {
+        for z in 0..height {
+            let terrain = map_data.get_tile(x, z).map(|t| t.terrain);
+            if terrain == Some(TerrainType::Stone) && rng.gen_bool(0.2) {
+                apply_cave_stamp(&mut map_data, x as i32, z as i32);
+            }
+        }
+    }
+
+    // Actual spawning
+    for x in 0..width {
+        for z in 0..height {
+            let tile_data = map_data.get_tile(x, z).cloned().unwrap_or_default();
+            let terrain = tile_data.terrain;
 
             let material = match terrain {
                 TerrainType::Grass => assets.ground_material.clone(),
@@ -178,6 +200,30 @@ fn spawn_map(
                     entity.insert(NavObstacle { cost: 80 }); // Труднопроходимо
                 }
                 TerrainType::Grass | TerrainType::Sand | TerrainType::CaveFloor => {} // Базовая стоимость 20
+            }
+
+            if tile_data.roofed {
+                commands.spawn((
+                    Mesh3d(assets.ground_mesh.clone()),
+                    MeshMaterial3d(assets.stone_material.clone()),
+                    Transform::from_xyz(x as f32, 1.0, z as f32),
+                    zoning::Roof,
+                ));
+            }
+        }
+    }
+}
+
+fn apply_cave_stamp(map: &mut MapData, x: i32, z: i32) {
+    for dx in -1..=1 {
+        for dz in -1..=1 {
+            let tx = x + dx;
+            let tz = z + dz;
+            if tx >= 0 && tz >= 0 {
+                if let Some(tile) = map.get_tile_mut(tx as u32, tz as u32) {
+                    tile.terrain = TerrainType::CaveFloor;
+                    tile.roofed = true;
+                }
             }
         }
     }

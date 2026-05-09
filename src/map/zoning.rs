@@ -34,6 +34,17 @@ pub struct Tile {
 }
 
 #[derive(Component)]
+pub struct Roof;
+
+#[derive(Bundle)]
+pub struct RoofBundle {
+    pub mesh: Mesh3d,
+    pub material: MeshMaterial3d<StandardMaterial>,
+    pub transform: Transform,
+    pub roof: Roof,
+}
+
+#[derive(Component)]
 #[allow(dead_code)]
 pub struct Zone(pub ZoneType);
 

@@ -15,6 +15,9 @@ use relations::RelationsPlugin;
 pub struct Settler; // Метка человека-поселенца
 
 #[derive(Component)]
+pub struct Pawn; // Общая метка для существ
+
+#[derive(Component)]
 pub struct Pioneer; // Роль: Пионер (первый из прибывших)
 
 #[derive(Component)]
@@ -121,6 +124,7 @@ impl Morale {
 #[derive(Bundle)]
 pub struct SettlerBundle {
     pub settler: Settler,
+    pub pawn: Pawn,
     pub pioneer: Pioneer,
     pub hunger: Hunger,
     pub morale: Morale,
@@ -133,6 +137,7 @@ pub struct SettlerBundle {
 fn spawn_starting_settler(mut commands: Commands, assets: Res<GameAssets>) {
     let mut settler = commands.spawn(SettlerBundle {
         settler: Settler,
+        pawn: Pawn,
         pioneer: Pioneer,
         hunger: Hunger::new(0.0),
         morale: Morale::new(100.0),
