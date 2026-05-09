@@ -139,7 +139,7 @@ fn spawn_starting_settler(mut commands: Commands, assets: Res<GameAssets>) {
         settler: Settler,
         pawn: Pawn,
         pioneer: Pioneer,
-        hunger: Hunger::new(0.0),
+        hunger: Hunger::new(15.0),
         morale: Morale::new(100.0),
         name: Name::new("Erik the Red"),
         mesh: Mesh3d(assets.settler_mesh.clone()),

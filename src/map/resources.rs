@@ -55,9 +55,11 @@ fn spawn_resources(
     seed: Res<WorldSeed>,
 ) {
     let mut rng = StdRng::seed_from_u64(u64::from(seed.value()) + 42);
+    let half_w = map_data.width as i32 / 2;
+    let half_h = map_data.height as i32 / 2;
 
-    for x in 0..map_data.width {
-        for z in 0..map_data.height {
+    for x in -half_w..half_w {
+        for z in -half_h..half_h {
             let tile = match map_data.get_tile(x, z) {
                 Some(t) => t,
                 None => continue,

@@ -23,8 +23,8 @@ pub fn update_cave_visibility(
     for transform in &pawns {
         let x = transform.translation.x.round() as i32;
         let z = transform.translation.z.round() as i32;
-        if x >= 0 && z >= 0 {
-            if let Some(tile) = map.get_tile(x as u32, z as u32) {
+        if x >= -20 && z >= -20 {
+            if let Some(tile) = map.get_tile(x, z) {
                 if tile.roofed {
                     any_pawn_in_cave = true;
                     break;

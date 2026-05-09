@@ -58,17 +58,21 @@ pub struct MapData {
 }
 
 impl MapData {
-    pub fn get_tile(&self, x: u32, z: u32) -> Option<&crate::map::zoning::TileData> {
-        if x < self.width && z < self.height {
-            Some(&self.tiles[(z * self.width + x) as usize])
+    pub fn get_tile(&self, x: i32, z: i32) -> Option<&crate::map::zoning::TileData> {
+        let ux = (x + (self.width as i32 / 2)) as u32;
+        let uz = (z + (self.height as i32 / 2)) as u32;
+        if ux < self.width && uz < self.height {
+            Some(&self.tiles[(uz * self.width + ux) as usize])
         } else {
             None
         }
     }
 
-    pub fn get_tile_mut(&mut self, x: u32, z: u32) -> Option<&mut crate::map::zoning::TileData> {
-        if x < self.width && z < self.height {
-            Some(&mut self.tiles[(z * self.width + x) as usize])
+    pub fn get_tile_mut(&mut self, x: i32, z: i32) -> Option<&mut crate::map::zoning::TileData> {
+        let ux = (x + (self.width as i32 / 2)) as u32;
+        let uz = (z + (self.height as i32 / 2)) as u32;
+        if ux < self.width && uz < self.height {
+            Some(&mut self.tiles[(uz * self.width + ux) as usize])
         } else {
             None
         }
@@ -102,8 +106,6 @@ fn generate_voronoi_heights(width: u32, height: u32, seed: u32) -> Vec<f32> {
             for p in &points {
                 min_dist = min_dist.min(p.distance(Vec2::new(x, z)));
             }
-            // Normalize: min_dist / 10.0 or similar.
-            // Using 10.0 as a base "radius" for features.
             (min_dist / 10.0).min(1.0)
         })
         .collect()
@@ -114,6 +116,7 @@ fn spawn_map(
     assets: Res<crate::economy::GameAssets>,
     seed: Res<WorldSeed>,
     mut map_data: ResMut<MapData>,
+    mut nav_map: ResMut<crate::map::navigation::NavigationMap>,
 ) {
     let elev_noise = Fbm::<Perlin>::new(seed.value());
     let temp_noise = Fbm::<Perlin>::new(seed.value() + 1);
@@ -121,6 +124,8 @@ fn spawn_map(
 
     let width = 20;
     let height = 20;
+    let half_w = width as i32 / 2;
+    let half_h = height as i32 / 2;
 
     let voronoi_map = generate_voronoi_heights(width, height, seed.value());
 
@@ -128,23 +133,21 @@ fn spawn_map(
     map_data.height = height;
     map_data.tiles = vec![crate::map::zoning::TileData::default(); (width * height) as usize];
 
-    for x in 0..width {
-        for z in 0..height {
-            let idx = (z * width + x) as usize;
+    for x in -half_w..half_w {
+        for z in -half_h..half_h {
+            let ux = (x + half_w) as u32;
+            let uz = (z + half_h) as u32;
+            let idx = (uz * width + ux) as usize;
             let voronoi_val = voronoi_map[idx];
 
-            // Генерируем значения шума
             let noise_val = elev_noise.get([x as f64 * 0.2, z as f64 * 0.2]) as f32;
             let temp_val = ((temp_noise.get([x as f64 * 0.1, z as f64 * 0.1]) as f32) + 1.0) * 0.5;
             let humid_val =
                 ((humid_noise.get([x as f64 * 0.1, z as f64 * 0.1]) as f32) + 1.0) * 0.5;
 
-            // Combine Voronoi and Noise (hills on top of skeleton)
             let combined_elevation = (voronoi_val + noise_val * 0.2).clamp(0.0, 1.0);
-
             let terrain = get_terrain_from_climate(temp_val, humid_val, combined_elevation);
 
-            // Update MapData
             if let Some(tile_data) = map_data.get_tile_mut(x, z) {
                 tile_data.terrain = terrain;
                 tile_data.elevation = combined_elevation;
@@ -155,20 +158,18 @@ fn spawn_map(
         }
     }
 
-    // Apply cave stamps
     let mut rng = StdRng::seed_from_u64(u64::from(seed.value()) + 100);
-    for x in 0..width {
-        for z in 0..height {
+    for x in -half_w..half_w {
+        for z in -half_h..half_h {
             let terrain = map_data.get_tile(x, z).map(|t| t.terrain);
             if terrain == Some(TerrainType::Stone) && rng.gen_bool(0.2) {
-                apply_cave_stamp(&mut map_data, x as i32, z as i32);
+                apply_cave_stamp(&mut map_data, x, z);
             }
         }
     }
 
-    // Actual spawning
-    for x in 0..width {
-        for z in 0..height {
+    for x in -half_w..half_w {
+        for z in -half_h..half_h {
             let tile_data = map_data.get_tile(x, z).cloned().unwrap_or_default();
             let terrain = tile_data.terrain;
 
@@ -188,19 +189,23 @@ fn spawn_map(
                 tile: Tile { terrain },
             });
 
-            // Добавляем препятствия/стоимость в навигацию
+            let mut cost = crate::map::navigation::COST_BASE;
             match terrain {
                 TerrainType::Water => {
-                    entity.insert(NavObstacle { cost: 0 }); // Блокер
+                    cost = crate::map::navigation::COST_BLOCKER;
+                    entity.insert(NavObstacle { cost });
                 }
                 TerrainType::Mud => {
-                    entity.insert(NavObstacle { cost: 50 }); // Замедление
+                    cost = 50;
+                    entity.insert(NavObstacle { cost });
                 }
                 TerrainType::Stone => {
-                    entity.insert(NavObstacle { cost: 80 }); // Труднопроходимо
+                    cost = 80;
+                    entity.insert(NavObstacle { cost });
                 }
-                TerrainType::Grass | TerrainType::Sand | TerrainType::CaveFloor => {} // Базовая стоимость 20
+                TerrainType::Grass | TerrainType::Sand | TerrainType::CaveFloor => {}
             }
+            nav_map.grid.insert(IVec2::new(x, z), cost);
 
             if tile_data.roofed {
                 commands.spawn(zoning::RoofBundle {
@@ -217,13 +222,9 @@ fn spawn_map(
 fn apply_cave_stamp(map: &mut MapData, x: i32, z: i32) {
     for dx in -1..=1 {
         for dz in -1..=1 {
-            let tx = x + dx;
-            let tz = z + dz;
-            if tx >= 0 && tz >= 0 {
-                if let Some(tile) = map.get_tile_mut(tx as u32, tz as u32) {
-                    tile.terrain = TerrainType::CaveFloor;
-                    tile.roofed = true;
-                }
+            if let Some(tile) = map.get_tile_mut(x + dx, z + dz) {
+                tile.terrain = TerrainType::CaveFloor;
+                tile.roofed = true;
             }
         }
     }
