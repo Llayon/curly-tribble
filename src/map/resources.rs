@@ -1,5 +1,6 @@
 use crate::economy::GameAssets;
-use crate::map::zoning::{TerrainType, Tile};
+use crate::map::zoning::TerrainType;
+use crate::map::{MapData, WorldSeed};
 use bevy::prelude::*;
 use rand::prelude::*;
 
@@ -36,43 +37,82 @@ pub struct TreeBundle {
     pub obstacle: crate::map::navigation::NavObstacle,
 }
 
+#[derive(Component)]
+pub struct Rock;
+
+#[derive(Bundle)]
+pub struct RockBundle {
+    pub rock: Rock,
+    pub scene: SceneRoot,
+    pub transform: Transform,
+    pub obstacle: crate::map::navigation::NavObstacle,
+}
+
 fn spawn_resources(
     mut commands: Commands,
     assets: Res<GameAssets>,
-    tiles: Query<(&Transform, &Tile)>,
+    map_data: Res<MapData>,
+    seed: Res<WorldSeed>,
 ) {
-    let mut rng = StdRng::seed_from_u64(42);
+    let mut rng = StdRng::seed_from_u64(u64::from(seed.value()) + 42);
 
-    for (transform, tile) in &tiles {
-        if tile.terrain != TerrainType::Grass {
-            continue;
-        }
+    for x in 0..map_data.width {
+        for z in 0..map_data.height {
+            let tile = match map_data.get_tile(x, z) {
+                Some(t) => t,
+                None => continue,
+            };
 
-        let spawn_chance = rng.gen_bool(0.1); // 10% шанс на объект
+            let pos = Vec3::new(x as f32, 0.4, z as f32);
 
-        if spawn_chance {
-            let pos = transform.translation + Vec3::Y * 0.4;
-
-            if rng.gen_bool(0.3) {
-                // Ягодный куст
-                commands.spawn(BerryBushBundle {
-                    bush: BerryBush { food_amount: 10.0 },
-                    scene: SceneRoot(assets.bush_scene.clone()),
-                    transform: Transform::from_translation(pos),
-                    obstacle: crate::map::navigation::NavObstacle {
-                        cost: crate::map::navigation::COST_BLOCKER,
-                    },
-                });
-            } else {
-                // Просто декоративное дерево
-                commands.spawn(TreeBundle {
-                    tree: Tree,
-                    scene: SceneRoot(assets.tree_scene.clone()),
-                    transform: Transform::from_translation(pos),
-                    obstacle: crate::map::navigation::NavObstacle {
-                        cost: crate::map::navigation::COST_BLOCKER,
-                    },
-                });
+            match tile.terrain {
+                TerrainType::Grass => {
+                    let tree_chance = if tile.humidity > 0.6 { 0.25 } else { 0.05 };
+                    if rng.gen_bool(tree_chance) {
+                        commands.spawn(TreeBundle {
+                            tree: Tree,
+                            scene: SceneRoot(assets.tree_scene.clone()),
+                            transform: Transform::from_translation(pos),
+                            obstacle: crate::map::navigation::NavObstacle {
+                                cost: crate::map::navigation::COST_BLOCKER,
+                            },
+                        });
+                    } else if rng.gen_bool(0.08) {
+                        commands.spawn(BerryBushBundle {
+                            bush: BerryBush { food_amount: 10.0 },
+                            scene: SceneRoot(assets.bush_scene.clone()),
+                            transform: Transform::from_translation(pos),
+                            obstacle: crate::map::navigation::NavObstacle {
+                                cost: crate::map::navigation::COST_BLOCKER,
+                            },
+                        });
+                    }
+                }
+                TerrainType::Mud => {
+                    if rng.gen_bool(0.15) {
+                        commands.spawn(BerryBushBundle {
+                            bush: BerryBush { food_amount: 10.0 },
+                            scene: SceneRoot(assets.bush_scene.clone()),
+                            transform: Transform::from_translation(pos),
+                            obstacle: crate::map::navigation::NavObstacle {
+                                cost: crate::map::navigation::COST_BLOCKER,
+                            },
+                        });
+                    }
+                }
+                TerrainType::Stone | TerrainType::Sand => {
+                    if rng.gen_bool(0.12) {
+                        commands.spawn(RockBundle {
+                            rock: Rock,
+                            scene: SceneRoot(assets.rock_scene.clone()),
+                            transform: Transform::from_translation(pos),
+                            obstacle: crate::map::navigation::NavObstacle {
+                                cost: crate::map::navigation::COST_BLOCKER,
+                            },
+                        });
+                    }
+                }
+                _ => {}
             }
         }
     }

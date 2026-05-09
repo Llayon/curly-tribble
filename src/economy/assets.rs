@@ -29,6 +29,7 @@ pub struct GameAssets {
     // GLTF Scenes from Quaternius
     pub bush_scene: Handle<Scene>,
     pub tree_scene: Handle<Scene>,
+    pub rock_scene: Handle<Scene>,
     pub house_scene: Handle<Scene>,
 }
 
@@ -74,6 +75,7 @@ pub fn setup_assets(
         // Загрузка сцен из GLTF
         bush_scene: asset_server.load("models/Resource_Tree2.gltf#Scene0"),
         tree_scene: asset_server.load("models/Resource_Tree1.gltf#Scene0"),
+        rock_scene: asset_server.load("models/Resource_Rock_1.gltf#Scene0"),
         house_scene: asset_server.load("models/Houses_FirstAge_1_Level1.gltf#Scene0"),
     };
 
