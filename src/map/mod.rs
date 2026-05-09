@@ -1,11 +1,12 @@
+use crate::economy::mesh_gen::MeshGenPlugin;
 use crate::sets::StartupSet;
 use bevy::prelude::*;
 use construction::ConstructionPlugin;
-use navigation::{NavObstacle, NavigationPlugin};
+use navigation::NavigationPlugin;
 use noise::{Fbm, NoiseFn, Perlin};
 use rand::prelude::*;
 use resources::ResourcesPlugin;
-use zoning::{TerrainType, Tile};
+use zoning::{MapData, TerrainType, Tile, WorldSeed, MAX_HEIGHT};
 
 pub mod atmosphere;
 pub mod construction;
@@ -16,80 +17,17 @@ pub mod zoning;
 
 pub struct MapPlugin;
 
-pub const MAX_HEIGHT: f32 = 4.0;
-
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<WorldSeed>()
-            .init_resource::<MapData>()
-            .add_plugins((
-                zoning::ZoningPlugin,
-                ResourcesPlugin,
-                ConstructionPlugin,
-                NavigationPlugin,
-                visibility::VisibilityPlugin,
-            ))
-            .add_systems(Startup, spawn_map.in_set(StartupSet::SpawnEntities));
-    }
-}
-
-#[derive(Resource)]
-pub struct WorldSeed(u32);
-
-impl WorldSeed {
-    pub fn new(seed: u32) -> Self {
-        Self(seed)
-    }
-
-    pub fn value(&self) -> u32 {
-        self.0
-    }
-}
-
-impl Default for WorldSeed {
-    fn default() -> Self {
-        Self(42) // Тот самый сид
-    }
-}
-
-#[derive(Resource, Default, Clone)]
-pub struct MapData {
-    pub width: u32,
-    pub height: u32,
-    pub tiles: Vec<crate::map::zoning::TileData>,
-}
-
-impl MapData {
-    pub fn get_tile(&self, x: i32, z: i32) -> Option<&crate::map::zoning::TileData> {
-        let ux = (x + (self.width as i32 / 2)) as u32;
-        let uz = (z + (self.height as i32 / 2)) as u32;
-        if ux < self.width && uz < self.height {
-            Some(&self.tiles[(uz * self.width + ux) as usize])
-        } else {
-            None
-        }
-    }
-
-    pub fn get_tile_mut(&mut self, x: i32, z: i32) -> Option<&mut crate::map::zoning::TileData> {
-        let ux = (x + (self.width as i32 / 2)) as u32;
-        let uz = (z + (self.height as i32 / 2)) as u32;
-        if ux < self.width && uz < self.height {
-            Some(&mut self.tiles[(uz * self.width + ux) as usize])
-        } else {
-            None
-        }
-    }
-
-    pub fn is_too_steep(&self, x: i32, z: i32) -> bool {
-        let current_elev = self.get_tile(x, z).map(|t| t.elevation).unwrap_or(0.0);
-        for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-            if let Some(neighbor) = self.get_tile(x + dx, z + dz) {
-                if (neighbor.elevation - current_elev).abs() > 0.3 {
-                    return true;
-                }
-            }
-        }
-        false
+        app.add_plugins((
+            zoning::ZoningPlugin,
+            ResourcesPlugin,
+            ConstructionPlugin,
+            NavigationPlugin,
+            visibility::VisibilityPlugin,
+            MeshGenPlugin,
+        ))
+        .add_systems(Startup, spawn_map.in_set(StartupSet::SpawnEntities));
     }
 }
 
@@ -197,39 +135,39 @@ fn spawn_map(
                 TerrainType::CaveFloor => assets.ground_material.clone(),
             };
 
-            let mut entity = commands.spawn(MapTileBundle {
-                mesh: Mesh3d(assets.ground_mesh.clone()),
-                material: MeshMaterial3d(material),
-                transform: Transform::from_xyz(
-                    x as f32,
-                    tile_data.elevation * MAX_HEIGHT,
-                    z as f32,
-                ),
-                tile: Tile { terrain },
+            let h_nw = map_data.get_corner_height(x, z);
+            let h_ne = map_data.get_corner_height(x + 1, z);
+            let h_sw = map_data.get_corner_height(x, z + 1);
+            let h_se = map_data.get_corner_height(x + 1, z + 1);
+
+            commands.queue(crate::economy::mesh_gen::SpawnSmoothTileCommand {
+                x,
+                z,
+                h_nw,
+                h_ne,
+                h_sw,
+                h_se,
+                material,
+                terrain,
             });
 
             let mut cost = crate::map::navigation::COST_BASE;
-            match terrain {
-                TerrainType::Water => {
-                    cost = crate::map::navigation::COST_BLOCKER;
-                    entity.insert(NavObstacle { cost });
-                }
-                TerrainType::Mud => {
-                    cost = 50;
-                    entity.insert(NavObstacle { cost });
-                }
-                TerrainType::Stone => {
-                    cost = 80;
-                    entity.insert(NavObstacle { cost });
-                }
-                TerrainType::Grass | TerrainType::Sand | TerrainType::CaveFloor => {}
-            }
-
             if map_data.is_too_steep(x, z) {
                 cost = crate::map::navigation::COST_BLOCKER;
-                entity.insert(NavObstacle { cost });
+            } else {
+                match terrain {
+                    TerrainType::Water => {
+                        cost = crate::map::navigation::COST_BLOCKER;
+                    }
+                    TerrainType::Mud => {
+                        cost = 50;
+                    }
+                    TerrainType::Stone => {
+                        cost = 80;
+                    }
+                    TerrainType::Grass | TerrainType::Sand | TerrainType::CaveFloor => {}
+                }
             }
-
             nav_map.grid.insert(IVec2::new(x, z), cost);
 
             if tile_data.roofed {
@@ -238,7 +176,7 @@ fn spawn_map(
                     material: MeshMaterial3d(assets.stone_material.clone()),
                     transform: Transform::from_xyz(
                         x as f32,
-                        (tile_data.elevation * MAX_HEIGHT) + 1.0,
+                        tile_data.elevation * MAX_HEIGHT + 1.0,
                         z as f32,
                     ),
                     roof: zoning::Roof,
@@ -270,7 +208,6 @@ fn get_terrain_from_climate(temp: f32, humid: f32, elev: f32) -> TerrainType {
         return TerrainType::Stone;
     }
 
-    // Simple Whittaker matrix
     if humid > 0.7 {
         if temp < 0.3 {
             TerrainType::Mud
