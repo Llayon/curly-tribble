@@ -33,8 +33,10 @@ impl NavigationCommandsExt for Commands<'_, '_> {
     }
 }
 
+type NavEntity = Entity;
+
 pub struct ComputePathCommand {
-    pub agent: Entity,
+    pub agent: NavEntity,
     pub target_pos: Vec3,
     pub radius: f32,
 }
