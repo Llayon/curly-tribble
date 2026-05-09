@@ -113,7 +113,10 @@ fn spawn_map(
     seed: Res<WorldSeed>,
     mut map_data: ResMut<MapData>,
 ) {
-    let fbm = Fbm::<Perlin>::new(seed.value());
+    let elev_noise = Fbm::<Perlin>::new(seed.value());
+    let temp_noise = Fbm::<Perlin>::new(seed.value() + 1);
+    let humid_noise = Fbm::<Perlin>::new(seed.value() + 2);
+
     let width = 20;
     let height = 20;
 
@@ -128,26 +131,23 @@ fn spawn_map(
             let idx = (z * width + x) as usize;
             let voronoi_val = voronoi_map[idx];
 
-            // Генерируем значение шума (-1.0 .. 1.0) для детализации
-            let noise_val = fbm.get([x as f64 * 0.2, z as f64 * 0.2]) as f32;
+            // Генерируем значения шума
+            let noise_val = elev_noise.get([x as f64 * 0.2, z as f64 * 0.2]) as f32;
+            let temp_val = ((temp_noise.get([x as f64 * 0.1, z as f64 * 0.1]) as f32) + 1.0) * 0.5;
+            let humid_val =
+                ((humid_noise.get([x as f64 * 0.1, z as f64 * 0.1]) as f32) + 1.0) * 0.5;
 
             // Combine Voronoi and Noise (hills on top of skeleton)
             let combined_elevation = (voronoi_val + noise_val * 0.2).clamp(0.0, 1.0);
 
-            let terrain = if combined_elevation < 0.2 {
-                TerrainType::Water
-            } else if combined_elevation > 0.8 {
-                TerrainType::Stone
-            } else if combined_elevation < 0.4 {
-                TerrainType::Mud
-            } else {
-                TerrainType::Grass
-            };
+            let terrain = get_terrain_from_climate(temp_val, humid_val, combined_elevation);
 
             // Update MapData
             if let Some(tile_data) = map_data.get_tile_mut(x, z) {
                 tile_data.terrain = terrain;
                 tile_data.elevation = combined_elevation;
+                tile_data.temperature = temp_val;
+                tile_data.humidity = humid_val;
             }
 
             let material = match terrain {
@@ -155,7 +155,8 @@ fn spawn_map(
                 TerrainType::Mud => assets.mud_material.clone(),
                 TerrainType::Water => assets.water_material.clone(),
                 TerrainType::Stone => assets.stone_material.clone(),
-                TerrainType::Sand | TerrainType::CaveFloor => assets.ground_material.clone(),
+                TerrainType::Sand => assets.sand_material.clone(),
+                TerrainType::CaveFloor => assets.ground_material.clone(),
             };
 
             let mut entity = commands.spawn(MapTileBundle {
@@ -179,5 +180,34 @@ fn spawn_map(
                 TerrainType::Grass | TerrainType::Sand | TerrainType::CaveFloor => {} // Базовая стоимость 20
             }
         }
+    }
+}
+
+fn get_terrain_from_climate(temp: f32, humid: f32, elev: f32) -> TerrainType {
+    if elev < 0.2 {
+        return TerrainType::Water;
+    }
+    if elev < 0.25 {
+        return TerrainType::Sand;
+    }
+    if elev > 0.8 {
+        return TerrainType::Stone;
+    }
+
+    // Simple Whittaker matrix
+    if humid > 0.7 {
+        if temp < 0.3 {
+            TerrainType::Mud
+        } else {
+            TerrainType::Grass
+        }
+    } else if humid < 0.3 {
+        if temp > 0.7 {
+            TerrainType::Sand
+        } else {
+            TerrainType::Grass
+        }
+    } else {
+        TerrainType::Grass
     }
 }

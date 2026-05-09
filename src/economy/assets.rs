@@ -18,6 +18,7 @@ pub struct GameAssets {
     pub ground_mesh: Handle<Mesh>,
     pub ground_material: Handle<StandardMaterial>,
     pub mud_material: Handle<StandardMaterial>,
+    pub sand_material: Handle<StandardMaterial>,
     pub water_material: Handle<StandardMaterial>,
     pub lantern_mesh: Handle<Mesh>,
     pub lantern_material: Handle<StandardMaterial>,
@@ -44,6 +45,7 @@ pub fn setup_assets(
         ground_mesh: meshes.add(Plane3d::default().mesh().size(1.0, 1.0)),
         ground_material: materials.add(Color::srgb(0.3, 0.5, 0.3)),
         mud_material: materials.add(Color::srgb(0.4, 0.3, 0.2)),
+        sand_material: materials.add(Color::srgb(0.8, 0.7, 0.4)),
         water_material: materials.add(StandardMaterial {
             base_color: Color::srgb(0.1, 0.3, 0.6),
             alpha_mode: AlphaMode::Blend,
