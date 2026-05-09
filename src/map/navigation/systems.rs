@@ -28,6 +28,7 @@ pub fn follow_path(
     mut commands: Commands,
     mut query: Query<(bevy::prelude::Entity, &mut Transform, &mut Path), With<Path>>,
     time: Res<Time>,
+    map: Res<crate::map::MapData>,
 ) {
     for (entity, mut transform, mut path) in &mut query {
         if path.current_index >= path.points.len() {
@@ -45,6 +46,13 @@ pub fn follow_path(
         } else {
             let move_dir = diff.normalize();
             transform.translation += move_dir * speed * time.delta_secs();
+
+            let grid_pos = world_to_grid(transform.translation);
+            if let Some(tile) = map.get_tile(grid_pos.x, grid_pos.y) {
+                let target_y = (tile.elevation * crate::map::MAX_HEIGHT) + AGENT_HEIGHT;
+                transform.translation.y = target_y;
+            }
+
             transform.look_to(move_dir, Vec3::Y);
         }
     }

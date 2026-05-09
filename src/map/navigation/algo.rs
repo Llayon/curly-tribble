@@ -1,4 +1,4 @@
-use super::types::*;
+use super::types::{grid_to_world, world_to_grid, COST_BASE, COST_BLOCKER};
 use bevy::prelude::*;
 use std::collections::HashMap;
 
@@ -7,11 +7,13 @@ impl Plugin for NavigationAlgoPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
-pub fn compute_astar_path(
-    grid: &HashMap<IVec2, u8>,
+#[must_use]
+pub fn compute_astar_path<S: std::hash::BuildHasher>(
+    grid: &HashMap<IVec2, u8, S>,
     start_pos: Vec3,
     target_pos: Vec3,
     radius: f32,
+    map: &crate::map::MapData,
 ) -> Option<Vec<Vec3>> {
     use pathfinding::prelude::astar;
 
@@ -27,7 +29,6 @@ pub fn compute_astar_path(
     let result = astar(
         &start_cell,
         |&p| {
-            // ... (rest of successors function)
             let neighbors = [
                 IVec2::new(p.x + 1, p.y),
                 IVec2::new(p.x - 1, p.y),
@@ -60,10 +61,14 @@ pub fn compute_astar_path(
             }
         },
         |&p| {
-            let world_p = grid_to_world(p);
+            let world_p = grid_to_world(p, map);
             world_p.distance(target_pos) <= radius + 0.001
         },
     );
 
-    result.map(|(path, _cost)| path.into_iter().map(grid_to_world).collect::<Vec<_>>())
+    result.map(|(path, _cost)| {
+        path.into_iter()
+            .map(|p| grid_to_world(p, map))
+            .collect::<Vec<_>>()
+    })
 }

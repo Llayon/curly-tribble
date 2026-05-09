@@ -16,6 +16,8 @@ pub mod zoning;
 
 pub struct MapPlugin;
 
+pub const MAX_HEIGHT: f32 = 4.0;
+
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WorldSeed>()
@@ -50,7 +52,7 @@ impl Default for WorldSeed {
     }
 }
 
-#[derive(Resource, Default)]
+#[derive(Resource, Default, Clone)]
 pub struct MapData {
     pub width: u32,
     pub height: u32,
@@ -77,6 +79,18 @@ impl MapData {
             None
         }
     }
+
+    pub fn is_too_steep(&self, x: i32, z: i32) -> bool {
+        let current_elev = self.get_tile(x, z).map(|t| t.elevation).unwrap_or(0.0);
+        for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
+            if let Some(neighbor) = self.get_tile(x + dx, z + dz) {
+                if (neighbor.elevation - current_elev).abs() > 0.3 {
+                    return true;
+                }
+            }
+        }
+        false
+    }
 }
 
 #[derive(Bundle)]
@@ -89,7 +103,7 @@ pub struct MapTileBundle {
 
 fn generate_voronoi_heights(width: u32, height: u32, seed: u32) -> Vec<f32> {
     let mut rng = rand::prelude::StdRng::seed_from_u64(u64::from(seed));
-    let points: Vec<Vec2> = (0..12)
+    let points: Vec<Vec2> = (0..24)
         .map(|_| {
             Vec2::new(
                 rng.gen_range(0.0..width as f32),
@@ -122,8 +136,8 @@ fn spawn_map(
     let temp_noise = Fbm::<Perlin>::new(seed.value() + 1);
     let humid_noise = Fbm::<Perlin>::new(seed.value() + 2);
 
-    let width = 20;
-    let height = 20;
+    let width = 40;
+    let height = 40;
     let half_w = width as i32 / 2;
     let half_h = height as i32 / 2;
 
@@ -140,10 +154,11 @@ fn spawn_map(
             let idx = (uz * width + ux) as usize;
             let voronoi_val = voronoi_map[idx];
 
-            let noise_val = elev_noise.get([x as f64 * 0.2, z as f64 * 0.2]) as f32;
-            let temp_val = ((temp_noise.get([x as f64 * 0.1, z as f64 * 0.1]) as f32) + 1.0) * 0.5;
+            let noise_val = elev_noise.get([x as f64 * 0.05, z as f64 * 0.05]) as f32;
+            let temp_val =
+                ((temp_noise.get([x as f64 * 0.05, z as f64 * 0.05]) as f32) + 1.0) * 0.5;
             let humid_val =
-                ((humid_noise.get([x as f64 * 0.1, z as f64 * 0.1]) as f32) + 1.0) * 0.5;
+                ((humid_noise.get([x as f64 * 0.05, z as f64 * 0.05]) as f32) + 1.0) * 0.5;
 
             let combined_elevation = (voronoi_val + noise_val * 0.2).clamp(0.0, 1.0);
             let terrain = get_terrain_from_climate(temp_val, humid_val, combined_elevation);
@@ -185,7 +200,11 @@ fn spawn_map(
             let mut entity = commands.spawn(MapTileBundle {
                 mesh: Mesh3d(assets.ground_mesh.clone()),
                 material: MeshMaterial3d(material),
-                transform: Transform::from_xyz(x as f32, 0.0, z as f32),
+                transform: Transform::from_xyz(
+                    x as f32,
+                    tile_data.elevation * MAX_HEIGHT,
+                    z as f32,
+                ),
                 tile: Tile { terrain },
             });
 
@@ -205,13 +224,23 @@ fn spawn_map(
                 }
                 TerrainType::Grass | TerrainType::Sand | TerrainType::CaveFloor => {}
             }
+
+            if map_data.is_too_steep(x, z) {
+                cost = crate::map::navigation::COST_BLOCKER;
+                entity.insert(NavObstacle { cost });
+            }
+
             nav_map.grid.insert(IVec2::new(x, z), cost);
 
             if tile_data.roofed {
                 commands.spawn(zoning::RoofBundle {
                     mesh: Mesh3d(assets.ground_mesh.clone()),
                     material: MeshMaterial3d(assets.stone_material.clone()),
-                    transform: Transform::from_xyz(x as f32, 1.0, z as f32),
+                    transform: Transform::from_xyz(
+                        x as f32,
+                        (tile_data.elevation * MAX_HEIGHT) + 1.0,
+                        z as f32,
+                    ),
                     roof: zoning::Roof,
                 });
             }

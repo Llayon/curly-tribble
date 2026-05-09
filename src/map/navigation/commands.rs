@@ -1,5 +1,5 @@
-use super::algo::*;
-use super::types::*;
+use super::algo::compute_astar_path;
+use super::types::{ComputingPath, NavigationMap};
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
 
@@ -9,17 +9,12 @@ impl Plugin for NavigationCommandsPlugin {
 }
 
 pub trait NavigationCommandsExt {
-    fn move_to(&mut self, entity: bevy::prelude::Entity, target_pos: Vec3) -> &mut Self;
-    fn interact_with(
-        &mut self,
-        entity: bevy::prelude::Entity,
-        target_pos: Vec3,
-        radius: f32,
-    ) -> &mut Self;
+    fn move_to(&mut self, entity: Entity, target_pos: Vec3) -> &mut Self;
+    fn interact_with(&mut self, entity: Entity, target_pos: Vec3, radius: f32) -> &mut Self;
 }
 
 impl NavigationCommandsExt for Commands<'_, '_> {
-    fn move_to(&mut self, entity: bevy::prelude::Entity, target_pos: Vec3) -> &mut Self {
+    fn move_to(&mut self, entity: Entity, target_pos: Vec3) -> &mut Self {
         self.queue(ComputePathCommand {
             agent: entity,
             target_pos,
@@ -28,12 +23,7 @@ impl NavigationCommandsExt for Commands<'_, '_> {
         self
     }
 
-    fn interact_with(
-        &mut self,
-        entity: bevy::prelude::Entity,
-        target_pos: Vec3,
-        radius: f32,
-    ) -> &mut Self {
+    fn interact_with(&mut self, entity: Entity, target_pos: Vec3, radius: f32) -> &mut Self {
         self.queue(ComputePathCommand {
             agent: entity,
             target_pos,
@@ -44,32 +34,35 @@ impl NavigationCommandsExt for Commands<'_, '_> {
 }
 
 pub struct ComputePathCommand {
-    pub agent: bevy::prelude::Entity,
+    pub agent: Entity,
     pub target_pos: Vec3,
     pub radius: f32,
 }
 
 impl Command for ComputePathCommand {
     fn apply(self, world: &mut World) {
-        let start_pos = if let Some(t) = world.get::<Transform>(self.agent) {
-            t.translation
-        } else {
+        let Some(t) = world.get::<Transform>(self.agent) else {
+            return;
+        };
+        let start_pos = t.translation;
+
+        let Some(nav_map_res) = world.get_resource::<NavigationMap>() else {
             return;
         };
 
-        let nav_map_res = if let Some(map) = world.get_resource::<NavigationMap>() {
-            map
-        } else {
+        let Some(map_data) = world.get_resource::<crate::map::MapData>() else {
             return;
         };
+        let map_data = map_data.clone();
 
         let grid = nav_map_res.grid.clone();
         let thread_pool = AsyncComputeTaskPool::get();
         let target_pos = self.target_pos;
         let radius = self.radius;
 
-        let task = thread_pool
-            .spawn(async move { compute_astar_path(&grid, start_pos, target_pos, radius) });
+        let task = thread_pool.spawn(async move {
+            compute_astar_path(&grid, start_pos, target_pos, radius, &map_data)
+        });
 
         // ВАЖНО: Вставляем компонент немедленно через World, а не через очередь команд,
         // чтобы избежать Race Condition в FixedUpdate.

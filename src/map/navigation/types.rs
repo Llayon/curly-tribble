@@ -42,6 +42,14 @@ pub fn world_to_grid(pos: Vec3) -> IVec2 {
     IVec2::new(pos.x.round() as i32, pos.z.round() as i32)
 }
 
-pub fn grid_to_world(cell: IVec2) -> Vec3 {
-    Vec3::new(cell.x as f32, AGENT_HEIGHT, cell.y as f32)
+pub fn grid_to_world(cell: IVec2, map: &crate::map::MapData) -> Vec3 {
+    let elevation = map
+        .get_tile(cell.x, cell.y)
+        .map(|t| t.elevation)
+        .unwrap_or(0.0);
+    Vec3::new(
+        cell.x as f32,
+        (elevation * crate::map::MAX_HEIGHT) + AGENT_HEIGHT,
+        cell.y as f32,
+    )
 }
