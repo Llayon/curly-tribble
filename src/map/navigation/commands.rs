@@ -9,12 +9,12 @@ impl Plugin for NavigationCommandsPlugin {
 }
 
 pub trait NavigationCommandsExt {
-    fn move_to(&mut self, entity: Entity, target_pos: Vec3) -> &mut Self;
-    fn interact_with(&mut self, entity: Entity, target_pos: Vec3, radius: f32) -> &mut Self;
+    fn move_to(&mut self, entity: NavEntity, target_pos: Vec3) -> &mut Self;
+    fn interact_with(&mut self, entity: NavEntity, target_pos: Vec3, radius: f32) -> &mut Self;
 }
 
 impl NavigationCommandsExt for Commands<'_, '_> {
-    fn move_to(&mut self, entity: Entity, target_pos: Vec3) -> &mut Self {
+    fn move_to(&mut self, entity: NavEntity, target_pos: Vec3) -> &mut Self {
         self.queue(ComputePathCommand {
             agent: entity,
             target_pos,
@@ -23,7 +23,7 @@ impl NavigationCommandsExt for Commands<'_, '_> {
         self
     }
 
-    fn interact_with(&mut self, entity: Entity, target_pos: Vec3, radius: f32) -> &mut Self {
+    fn interact_with(&mut self, entity: NavEntity, target_pos: Vec3, radius: f32) -> &mut Self {
         self.queue(ComputePathCommand {
             agent: entity,
             target_pos,
