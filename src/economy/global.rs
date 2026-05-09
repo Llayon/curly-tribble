@@ -83,13 +83,11 @@ impl Command for BuildWardingStone {
 
         if enough_resources {
             if let Some(assets) = world.get_resource::<crate::economy::assets::GameAssets>() {
-                let mesh = assets.stone_mesh.clone();
-                let material = assets.stone_material.clone();
+                let scene = assets.house_scene.clone();
 
                 world.commands().spawn(WardingStoneBundle {
                     stone: WardingStone,
-                    mesh: Mesh3d(mesh),
-                    material: MeshMaterial3d(material),
+                    scene: SceneRoot(scene),
                     transform: Transform::from_translation(self.position),
                     obstacle: NavObstacle::default(),
                 });

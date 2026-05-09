@@ -1,12 +1,15 @@
 use crate::economy::GameAssets;
 use crate::sets::StartupSet;
+use crate::map::zoning::{TerrainType, Tile};
 use bevy::prelude::*;
+use rand::prelude::*;
 
 pub struct ResourcesPlugin;
 
 impl Plugin for ResourcesPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, spawn_bushes.in_set(StartupSet::SpawnEntities));
+        // Запускаем после того, как карта создана
+        app.add_systems(PostStartup, spawn_resources);
     }
 }
 
@@ -18,32 +21,52 @@ pub struct BerryBush {
 #[derive(Bundle)]
 pub struct BerryBushBundle {
     pub bush: BerryBush,
-    pub mesh: Mesh3d,
-    pub material: MeshMaterial3d<StandardMaterial>,
+    pub scene: SceneRoot,
     pub transform: Transform,
     pub obstacle: crate::map::navigation::NavObstacle,
 }
 
-fn spawn_bushes(mut commands: Commands, assets: Res<GameAssets>) {
-    // Рассадим побольше кустов для устойчивого снабжения
-    let bush_positions = [
-        Vec3::new(3.0, 0.4, 2.0),
-        Vec3::new(-4.0, 0.4, -3.0),
-        Vec3::new(2.0, 0.4, -4.0),
-        Vec3::new(-2.0, 0.4, 4.0),
-        Vec3::new(5.0, 0.4, 0.0),
-        Vec3::new(0.0, 0.4, -5.0),
-    ];
+#[derive(Component)]
+pub struct Tree;
 
-    for pos in bush_positions {
-        commands.spawn(BerryBushBundle {
-            bush: BerryBush { food_amount: 10.0 },
-            mesh: Mesh3d(assets.bush_mesh.clone()),
-            material: MeshMaterial3d(assets.bush_material.clone()),
-            transform: Transform::from_translation(pos),
-            obstacle: crate::map::navigation::NavObstacle {
-                cost: crate::map::navigation::COST_BLOCKER,
-            },
-        });
+fn spawn_resources(
+    mut commands: Commands, 
+    assets: Res<GameAssets>,
+    tiles: Query<(&Transform, &Tile)>,
+) {
+    let mut rng = StdRng::seed_from_u64(42);
+
+    for (transform, tile) in &tiles {
+        if tile.terrain != TerrainType::Grass {
+            continue;
+        }
+
+        let spawn_chance = rng.gen_bool(0.1); // 10% шанс на объект
+
+        if spawn_chance {
+            let pos = transform.translation + Vec3::Y * 0.4;
+            
+            if rng.gen_bool(0.3) {
+                // Ягодный куст
+                commands.spawn(BerryBushBundle {
+                    bush: BerryBush { food_amount: 10.0 },
+                    scene: SceneRoot(assets.bush_scene.clone()),
+                    transform: Transform::from_translation(pos),
+                    obstacle: crate::map::navigation::NavObstacle {
+                        cost: crate::map::navigation::COST_BLOCKER,
+                    },
+                });
+            } else {
+                // Просто декоративное дерево
+                commands.spawn((
+                    Tree,
+                    SceneRoot(assets.tree_scene.clone()),
+                    Transform::from_translation(pos),
+                    crate::map::navigation::NavObstacle {
+                        cost: crate::map::navigation::COST_BLOCKER,
+                    },
+                ));
+            }
+        }
     }
 }

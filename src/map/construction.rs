@@ -11,8 +11,7 @@ pub struct WardingStone;
 #[derive(Bundle, Default)]
 pub struct WardingStoneBundle {
     pub stone: WardingStone,
-    pub mesh: Mesh3d,
-    pub material: MeshMaterial3d<StandardMaterial>,
+    pub scene: SceneRoot,
     pub transform: Transform,
     pub obstacle: NavObstacle,
 }

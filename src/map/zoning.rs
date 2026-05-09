@@ -8,8 +8,17 @@ pub enum ZoneType {
     Housing,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerrainType {
+    Grass,
+    Mud,
+    Water,
+}
+
 #[derive(Component)]
-pub struct Tile;
+pub struct Tile {
+    pub terrain: TerrainType,
+}
 
 #[derive(Component)]
 #[allow(dead_code)]
