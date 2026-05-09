@@ -1,5 +1,4 @@
 use crate::economy::GameAssets;
-use crate::sets::StartupSet;
 use crate::map::zoning::{TerrainType, Tile};
 use bevy::prelude::*;
 use rand::prelude::*;
@@ -29,8 +28,16 @@ pub struct BerryBushBundle {
 #[derive(Component)]
 pub struct Tree;
 
+#[derive(Bundle)]
+pub struct TreeBundle {
+    pub tree: Tree,
+    pub scene: SceneRoot,
+    pub transform: Transform,
+    pub obstacle: crate::map::navigation::NavObstacle,
+}
+
 fn spawn_resources(
-    mut commands: Commands, 
+    mut commands: Commands,
     assets: Res<GameAssets>,
     tiles: Query<(&Transform, &Tile)>,
 ) {
@@ -45,7 +52,7 @@ fn spawn_resources(
 
         if spawn_chance {
             let pos = transform.translation + Vec3::Y * 0.4;
-            
+
             if rng.gen_bool(0.3) {
                 // Ягодный куст
                 commands.spawn(BerryBushBundle {
@@ -58,14 +65,14 @@ fn spawn_resources(
                 });
             } else {
                 // Просто декоративное дерево
-                commands.spawn((
-                    Tree,
-                    SceneRoot(assets.tree_scene.clone()),
-                    Transform::from_translation(pos),
-                    crate::map::navigation::NavObstacle {
+                commands.spawn(TreeBundle {
+                    tree: Tree,
+                    scene: SceneRoot(assets.tree_scene.clone()),
+                    transform: Transform::from_translation(pos),
+                    obstacle: crate::map::navigation::NavObstacle {
                         cost: crate::map::navigation::COST_BLOCKER,
                     },
-                ));
+                });
             }
         }
     }

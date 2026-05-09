@@ -1,10 +1,11 @@
 use crate::sets::StartupSet;
 use bevy::prelude::*;
 use construction::ConstructionPlugin;
-use navigation::{NavigationPlugin, NavObstacle};
+use navigation::{NavObstacle, NavigationPlugin};
+use noise::{Fbm, NoiseFn, Perlin};
+use rand::prelude::*;
 use resources::ResourcesPlugin;
 use zoning::{TerrainType, Tile};
-use noise::{NoiseFn, Fbm, Perlin};
 
 pub mod atmosphere;
 pub mod construction;
@@ -17,6 +18,7 @@ pub struct MapPlugin;
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<WorldSeed>()
+            .init_resource::<MapData>()
             .add_plugins((
                 zoning::ZoningPlugin,
                 ResourcesPlugin,
@@ -28,11 +30,46 @@ impl Plugin for MapPlugin {
 }
 
 #[derive(Resource)]
-pub struct WorldSeed(pub u32);
+pub struct WorldSeed(u32);
+
+impl WorldSeed {
+    pub fn new(seed: u32) -> Self {
+        Self(seed)
+    }
+
+    pub fn value(&self) -> u32 {
+        self.0
+    }
+}
 
 impl Default for WorldSeed {
     fn default() -> Self {
         Self(42) // Тот самый сид
+    }
+}
+
+#[derive(Resource, Default)]
+pub struct MapData {
+    pub width: u32,
+    pub height: u32,
+    pub tiles: Vec<crate::map::zoning::TileData>,
+}
+
+impl MapData {
+    pub fn get_tile(&self, x: u32, z: u32) -> Option<&crate::map::zoning::TileData> {
+        if x < self.width && z < self.height {
+            Some(&self.tiles[(z * self.width + x) as usize])
+        } else {
+            None
+        }
+    }
+
+    pub fn get_tile_mut(&mut self, x: u32, z: u32) -> Option<&mut crate::map::zoning::TileData> {
+        if x < self.width && z < self.height {
+            Some(&mut self.tiles[(z * self.width + x) as usize])
+        } else {
+            None
+        }
     }
 }
 
@@ -44,31 +81,81 @@ pub struct MapTileBundle {
     pub tile: Tile,
 }
 
+fn generate_voronoi_heights(width: u32, height: u32, seed: u32) -> Vec<f32> {
+    let mut rng = rand::prelude::StdRng::seed_from_u64(u64::from(seed));
+    let points: Vec<Vec2> = (0..12)
+        .map(|_| {
+            Vec2::new(
+                rng.gen_range(0.0..width as f32),
+                rng.gen_range(0.0..height as f32),
+            )
+        })
+        .collect();
+
+    (0..width * height)
+        .map(|i| {
+            let x = (i % width) as f32;
+            let z = (i / width) as f32;
+            let mut min_dist = f32::MAX;
+            for p in &points {
+                min_dist = min_dist.min(p.distance(Vec2::new(x, z)));
+            }
+            // Normalize: min_dist / 10.0 or similar.
+            // Using 10.0 as a base "radius" for features.
+            (min_dist / 10.0).min(1.0)
+        })
+        .collect()
+}
+
 fn spawn_map(
-    mut commands: Commands, 
+    mut commands: Commands,
     assets: Res<crate::economy::GameAssets>,
     seed: Res<WorldSeed>,
+    mut map_data: ResMut<MapData>,
 ) {
-    let fbm = Fbm::<Perlin>::new(seed.0);
-    
-    // Увеличим карту до 20x20 для интереса
-    for x in -10..10 {
-        for z in -10..10 {
-            // Генерируем значение шума (-1.0 .. 1.0)
-            let val = fbm.get([x as f64 * 0.2, z as f64 * 0.2]);
-            
-            let terrain = if val < -0.3 {
+    let fbm = Fbm::<Perlin>::new(seed.value());
+    let width = 20;
+    let height = 20;
+
+    let voronoi_map = generate_voronoi_heights(width, height, seed.value());
+
+    map_data.width = width;
+    map_data.height = height;
+    map_data.tiles = vec![crate::map::zoning::TileData::default(); (width * height) as usize];
+
+    for x in 0..width {
+        for z in 0..height {
+            let idx = (z * width + x) as usize;
+            let voronoi_val = voronoi_map[idx];
+
+            // Генерируем значение шума (-1.0 .. 1.0) для детализации
+            let noise_val = fbm.get([x as f64 * 0.2, z as f64 * 0.2]) as f32;
+
+            // Combine Voronoi and Noise (hills on top of skeleton)
+            let combined_elevation = (voronoi_val + noise_val * 0.2).clamp(0.0, 1.0);
+
+            let terrain = if combined_elevation < 0.2 {
                 TerrainType::Water
-            } else if val < 0.2 {
-                TerrainType::Grass
-            } else {
+            } else if combined_elevation > 0.8 {
+                TerrainType::Stone
+            } else if combined_elevation < 0.4 {
                 TerrainType::Mud
+            } else {
+                TerrainType::Grass
             };
+
+            // Update MapData
+            if let Some(tile_data) = map_data.get_tile_mut(x, z) {
+                tile_data.terrain = terrain;
+                tile_data.elevation = combined_elevation;
+            }
 
             let material = match terrain {
                 TerrainType::Grass => assets.ground_material.clone(),
                 TerrainType::Mud => assets.mud_material.clone(),
                 TerrainType::Water => assets.water_material.clone(),
+                TerrainType::Stone => assets.stone_material.clone(),
+                TerrainType::Sand | TerrainType::CaveFloor => assets.ground_material.clone(),
             };
 
             let mut entity = commands.spawn(MapTileBundle {
@@ -86,7 +173,10 @@ fn spawn_map(
                 TerrainType::Mud => {
                     entity.insert(NavObstacle { cost: 50 }); // Замедление
                 }
-                TerrainType::Grass => {} // Базовая стоимость 20
+                TerrainType::Stone => {
+                    entity.insert(NavObstacle { cost: 80 }); // Труднопроходимо
+                }
+                TerrainType::Grass | TerrainType::Sand | TerrainType::CaveFloor => {} // Базовая стоимость 20
             }
         }
     }

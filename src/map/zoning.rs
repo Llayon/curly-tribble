@@ -8,11 +8,24 @@ pub enum ZoneType {
     Housing,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum TerrainType {
+    #[default]
     Grass,
     Mud,
     Water,
+    Sand,
+    Stone,
+    CaveFloor,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct TileData {
+    pub terrain: TerrainType,
+    pub elevation: f32,
+    pub humidity: f32,
+    pub temperature: f32,
+    pub roofed: bool,
 }
 
 #[derive(Component)]
