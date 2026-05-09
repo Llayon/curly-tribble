@@ -1,0 +1,1 @@
+# Procedural Generation Overhaul Todos`n`n- [x] Task 1: Refactor Map Data Structures`n- [x] Task 2: Implement Voronoi Skeleton (The Bones)`n- [x] Task 3: Implement Whittaker Biomes (The Climate)`n- [x] Task 4: Cave Stamp System & Seamless Cutaway`n- [x] Task 5: Resource Scattering (Smart Placement)

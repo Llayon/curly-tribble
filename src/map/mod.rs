@@ -203,12 +203,12 @@ fn spawn_map(
             }
 
             if tile_data.roofed {
-                commands.spawn((
-                    Mesh3d(assets.ground_mesh.clone()),
-                    MeshMaterial3d(assets.stone_material.clone()),
-                    Transform::from_xyz(x as f32, 1.0, z as f32),
-                    zoning::Roof,
-                ));
+                commands.spawn(zoning::RoofBundle {
+                    mesh: Mesh3d(assets.ground_mesh.clone()),
+                    material: MeshMaterial3d(assets.stone_material.clone()),
+                    transform: Transform::from_xyz(x as f32, 1.0, z as f32),
+                    roof: zoning::Roof,
+                });
             }
         }
     }
