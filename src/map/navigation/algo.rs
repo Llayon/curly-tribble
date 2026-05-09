@@ -27,6 +27,7 @@ pub fn compute_astar_path(
     let result = astar(
         &start_cell,
         |&p| {
+            // ... (rest of successors function)
             let neighbors = [
                 IVec2::new(p.x + 1, p.y),
                 IVec2::new(p.x - 1, p.y),

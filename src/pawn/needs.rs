@@ -12,16 +12,15 @@ impl Plugin for NeedsPlugin {
     }
 }
 
-fn update_hunger(time: Res<Time<Fixed>>, mut query: Query<&mut Hunger, With<Settler>>) {
+fn update_hunger(time: Res<Time<Fixed>>, mut query: Query<(Entity, &mut Hunger), With<Settler>>) {
     // В FixedUpdate используем Time<Fixed> для абсолютной точности
-    for mut hunger in &mut query {
+    for (_entity, mut hunger) in &mut query {
         hunger.increase(1.0 * time.delta_secs());
     }
 }
 
 fn manage_hungry_marker(
     mut commands: Commands,
-    // Проверяем только тех, чей уровень голода изменился
     query: Query<(Entity, &Hunger), (Without<Hungry>, Changed<Hunger>)>,
     hungry_query: Query<(Entity, &Hunger), (With<Hungry>, Changed<Hunger>)>,
 ) {

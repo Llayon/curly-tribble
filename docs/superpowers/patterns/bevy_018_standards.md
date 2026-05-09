@@ -21,3 +21,7 @@
 ## Global Orchestration (System Sets)
 - **Rule**: Every system must belong to a `GameSet` (Update/FixedUpdate) or `StartupSet`.
 - **Shield**: Use `GameSet::Logic.run_if(in_state(GameState::Playing))` for centralized state control.
+
+## Command Application (Race Conditions)
+- **Rule**: Bevy `Commands` are not applied immediately within chained systems. When a custom `Command`'s `apply` method runs, any further `world.commands()` queued inside it will suffer a 1-tick delay.
+- **Pattern**: When implementing `Command::apply(self, world: &mut World)`, use `world.get_entity_mut()` or `world.get_resource_mut()` to insert components or mutate resources *immediately*. This prevents race conditions where subsequent chained systems fail their query filters (e.g. `Without<ComputingPath>`).

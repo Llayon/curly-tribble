@@ -95,7 +95,6 @@ impl Hunger {
     pub fn increase(&mut self, amount: f32) {
         self.0 = (self.0 + amount).min(100.0);
     }
-    #[allow(dead_code)]
     pub fn satisfy(&mut self, amount: f32) {
         self.0 = (self.0 - amount).max(0.0);
     }

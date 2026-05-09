@@ -25,11 +25,14 @@ pub struct BerryBushBundle {
 }
 
 fn spawn_bushes(mut commands: Commands, assets: Res<GameAssets>) {
-    // Рассадим несколько таинственных кустов вокруг берега
+    // Рассадим побольше кустов для устойчивого снабжения
     let bush_positions = [
         Vec3::new(3.0, 0.4, 2.0),
         Vec3::new(-4.0, 0.4, -3.0),
         Vec3::new(2.0, 0.4, -4.0),
+        Vec3::new(-2.0, 0.4, 4.0),
+        Vec3::new(5.0, 0.4, 0.0),
+        Vec3::new(0.0, 0.4, -5.0),
     ];
 
     for pos in bush_positions {

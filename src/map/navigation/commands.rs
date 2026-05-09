@@ -71,9 +71,10 @@ impl Command for ComputePathCommand {
         let task = thread_pool
             .spawn(async move { compute_astar_path(&grid, start_pos, target_pos, radius) });
 
-        world
-            .commands()
-            .entity(self.agent)
-            .insert(ComputingPath(task));
+        // ВАЖНО: Вставляем компонент немедленно через World, а не через очередь команд,
+        // чтобы избежать Race Condition в FixedUpdate.
+        if let Ok(mut entity) = world.get_entity_mut(self.agent) {
+            entity.insert(ComputingPath(task));
+        }
     }
 }

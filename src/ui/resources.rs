@@ -23,7 +23,7 @@ pub fn update_resource_ui(
     mut query: Query<&mut Text, With<ResourceText>>,
 ) {
     if let Some(mut text) = query.iter_mut().next() {
-        text.0 = format!("Resources: {:.0}", resources.food);
+        text.0 = format!("Resources: {:.1}", resources.food);
     }
 }
 

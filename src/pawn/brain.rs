@@ -12,52 +12,61 @@ pub struct BrainPlugin;
 
 impl Plugin for BrainPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins(NavigationCommandsPlugin).add_systems(
+        app.add_systems(
             FixedUpdate,
-            (think, find_resources, collect_berries, decide_construction)
+            (
+                think,
+                find_resources,
+                collect_berries,
+                eat_from_stockpile,
+                decide_construction,
+            )
                 .chain()
                 .in_set(GameSet::Logic),
         );
     }
 }
 
-// Заглушка для плагина команд, если он нужен в Brain
-pub struct NavigationCommandsPlugin;
-impl Plugin for NavigationCommandsPlugin {
-    fn build(&self, _app: &mut App) {}
-}
-
-fn think(query: Query<&Hunger, (With<Settler>, With<Hungry>, With<Idle>, Changed<Hunger>)>) {
-    for hunger in &query {
-        if hunger.value() > 50.0 {
-            // Реакция на голод
-        }
+fn think(
+    query: Query<(Entity, &Hunger), (With<Settler>, With<Hungry>, With<Idle>, Changed<Hunger>)>,
+) {
+    for (_entity, _hunger) in &query {
+        // Здесь можно добавить сложную логику выбора целей
     }
 }
 
 fn find_resources(
     mut commands: Commands,
     idlers: Query<
-        Entity,
+        (Entity, &Hunger),
         (
             With<Settler>,
-            Added<Idle>,
+            With<Idle>,
             Without<Targeting>,
             Without<ComputingPath>,
         ),
     >,
     bushes: Query<(Entity, &Transform), With<BerryBush>>,
+    resources: Res<GlobalResources>,
 ) {
-    for settler in &idlers {
+    for (settler, hunger) in &idlers {
+        // Поселенец идет за едой если:
+        // 1. Он голоден (>10%)
+        // 2. В колонии мало еды (<200)
+        let colony_needs_food = resources.food < 200.0;
+        let is_hungry = hunger.value() > 10.0;
+
+        if !is_hungry && !colony_needs_food {
+            continue;
+        }
+
         if let Some((bush_entity, bush_transform)) = bushes.iter().next() {
-            // Устанавливаем цель
-            commands.entity(settler).insert(Targeting(bush_entity));
-
-            // ПРИКАЗ: Иди к кусту, но остановись в радиусе 1.0м
-            commands.interact_with(settler, bush_transform.translation, 1.0);
-
-            // Переключаемся в Gathering
+            // ВАЖНО: Сначала переключаем поведение, т.к. switch_behavior очищает Targeting
             commands.entity(settler).switch_behavior::<Gathering>();
+
+            // Затем устанавливаем цель и приказ на перемещение (подходим на 1.1м для сетки 1х1)
+            commands.entity(settler).insert(Targeting(bush_entity));
+            commands.interact_with(settler, bush_transform.translation, 1.1);
         }
     }
 }
@@ -75,27 +84,30 @@ fn collect_berries(
     >,
     mut bushes: Query<(&mut BerryBush, &Transform), With<BerryBush>>,
     time: Res<Time<Fixed>>,
+    _resources: Res<GlobalResources>,
 ) {
     for (entity, mut hunger, target, settler_transform) in &mut settlers {
         if let Ok((mut bush, bush_transform)) = bushes.get_mut(target.0) {
-            // Проверяем дистанцию (реалистичность)
             let dist = settler_transform
                 .translation
                 .distance(bush_transform.translation);
-            if dist < 1.2 {
-                // В РАДИУСЕ СБОРА
-                let amount = 2.0 * time.delta_secs();
-                bush.food_amount -= amount;
-                hunger.satisfy(amount * 5.0);
-                commands.add_food(amount);
 
-                if bush.food_amount <= 0.0 {
-                    commands.entity(target.0).despawn();
-                    commands.entity(entity).switch_behavior::<Idle>();
+            // Увеличиваем зону сбора до 1.5м (было 1.2м)
+            if dist < 1.5 {
+                let amount = 5.0 * time.delta_secs();
+                if amount > 0.0 {
+                    bush.food_amount -= amount;
+                    hunger.satisfy(amount * 10.0);
+                    commands.add_food(amount);
+
+                    if bush.food_amount <= 0.0 {
+                        commands.entity(target.0).despawn();
+                        commands.entity(entity).switch_behavior::<Idle>();
+                    }
                 }
             } else {
-                // ПОТЕРЯЛИСЬ ИЛИ ПУТЬ ПЕРЕГОРОЖЕН: запрашиваем путь снова
-                commands.interact_with(entity, bush_transform.translation, 1.0);
+                // Если мы слишком далеко, запрашиваем путь снова (подходим на 1.1м)
+                commands.interact_with(entity, bush_transform.translation, 1.1);
             }
         } else {
             commands.entity(entity).switch_behavior::<Idle>();
@@ -103,17 +115,43 @@ fn collect_berries(
     }
 }
 
+fn eat_from_stockpile(
+    mut query: Query<(Entity, &mut Hunger), (With<Settler>, With<Hungry>, With<Idle>)>,
+    mut resources: ResMut<GlobalResources>,
+    time: Res<Time<Fixed>>,
+) {
+    for (_entity, mut hunger) in &mut query {
+        if resources.food > 0.1 {
+            // Поедаем медленнее (1.0 ед/сек вместо 10.0)
+            let amount = 1.0 * time.delta_secs();
+            let consumed = amount.min(resources.food);
+
+            if consumed > 0.0 {
+                resources.food -= consumed;
+                hunger.satisfy(consumed * 50.0); // Еда со склада ОЧЕНЬ сытная
+            }
+        }
+    }
+}
 fn decide_construction(
     mut commands: Commands,
     resources: Res<GlobalResources>,
     idlers: Query<Entity, (With<Settler>, With<Idle>)>,
+    time: Res<Time>,
+    mut cooldown: Local<f32>,
 ) {
-    if resources.food > 15.0 {
+    // Уменьшаем кулдаун
+    if *cooldown > 0.0 {
+        *cooldown -= time.delta_secs();
+        return;
+    }
+
+    // Повышаем порог строительства и добавляем кулдаун
+    if resources.food > 100.0 {
         if let Some(_settler) = idlers.iter().next() {
-            // Строим в случайном месте неподалеку
-            let pos = Vec3::new(3.0, 0.0, 3.0);
+            let pos = Vec3::new(5.0, 0.0, 5.0);
             commands.build_warding_stone(pos);
-            // Чтобы не строить каждый кадр, можно добавить таймер или сбросить еду
+            *cooldown = 10.0; // Строим не чаще чем раз в 10 секунд
         }
     }
 }
