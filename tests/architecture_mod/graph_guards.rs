@@ -19,8 +19,11 @@ fn check_entity_refs_recursive(dir: &Path) {
         } else if path.extension().map_or(false, |ext| ext == "rs") {
             let path_str = path.to_str().unwrap();
 
-            // Исключения: Файлы определений отношений и мета-файлы
-            if path_str.contains("relations.rs") || path_str.contains("main.rs") {
+            // Исключения: Файлы определений отношений, команд и мета-файлы
+            if path_str.contains("relations.rs")
+                || path_str.contains("commands.rs")
+                || path_str.contains("main.rs")
+            {
                 continue;
             }
 
