@@ -141,11 +141,8 @@ fn spawn_starting_settler(
 ) {
     let spawn_x = 0;
     let spawn_z = 0;
-    let elevation = map_data
-        .get_tile(spawn_x, spawn_z)
-        .map(|t| t.elevation)
-        .unwrap_or(0.0);
-    let spawn_y = elevation * crate::map::zoning::MAX_HEIGHT + 0.5;
+    let elevation = map_data.get_corner_height(spawn_x, spawn_z);
+    let spawn_y = elevation + 0.5;
 
     let mut settler = commands.spawn(SettlerBundle {
         settler: Settler,

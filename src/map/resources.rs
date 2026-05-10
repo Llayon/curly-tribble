@@ -65,7 +65,7 @@ fn spawn_resources(
                 None => continue,
             };
 
-            let elevation = tile.elevation * crate::map::zoning::MAX_HEIGHT;
+            let elevation = map_data.get_corner_height(x, z);
             let pos = Vec3::new(x as f32, elevation, z as f32);
 
             match tile.terrain {

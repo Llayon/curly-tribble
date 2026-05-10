@@ -31,8 +31,14 @@ impl Plugin for UiPlugin {
 
 fn setup_ui(mut commands: Commands) {
     // 0. Explicit 2D Camera for UI.
-    // Camera2d automatically adds the core Camera component with the correct render graph.
-    commands.spawn(Camera2d);
+    // Camera2d automatically adds the core Camera component, but we add it manually to set the order.
+    commands.spawn((
+        Camera2d,
+        Camera {
+            order: 1, // UI рисуется поверх 3D мира (order 0)
+            ..default()
+        },
+    ));
 
     // 1. Top-left: Global Resources
     let mut resources_node = commands.spawn((

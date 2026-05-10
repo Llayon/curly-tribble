@@ -1,10 +1,11 @@
 use crate::game_state::GameState;
 use crate::sets::{GameSet, StartupSet};
+use bevy::anti_alias::taa::TemporalAntiAliasPlugin;
 use bevy::anti_alias::taa::TemporalAntiAliasing;
-use bevy::post_process::bloom::Bloom;
 use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::pbr::ScreenSpaceAmbientOcclusion;
+use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::render::view::Hdr;
 
@@ -12,6 +13,13 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
+        // Добавляем плагин TAA, так как он не входит в DefaultPlugins
+        // Мы используем wrap для предотвращения двойной регистрации в будущем,
+        // но здесь мы точно знаем, что он нам нужен один раз.
+        if !app.is_plugin_added::<TemporalAntiAliasPlugin>() {
+            app.add_plugins(TemporalAntiAliasPlugin);
+        }
+
         app.register_type::<CameraFocus>()
             .register_type::<CameraConfig>()
             .add_systems(Startup, setup_camera.in_set(StartupSet::SpawnEntities))
@@ -47,11 +55,10 @@ impl Default for CameraConfig {
 }
 
 /// Бандл для камеры.
-/// ВАЖНО: Мы убрали Camera (core), так как Camera3d автоматически добавит её с нужным RenderGraph.
-/// Если добавить Camera вручную без указания графа, Bevy 0.18.1 выдаст предупреждение и ничего не отрисует.
 #[derive(Bundle)]
 pub struct OrbitCameraBundle {
     pub camera_3d: Camera3d,
+    pub camera: Camera, // Добавляем явно, чтобы задать порядок
     pub transform: Transform,
     pub focus: CameraFocus,
     pub config: CameraConfig,
@@ -69,13 +76,17 @@ pub struct OrbitCameraBundle {
 fn setup_camera(mut commands: Commands) {
     commands.spawn(OrbitCameraBundle {
         camera_3d: Camera3d::default(),
+        camera: Camera {
+            order: 0, // 3D мир рисуется первым
+            ..default()
+        },
         transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
         focus: CameraFocus(Vec3::ZERO),
         config: CameraConfig::default(),
         tonemapping: Tonemapping::TonyMcMapface,
         bloom: Bloom::NATURAL,
         hdr: Hdr,
-        msaa: Msaa::Off, // Отключаем для корректной работы SSAO и TAA
+        msaa: Msaa::Off,
         depth_prepass: DepthPrepass,
         normal_prepass: NormalPrepass,
         motion_vector_prepass: MotionVectorPrepass,
@@ -157,6 +168,7 @@ mod tests {
             .world_mut()
             .spawn(OrbitCameraBundle {
                 camera_3d: Camera3d::default(),
+                camera: Camera::default(),
                 transform: Transform::from_xyz(0.0, 0.0, 0.0),
                 focus: CameraFocus(Vec3::ZERO),
                 config: CameraConfig::default(),
