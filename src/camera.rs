@@ -1,10 +1,12 @@
 use crate::game_state::GameState;
 use crate::sets::{GameSet, StartupSet};
-use bevy::core_pipeline::prepass::{DepthPrepass, NormalPrepass};
+use bevy::anti_alias::taa::TemporalAntiAliasing;
+use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::pbr::ScreenSpaceAmbientOcclusion;
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
+use bevy::render::view::Hdr;
 
 pub struct CameraPlugin;
 
@@ -53,25 +55,30 @@ pub struct OrbitCameraBundle {
     pub config: CameraConfig,
     pub tonemapping: Tonemapping,
     pub bloom: Bloom,
+    pub hdr: Hdr,
+    pub msaa: Msaa,
     pub depth_prepass: DepthPrepass,
     pub normal_prepass: NormalPrepass,
+    pub motion_vector_prepass: MotionVectorPrepass,
+    pub taa: TemporalAntiAliasing,
     pub ssao: ScreenSpaceAmbientOcclusion,
 }
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn(OrbitCameraBundle {
-        camera_core: Camera {
-            order: 0,
-            ..default()
-        },
+        camera_core: Camera::default(),
         camera_3d: Camera3d::default(),
         transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
         focus: CameraFocus(Vec3::ZERO),
         config: CameraConfig::default(),
         tonemapping: Tonemapping::TonyMcMapface,
         bloom: Bloom::NATURAL,
+        hdr: Hdr,
+        msaa: Msaa::Off, // Disable MSAA for SSAO/TAA compatibility
         depth_prepass: DepthPrepass,
         normal_prepass: NormalPrepass,
+        motion_vector_prepass: MotionVectorPrepass,
+        taa: TemporalAntiAliasing::default(),
         ssao: ScreenSpaceAmbientOcclusion::default(),
     });
 }
@@ -99,8 +106,6 @@ fn move_camera(
     for event in mouse_wheel.read() {
         config.distance -= event.y * 2.0;
         config.distance = config.distance.clamp(5.0, 40.0);
-        // Adjust pitch based on zoom (higher zoom = steeper angle)
-        // config.pitch: 0.5 (near) to 1.2 (far)
         config.pitch = (config.distance / 40.0 * 0.7 + 0.5).clamp(0.5, 1.2);
     }
 
@@ -108,9 +113,8 @@ fn move_camera(
     let move_speed = 15.0;
     let mut move_dir = Vec3::ZERO;
 
-    // Calculate forward/right based on azimuth
     let forward = Vec3::new(config.azimuth.sin(), 0.0, config.azimuth.cos()).normalize_or_zero();
-    let right = Vec3::new(forward.z, 0.0, -forward.x); // Perpendicular
+    let right = Vec3::new(forward.z, 0.0, -forward.x);
 
     if keyboard.pressed(KeyCode::KeyW) {
         move_dir -= forward;
@@ -158,17 +162,19 @@ mod tests {
                 config: CameraConfig::default(),
                 tonemapping: Tonemapping::None,
                 bloom: Bloom::default(),
+                hdr: Hdr,
+                msaa: Msaa::Off,
                 depth_prepass: DepthPrepass,
                 normal_prepass: NormalPrepass,
+                motion_vector_prepass: MotionVectorPrepass,
+                taa: TemporalAntiAliasing::default(),
                 ssao: ScreenSpaceAmbientOcclusion::default(),
             })
             .id();
 
-        // Mock pressing W
         let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
         input.press(KeyCode::KeyW);
 
-        // Mock time delta
         let mut time = app.world_mut().resource_mut::<Time<Real>>();
         time.advance_by(std::time::Duration::from_secs_f32(0.1));
 
@@ -176,8 +182,6 @@ mod tests {
         app.update();
 
         let focus = app.world().get::<CameraFocus>(entity).unwrap();
-        // move_speed is 15.0, time is 0.1, direction is -forward (0,0,1)
-        // focus.0.z should be -1.5
         assert!((focus.0.z - (-1.5)).abs() < 0.001);
     }
 }
