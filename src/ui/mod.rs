@@ -24,16 +24,15 @@ impl Plugin for UiPlugin {
                         .run_if(resource_changed::<GlobalResources>)
                         .in_set(GameSet::Visuals),
                     details::update_settler_detail_ui.in_set(GameSet::Visuals),
-                    set_ui_camera_order,
                 ),
             );
     }
 }
 
 fn setup_ui(mut commands: Commands) {
-    // 0. Explicit 2D Camera for UI.
-    // Camera2d automatically adds the core Camera component with the correct render graph.
-    commands.spawn(Camera2d);
+    // В Bevy 0.18.1 отдельная Camera2d для UI не нужна!
+    // UI автоматически отрисовывается поверх основной 3D камеры.
+    // Удаление Camera2d предотвращает "Double Camera Trap" (затирание 3D мира серым фоном).
 
     // 1. Top-left: Global Resources
     let mut resources_node = commands.spawn((
@@ -72,35 +71,26 @@ fn setup_ui(mut commands: Commands) {
     logs::setup_log_ui(&mut log_node);
 }
 
-/// Система для установки порядка отрисовки UI камеры.
-/// Мы делаем это здесь, чтобы не перезаписывать настройки Camera2d при спавне.
-fn set_ui_camera_order(mut query: Query<&mut Camera, Added<Camera2d>>) {
-    for mut camera in &mut query {
-        camera.order = 1;
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_ui_spawns_camera2d() {
+    fn test_ui_exists() {
         let mut app = App::new();
         app.init_resource::<GlobalResources>();
         app.add_message::<crate::events::GameLogMessage>();
         app.add_plugins(UiPlugin);
 
-        // Run the app's startup systems
         app.finish();
         app.cleanup();
         app.update();
 
-        let mut query = app.world_mut().query::<&Camera2d>();
-        assert_eq!(
-            query.iter(app.world()).count(),
-            1,
-            "UI should spawn exactly one Camera2d for rendering"
+        // Проверяем, что узлы интерфейса созданы (ищем по фоновому цвету или нодам)
+        let mut query = app.world_mut().query::<&Node>();
+        assert!(
+            query.iter(app.world()).count() > 0,
+            "UI Nodes should be spawned"
         );
     }
 }
