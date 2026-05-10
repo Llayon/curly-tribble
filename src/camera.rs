@@ -39,8 +39,8 @@ pub struct CameraFocus(pub Vec3);
 #[reflect(Component)]
 pub struct CameraConfig {
     pub distance: f32,
-    pub azimuth: f32,
-    pub pitch: f32,
+    pub azimuth: f32, // Rotation around Y
+    pub pitch: f32,   // Tilt angle
 }
 
 impl Default for CameraConfig {
@@ -48,31 +48,31 @@ impl Default for CameraConfig {
         Self {
             distance: 15.0,
             azimuth: 0.0,
-            pitch: 0.8,
+            pitch: 0.8, // Radian (~45 deg)
         }
     }
 }
 
 fn setup_camera(mut commands: Commands) {
-    // В Bevy 0.18.1 мы явно связываем камеру с 3D пайплайном через CameraRenderGraph.
-    // Это обходит проблемы с автоматической инициализацией в сложных бандлах.
-    commands
-        .spawn((Camera3d::default(), CameraRenderGraph::new(Core3d)))
-        .insert((
-            Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
-            CameraFocus(Vec3::ZERO),
-            CameraConfig::default(),
-            Tonemapping::TonyMcMapface,
-            Bloom::NATURAL,
-            Hdr,
-            Msaa::Off,
-            DepthPrepass,
-            NormalPrepass,
-            MotionVectorPrepass,
-            TemporalAntiAliasing::default(),
-            ScreenSpaceAmbientOcclusion::default(),
-            Name::new("Main Camera"),
-        ));
+    // В Bevy 0.18.1 мы используем максимально явную инициализацию,
+    // чтобы гарантировать привязку RenderGraph.
+    commands.spawn((
+        Camera3d::default(),
+        CameraRenderGraph::new(Core3d),
+        Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+        CameraFocus(Vec3::ZERO),
+        CameraConfig::default(),
+        Tonemapping::TonyMcMapface,
+        Bloom::NATURAL,
+        Hdr,
+        Msaa::Off,
+        DepthPrepass,
+        NormalPrepass,
+        MotionVectorPrepass,
+        TemporalAntiAliasing::default(),
+        ScreenSpaceAmbientOcclusion::default(),
+        Name::new("Main Camera"),
+    ));
 }
 
 fn move_camera(
@@ -85,6 +85,7 @@ fn move_camera(
         return;
     };
 
+    // 1. Rotation (Q/E)
     let rot_speed = 2.0;
     if keyboard.pressed(KeyCode::KeyQ) {
         config.azimuth += rot_speed * time.delta_secs();
@@ -93,12 +94,14 @@ fn move_camera(
         config.azimuth -= rot_speed * time.delta_secs();
     }
 
+    // 2. Zoom (Mouse Wheel)
     for event in mouse_wheel.read() {
         config.distance -= event.y * 2.0;
         config.distance = config.distance.clamp(5.0, 40.0);
         config.pitch = (config.distance / 40.0 * 0.7 + 0.5).clamp(0.5, 1.2);
     }
 
+    // 3. Movement (WASD) - Relative to camera rotation
     let move_speed = 15.0;
     let mut move_dir = Vec3::ZERO;
 
@@ -120,6 +123,7 @@ fn move_camera(
 
     focus.0 += move_dir.normalize_or_zero() * move_speed * time.delta_secs();
 
+    // 4. Update Transform (Orbit math)
     let x = config.distance * config.azimuth.sin() * config.pitch.cos();
     let y = config.distance * config.pitch.sin();
     let z = config.distance * config.azimuth.cos() * config.pitch.cos();
@@ -142,8 +146,9 @@ mod tests {
 
         let entity = app
             .world_mut()
-            .spawn((Camera3d::default(), CameraRenderGraph::new(Core3d)))
-            .insert((
+            .spawn((
+                Camera3d::default(),
+                CameraRenderGraph::new(Core3d),
                 Transform::from_xyz(0.0, 0.0, 0.0),
                 CameraFocus(Vec3::ZERO),
                 CameraConfig::default(),
