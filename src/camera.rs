@@ -47,7 +47,8 @@ impl Default for CameraConfig {
 }
 
 /// Бандл для камеры.
-/// Мы убрали Camera (core), так как Camera3d автоматически добавит её с нужным RenderGraph.
+/// ВАЖНО: Мы убрали Camera (core), так как Camera3d автоматически добавит её с нужным RenderGraph.
+/// Если добавить Camera вручную без указания графа, Bevy 0.18.1 выдаст предупреждение и ничего не отрисует.
 #[derive(Bundle)]
 pub struct OrbitCameraBundle {
     pub camera_3d: Camera3d,
