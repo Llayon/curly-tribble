@@ -140,6 +140,29 @@ pub struct SmoothTileBundle {
     pub tile: Tile,
 }
 
+#[derive(Bundle)]
+pub struct GlobalTerrainBundle {
+    pub mesh: Mesh3d,
+    pub material: MeshMaterial3d<StandardMaterial>,
+    pub transform: Transform,
+    pub name: Name,
+}
+
+#[derive(Bundle)]
+pub struct WaterBundle {
+    pub mesh: Mesh3d,
+    pub material: MeshMaterial3d<StandardMaterial>,
+    pub transform: Transform,
+    pub name: Name,
+}
+
+#[derive(Bundle)]
+pub struct LogicTileBundle {
+    pub transform: Transform,
+    pub tile: Tile,
+    pub name: Name,
+}
+
 #[derive(Component)]
 #[allow(dead_code)]
 pub struct Zone(pub ZoneType);

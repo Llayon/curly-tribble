@@ -6,7 +6,7 @@ use navigation::NavigationPlugin;
 use noise::{Fbm, NoiseFn, Perlin};
 use rand::prelude::*;
 use resources::ResourcesPlugin;
-use zoning::{MapData, TerrainType, Tile, WorldSeed, MAX_HEIGHT};
+pub use zoning::{MapData, TerrainType, Tile, WorldSeed, MAX_HEIGHT};
 
 pub mod atmosphere;
 pub mod construction;
@@ -126,31 +126,11 @@ fn spawn_map(
             let tile_data = map_data.get_tile(x, z).cloned().unwrap_or_default();
             let terrain = tile_data.terrain;
 
-            let material = match terrain {
-                TerrainType::Grass => assets.ground_material.clone(),
-                TerrainType::Mud => assets.mud_material.clone(),
-                TerrainType::Water => assets.water_material.clone(),
-                TerrainType::Stone => assets.stone_material.clone(),
-                TerrainType::Sand => assets.sand_material.clone(),
-                TerrainType::CaveFloor => assets.ground_material.clone(),
-            };
-
-            let h_nw = map_data.get_corner_height(x, z);
-            let h_ne = map_data.get_corner_height(x + 1, z);
-            let h_sw = map_data.get_corner_height(x, z + 1);
-            let h_se = map_data.get_corner_height(x + 1, z + 1);
-
-            commands.queue(crate::economy::mesh_gen::SpawnSmoothTileCommand {
-                x,
-                z,
-                h_nw,
-                h_ne,
-                h_sw,
-                h_se,
-                offset_y: 0.0,
-                material,
-                terrain,
-                layer: crate::map::zoning::TileLayer::Ground,
+            // Логическая сущность тайла (без меша) для кликов и ИИ
+            commands.spawn(zoning::LogicTileBundle {
+                transform: Transform::from_xyz(x as f32, 0.0, z as f32),
+                tile: Tile { terrain },
+                name: Name::new(format!("Tile {},{}", x, z)),
             });
 
             let mut cost = crate::map::navigation::COST_BASE;
@@ -173,6 +153,11 @@ fn spawn_map(
             nav_map.grid.insert(IVec2::new(x, z), cost);
 
             if tile_data.roofed {
+                let h_nw = map_data.get_corner_height(x, z);
+                let h_ne = map_data.get_corner_height(x + 1, z);
+                let h_sw = map_data.get_corner_height(x, z + 1);
+                let h_se = map_data.get_corner_height(x + 1, z + 1);
+
                 commands.queue(crate::economy::mesh_gen::SpawnSmoothTileCommand {
                     x,
                     z,
@@ -188,6 +173,11 @@ fn spawn_map(
             }
         }
     }
+
+    // Создаем глобальный ландшафт и воду одной командой
+    commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
+        map_data: map_data.clone(),
+    });
 }
 
 fn apply_cave_stamp(map: &mut MapData, x: i32, z: i32) {
