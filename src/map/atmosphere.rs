@@ -1,5 +1,8 @@
 use crate::pawn::{Morale, Settler};
+use crate::sets::StartupSet;
+use bevy::light::{CascadeShadowConfig, CascadeShadowConfigBuilder};
 use bevy::prelude::*;
+use std::f32::consts::PI;
 
 #[derive(Component)]
 pub struct LightSource {
@@ -13,6 +16,15 @@ pub struct Campfire;
 pub struct CampfireBundle {
     pub campfire: Campfire,
     pub transform: Transform,
+}
+
+/// Внутренний бандл для автоматизации света Солнца (чтобы избежать анонимных кортежей)
+#[derive(Bundle)]
+pub struct SunBundle {
+    pub light: DirectionalLight,
+    pub transform: Transform,
+    pub visibility: Visibility,
+    pub shadow_config: CascadeShadowConfig,
 }
 
 /// Внутренний бандл для компонентов, добавляемых хуком Campfire.
@@ -51,7 +63,43 @@ impl Plugin for AtmospherePlugin {
             FixedUpdate,
             (detect_darkness, apply_darkness_effects).in_set(crate::sets::GameSet::Logic),
         );
+
+        app.add_systems(Startup, setup_atmosphere.in_set(StartupSet::SpawnEntities));
     }
+}
+
+fn setup_atmosphere(mut commands: Commands) {
+    // 1. Заполняющий свет (Ambient) - холодный синий оттенок для теней
+    commands.insert_resource(GlobalAmbientLight {
+        color: Color::srgb(0.6, 0.7, 1.0),
+        brightness: 50.0,
+        affects_lightmapped_meshes: true,
+    });
+
+    // 2. Главный свет (Солнце) + CSM
+    commands.spawn(SunBundle {
+        light: DirectionalLight {
+            shadows_enabled: true,
+            illuminance: 3000.0, // Яркость солнца
+            ..default()
+        },
+        transform: Transform {
+            translation: Vec3::new(0.0, 50.0, 0.0),
+            rotation: Quat::from_rotation_x(-PI / 4.0), // Под углом 45 градусов
+            ..default()
+        },
+        visibility: Visibility::default(),
+        // Настройка каскадных теней для больших пространств
+        shadow_config: CascadeShadowConfigBuilder {
+            num_cascades: 4,
+            minimum_distance: 0.1,
+            maximum_distance: 150.0,
+            first_cascade_far_bound: 10.0,
+            overlap_proportion: 0.2,
+            ..default()
+        }
+        .build(),
+    });
 }
 
 fn detect_darkness(

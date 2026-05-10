@@ -1,5 +1,9 @@
 use crate::game_state::GameState;
 use crate::sets::{GameSet, StartupSet};
+use bevy::core_pipeline::prepass::{DepthPrepass, NormalPrepass};
+use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::pbr::ScreenSpaceAmbientOcclusion;
+use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 
 pub struct CameraPlugin;
@@ -47,6 +51,11 @@ pub struct OrbitCameraBundle {
     pub transform: Transform,
     pub focus: CameraFocus,
     pub config: CameraConfig,
+    pub tonemapping: Tonemapping,
+    pub bloom: Bloom,
+    pub depth_prepass: DepthPrepass,
+    pub normal_prepass: NormalPrepass,
+    pub ssao: ScreenSpaceAmbientOcclusion,
 }
 
 fn setup_camera(mut commands: Commands) {
@@ -59,6 +68,11 @@ fn setup_camera(mut commands: Commands) {
         transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
         focus: CameraFocus(Vec3::ZERO),
         config: CameraConfig::default(),
+        tonemapping: Tonemapping::TonyMcMapface,
+        bloom: Bloom::NATURAL,
+        depth_prepass: DepthPrepass,
+        normal_prepass: NormalPrepass,
+        ssao: ScreenSpaceAmbientOcclusion::default(),
     });
 }
 
@@ -142,6 +156,11 @@ mod tests {
                 transform: Transform::from_xyz(0.0, 0.0, 0.0),
                 focus: CameraFocus(Vec3::ZERO),
                 config: CameraConfig::default(),
+                tonemapping: Tonemapping::None,
+                bloom: Bloom::default(),
+                depth_prepass: DepthPrepass,
+                normal_prepass: NormalPrepass,
+                ssao: ScreenSpaceAmbientOcclusion::default(),
             })
             .id();
 

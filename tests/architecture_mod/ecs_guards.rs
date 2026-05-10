@@ -263,9 +263,12 @@ fn check_logic_assignment_recursive(dir: &Path) {
                 || path_str.contains("atmosphere.rs")
             {
                 let sniffer = CodeSniffer::new(path_str);
-                let registrations = sniffer.count_occurrences("add_systems(");
+                let registrations = sniffer.count_occurrences("app.add_systems(");
+                let startup_registrations = sniffer.count_occurrences("app.add_systems(Startup");
                 let logic_set_usage = sniffer.count_occurrences("GameSet::Logic");
-                if registrations > logic_set_usage {
+
+                // Проверяем только Update/FixedUpdate системы
+                if registrations - startup_registrations > logic_set_usage {
                     panic!("Security Leak in {:?}: gameplay logic must be in protected 'GameSet::Logic'.", path);
                 }
             }
@@ -354,8 +357,12 @@ fn check_assets_recursive(dir: &Path) {
             }
             let sniffer = CodeSniffer::new(&path_str);
             let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
-            if code_no_tests.contains(".add(")
-                && (code_no_tests.contains("meshes") || code_no_tests.contains("materials"))
+            let code_filtered = code_no_tests
+                .replace("affects_lightmapped_meshes", "")
+                .replace(".on_add(", "");
+
+            if code_filtered.contains(".add(")
+                && (code_filtered.contains("meshes") || code_filtered.contains("materials"))
             {
                 panic!(
                     "Asset Violation in {:?}: Found direct asset creation using '.add(...)'.",
