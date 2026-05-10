@@ -1,0 +1,1 @@
+# 3D Verticality Todos`n`n- [x] Task 1: Vertical Visuals & Data Sync`n- [x] Task 2: Slope-Aware Navigation`n- [x] Task 2.5: Map Scaling & Polish`n- [x] Task 3: Adaptive Follow-Path

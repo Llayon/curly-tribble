@@ -12,13 +12,15 @@ pub fn poll_path_tasks(
     mut query: Query<(bevy::prelude::Entity, &mut ComputingPath), With<ComputingPath>>,
 ) {
     for (entity, mut task) in &mut query {
-        if let Some(result) = future::block_on(future::poll_once(&mut task.0)) {
-            commands.entity(entity).remove::<ComputingPath>();
-            if let Some(points) = result {
+        if task.0.is_finished() {
+            if let Some(points) = future::block_on(&mut task.0) {
+                commands.entity(entity).remove::<ComputingPath>();
                 commands.entity(entity).insert(Path {
                     points,
                     current_index: 0,
                 });
+            } else {
+                commands.entity(entity).remove::<ComputingPath>();
             }
         }
     }
@@ -50,7 +52,8 @@ pub fn follow_path(
             let grid_pos = world_to_grid(transform.translation);
             if let Some(tile) = map.get_tile(grid_pos.x, grid_pos.y) {
                 let target_y = (tile.elevation * crate::map::MAX_HEIGHT) + AGENT_HEIGHT;
-                transform.translation.y = target_y;
+                let lerp_factor = (10.0 * time.delta_secs()).min(1.0);
+                transform.translation.y += (target_y - transform.translation.y) * lerp_factor;
             }
 
             transform.look_to(move_dir, Vec3::Y);

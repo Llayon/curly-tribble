@@ -4467,6 +4467,7 @@ dependencies = [
  "bevy",
  "bevy_ai_remote",
  "futures-lite",
+ "futures-util",
  "noise",
  "pathfinding",
  "rand 0.8.6",
