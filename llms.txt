@@ -11,6 +11,7 @@
 - [SOP: Zenith Navigator](docs/superpowers/patterns/zenith_navigator.md): Standards for asynchronous, reactive pathfinding.
 - [ADR 0004: Procedural Generation](docs/superpowers/adr/0004-procedural-world-generation.md): Rules for Noise, Global Smooth Meshes, Biome Blending, Water Layer, and Premium PBR Lighting (CSM, SSAO, Bloom).
 - [Plan: Premium PBR Lighting](docs/superpowers/plans/2026-05-09-premium-pbr-lighting.md): Implementation of the 4-layer cinematic lighting system.
+- **Visual Stability**: Resolved "Gray Screen" by consolidating UI and World rendering into a single Camera3d and implementing TAA for SSAO compatibility.
 
 ## Narrative & Design Docs
 - [Dark Narrative Design](docs/superpowers/specs/2026-05-02-the-dark-narrative-design.md): Vision and atmosphere specifications.

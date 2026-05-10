@@ -69,13 +69,6 @@ impl Plugin for AtmospherePlugin {
 }
 
 fn setup_atmosphere(mut commands: Commands) {
-    // 1. Заполняющий свет (Ambient) - холодный синий оттенок для теней
-    commands.insert_resource(GlobalAmbientLight {
-        color: Color::srgb(0.6, 0.7, 1.0),
-        brightness: 50.0,
-        affects_lightmapped_meshes: true,
-    });
-
     // 2. Главный свет (Солнце) + CSM
     commands.spawn(SunBundle {
         light: DirectionalLight {

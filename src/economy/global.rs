@@ -18,10 +18,11 @@ pub struct GlobalResources {
 fn setup_economy(mut commands: Commands, mut resources: ResMut<GlobalResources>) {
     resources.food = 10.0;
 
-    commands.spawn(AmbientLight {
-        color: Color::srgb(0.05, 0.05, 0.1),
-        brightness: 100.0,
-        ..default()
+    // Используем GlobalAmbientLight как ресурс (Bevy 0.18.1)
+    commands.insert_resource(GlobalAmbientLight {
+        color: Color::srgb(0.6, 0.7, 1.0),
+        brightness: 50.0,
+        affects_lightmapped_meshes: true,
     });
 
     // "The Great Campfire"
