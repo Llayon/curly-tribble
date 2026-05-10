@@ -2,11 +2,13 @@ use crate::game_state::GameState;
 use crate::sets::{GameSet, StartupSet};
 use bevy::anti_alias::taa::TemporalAntiAliasPlugin;
 use bevy::anti_alias::taa::TemporalAntiAliasing;
+use bevy::core_pipeline::core_3d::graph::Core3d;
 use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::pbr::ScreenSpaceAmbientOcclusion;
 use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
+use bevy::render::camera::CameraRenderGraph;
 use bevy::render::view::Hdr;
 
 pub struct CameraPlugin;
@@ -52,23 +54,25 @@ impl Default for CameraConfig {
 }
 
 fn setup_camera(mut commands: Commands) {
-    // В Bevy 0.18.1 спавн через кортежи или бандлы может конфликтовать с RequiredComponents.
-    // Самый надежный способ: спавним базу и добавляем настройки цепочкой.
-    commands.spawn(Camera3d::default()).insert((
-        Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
-        CameraFocus(Vec3::ZERO),
-        CameraConfig::default(),
-        Tonemapping::TonyMcMapface,
-        Bloom::NATURAL,
-        Hdr,
-        Msaa::Off,
-        DepthPrepass,
-        NormalPrepass,
-        MotionVectorPrepass,
-        TemporalAntiAliasing::default(),
-        ScreenSpaceAmbientOcclusion::default(),
-        Name::new("Main Camera"),
-    ));
+    // В Bevy 0.18.1 мы явно связываем камеру с 3D пайплайном через CameraRenderGraph.
+    // Это обходит проблемы с автоматической инициализацией в сложных бандлах.
+    commands
+        .spawn((Camera3d::default(), CameraRenderGraph::new(Core3d)))
+        .insert((
+            Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+            CameraFocus(Vec3::ZERO),
+            CameraConfig::default(),
+            Tonemapping::TonyMcMapface,
+            Bloom::NATURAL,
+            Hdr,
+            Msaa::Off,
+            DepthPrepass,
+            NormalPrepass,
+            MotionVectorPrepass,
+            TemporalAntiAliasing::default(),
+            ScreenSpaceAmbientOcclusion::default(),
+            Name::new("Main Camera"),
+        ));
 }
 
 fn move_camera(
@@ -138,7 +142,7 @@ mod tests {
 
         let entity = app
             .world_mut()
-            .spawn(Camera3d::default())
+            .spawn((Camera3d::default(), CameraRenderGraph::new(Core3d)))
             .insert((
                 Transform::from_xyz(0.0, 0.0, 0.0),
                 CameraFocus(Vec3::ZERO),
