@@ -13,9 +13,6 @@ pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        // Добавляем плагин TAA, так как он не входит в DefaultPlugins
-        // Мы используем wrap для предотвращения двойной регистрации в будущем,
-        // но здесь мы точно знаем, что он нам нужен один раз.
         if !app.is_plugin_added::<TemporalAntiAliasPlugin>() {
             app.add_plugins(TemporalAntiAliasPlugin);
         }
@@ -40,8 +37,8 @@ pub struct CameraFocus(pub Vec3);
 #[reflect(Component)]
 pub struct CameraConfig {
     pub distance: f32,
-    pub azimuth: f32, // Rotation around Y
-    pub pitch: f32,   // Tilt angle
+    pub azimuth: f32,
+    pub pitch: f32,
 }
 
 impl Default for CameraConfig {
@@ -49,16 +46,14 @@ impl Default for CameraConfig {
         Self {
             distance: 15.0,
             azimuth: 0.0,
-            pitch: 0.8, // Radian (~45 deg)
+            pitch: 0.8,
         }
     }
 }
 
-/// Бандл для камеры.
+/// Бандл для настроек камеры (без базового Camera и Camera3d)
 #[derive(Bundle)]
-pub struct OrbitCameraBundle {
-    pub camera_3d: Camera3d,
-    pub camera: Camera, // Добавляем явно, чтобы задать порядок
+pub struct OrbitCameraSettingsBundle {
     pub transform: Transform,
     pub focus: CameraFocus,
     pub config: CameraConfig,
@@ -74,25 +69,24 @@ pub struct OrbitCameraBundle {
 }
 
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(OrbitCameraBundle {
-        camera_3d: Camera3d::default(),
-        camera: Camera {
-            order: 0, // 3D мир рисуется первым
-            ..default()
+    // Спавним через кортеж, где Camera3d автоматически добавит правильно настроенный Camera
+    commands.spawn((
+        Camera3d::default(),
+        OrbitCameraSettingsBundle {
+            transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+            focus: CameraFocus(Vec3::ZERO),
+            config: CameraConfig::default(),
+            tonemapping: Tonemapping::TonyMcMapface,
+            bloom: Bloom::NATURAL,
+            hdr: Hdr,
+            msaa: Msaa::Off,
+            depth_prepass: DepthPrepass,
+            normal_prepass: NormalPrepass,
+            motion_vector_prepass: MotionVectorPrepass,
+            taa: TemporalAntiAliasing::default(),
+            ssao: ScreenSpaceAmbientOcclusion::default(),
         },
-        transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
-        focus: CameraFocus(Vec3::ZERO),
-        config: CameraConfig::default(),
-        tonemapping: Tonemapping::TonyMcMapface,
-        bloom: Bloom::NATURAL,
-        hdr: Hdr,
-        msaa: Msaa::Off,
-        depth_prepass: DepthPrepass,
-        normal_prepass: NormalPrepass,
-        motion_vector_prepass: MotionVectorPrepass,
-        taa: TemporalAntiAliasing::default(),
-        ssao: ScreenSpaceAmbientOcclusion::default(),
-    });
+    ));
 }
 
 fn move_camera(
@@ -105,7 +99,6 @@ fn move_camera(
         return;
     };
 
-    // 1. Rotation (Q/E)
     let rot_speed = 2.0;
     if keyboard.pressed(KeyCode::KeyQ) {
         config.azimuth += rot_speed * time.delta_secs();
@@ -114,14 +107,12 @@ fn move_camera(
         config.azimuth -= rot_speed * time.delta_secs();
     }
 
-    // 2. Zoom (Mouse Wheel)
     for event in mouse_wheel.read() {
         config.distance -= event.y * 2.0;
         config.distance = config.distance.clamp(5.0, 40.0);
         config.pitch = (config.distance / 40.0 * 0.7 + 0.5).clamp(0.5, 1.2);
     }
 
-    // 3. Movement (WASD) - Relative to camera rotation
     let move_speed = 15.0;
     let mut move_dir = Vec3::ZERO;
 
@@ -143,7 +134,6 @@ fn move_camera(
 
     focus.0 += move_dir.normalize_or_zero() * move_speed * time.delta_secs();
 
-    // 4. Update Transform (Orbit math)
     let x = config.distance * config.azimuth.sin() * config.pitch.cos();
     let y = config.distance * config.pitch.sin();
     let z = config.distance * config.azimuth.cos() * config.pitch.cos();
@@ -166,22 +156,23 @@ mod tests {
 
         let entity = app
             .world_mut()
-            .spawn(OrbitCameraBundle {
-                camera_3d: Camera3d::default(),
-                camera: Camera::default(),
-                transform: Transform::from_xyz(0.0, 0.0, 0.0),
-                focus: CameraFocus(Vec3::ZERO),
-                config: CameraConfig::default(),
-                tonemapping: Tonemapping::None,
-                bloom: Bloom::default(),
-                hdr: Hdr,
-                msaa: Msaa::Off,
-                depth_prepass: DepthPrepass,
-                normal_prepass: NormalPrepass,
-                motion_vector_prepass: MotionVectorPrepass,
-                taa: TemporalAntiAliasing::default(),
-                ssao: ScreenSpaceAmbientOcclusion::default(),
-            })
+            .spawn((
+                Camera3d::default(),
+                OrbitCameraSettingsBundle {
+                    transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                    focus: CameraFocus(Vec3::ZERO),
+                    config: CameraConfig::default(),
+                    tonemapping: Tonemapping::None,
+                    bloom: Bloom::default(),
+                    hdr: Hdr,
+                    msaa: Msaa::Off,
+                    depth_prepass: DepthPrepass,
+                    normal_prepass: NormalPrepass,
+                    motion_vector_prepass: MotionVectorPrepass,
+                    taa: TemporalAntiAliasing::default(),
+                    ssao: ScreenSpaceAmbientOcclusion::default(),
+                },
+            ))
             .id();
 
         let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();

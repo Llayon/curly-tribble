@@ -24,6 +24,7 @@ impl Plugin for UiPlugin {
                         .run_if(resource_changed::<GlobalResources>)
                         .in_set(GameSet::Visuals),
                     details::update_settler_detail_ui.in_set(GameSet::Visuals),
+                    set_ui_camera_order,
                 ),
             );
     }
@@ -31,14 +32,8 @@ impl Plugin for UiPlugin {
 
 fn setup_ui(mut commands: Commands) {
     // 0. Explicit 2D Camera for UI.
-    // Camera2d automatically adds the core Camera component, but we add it manually to set the order.
-    commands.spawn((
-        Camera2d,
-        Camera {
-            order: 1, // UI рисуется поверх 3D мира (order 0)
-            ..default()
-        },
-    ));
+    // Camera2d automatically adds the core Camera component with the correct render graph.
+    commands.spawn(Camera2d);
 
     // 1. Top-left: Global Resources
     let mut resources_node = commands.spawn((
@@ -75,6 +70,14 @@ fn setup_ui(mut commands: Commands) {
         ..default()
     });
     logs::setup_log_ui(&mut log_node);
+}
+
+/// Система для установки порядка отрисовки UI камеры.
+/// Мы делаем это здесь, чтобы не перезаписывать настройки Camera2d при спавне.
+fn set_ui_camera_order(mut query: Query<&mut Camera, Added<Camera2d>>) {
+    for mut camera in &mut query {
+        camera.order = 1;
+    }
 }
 
 #[cfg(test)]
