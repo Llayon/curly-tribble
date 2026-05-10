@@ -26,6 +26,7 @@ pub struct GameAssets {
     pub bush_material: Handle<StandardMaterial>,
     pub stone_mesh: Handle<Mesh>,
     pub stone_material: Handle<StandardMaterial>,
+    pub mountain_material: Handle<StandardMaterial>,
     // GLTF Scenes from Quaternius
     pub bush_scene: Handle<Scene>,
     pub tree_scene: Handle<Scene>,
@@ -72,6 +73,7 @@ pub fn setup_assets(
             emissive: LinearRgba::from(Color::srgb(0.3, 0.6, 1.0)) * 4.0,
             ..default()
         }),
+        mountain_material: materials.add(Color::srgb(0.15, 0.15, 0.15)), // Темный скалистый камень
         // Загрузка сцен из GLTF
         bush_scene: asset_server.load("models/Resource_Tree2.gltf#Scene0"),
         tree_scene: asset_server.load("models/Resource_Tree1.gltf#Scene0"),

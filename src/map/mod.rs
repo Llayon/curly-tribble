@@ -65,7 +65,7 @@ fn generate_voronoi_heights(width: u32, height: u32, seed: u32) -> Vec<f32> {
 
 fn spawn_map(
     mut commands: Commands,
-    assets: Res<crate::economy::GameAssets>,
+    _assets: Res<crate::economy::GameAssets>,
     seed: Res<WorldSeed>,
     mut map_data: ResMut<MapData>,
     mut nav_map: ResMut<crate::map::navigation::NavigationMap>,
@@ -151,30 +151,10 @@ fn spawn_map(
                 }
             }
             nav_map.grid.insert(IVec2::new(x, z), cost);
-
-            if tile_data.roofed {
-                let h_nw = map_data.get_corner_height(x, z);
-                let h_ne = map_data.get_corner_height(x + 1, z);
-                let h_sw = map_data.get_corner_height(x, z + 1);
-                let h_se = map_data.get_corner_height(x + 1, z + 1);
-
-                commands.queue(crate::economy::mesh_gen::SpawnSmoothTileCommand {
-                    x,
-                    z,
-                    h_nw,
-                    h_ne,
-                    h_sw,
-                    h_se,
-                    offset_y: 1.0,
-                    material: assets.stone_material.clone(),
-                    terrain: TerrainType::Stone,
-                    layer: crate::map::zoning::TileLayer::Roof,
-                });
-            }
         }
     }
 
-    // Создаем глобальный ландшафт и воду одной командой
+    // Создаем глобальный ландшафт, воду и крыши одной командой
     commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
         map_data: map_data.clone(),
     });

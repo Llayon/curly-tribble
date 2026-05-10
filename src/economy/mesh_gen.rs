@@ -15,15 +15,17 @@ pub struct SpawnGlobalTerrainCommand {
 
 impl Command for SpawnGlobalTerrainCommand {
     fn apply(self, world: &mut World) {
-        let (mesh, water_mesh) = create_global_map_meshes(&self.map_data);
+        let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(&self.map_data);
 
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
         let terrain_handle = meshes.add(mesh);
         let water_handle = meshes.add(water_mesh);
+        let roof_handle = meshes.add(roof_mesh);
 
         let assets = world.resource::<crate::economy::GameAssets>();
         let ground_mat = assets.ground_material.clone();
         let water_mat = assets.water_material.clone();
+        let mountain_mat = assets.mountain_material.clone();
 
         // Спавним основной ландшафт
         world.spawn(GlobalTerrainBundle {
@@ -39,6 +41,15 @@ impl Command for SpawnGlobalTerrainCommand {
             material: MeshMaterial3d(water_mat),
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
             name: Name::new("Water Layer"),
+        });
+
+        // Спавним крыши пещер (единым мешем)
+        world.spawn(crate::map::zoning::MountainRoofBundle {
+            mesh: Mesh3d(roof_handle),
+            material: MeshMaterial3d(mountain_mat),
+            transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            roof: Roof,
+            name: Name::new("Global Mountain Roofs"),
         });
     }
 }
@@ -80,13 +91,13 @@ impl Command for SpawnSmoothTileCommand {
     }
 }
 
-pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh) {
+pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
     let width = map.width;
     let height = map.height;
     let half_w = width as i32 / 2;
     let half_h = height as i32 / 2;
 
-    // ВЕРШИНЫ И ЦВЕТА
+    // --- ТЕРРЕЙН (ВЕРШИНЫ И ЦВЕТА) ---
     let mut vertices = Vec::new();
     let mut colors = Vec::new();
 
@@ -108,7 +119,7 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh) {
         }
     }
 
-    // ИНДЕКСЫ
+    // --- ТЕРРЕЙН (ИНДЕКСЫ) ---
     let mut indices = Vec::new();
     let row_size = width + 1;
     for z in 0..height {
@@ -117,18 +128,10 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh) {
             let ne = nw + 1;
             let sw = (z + 1) * row_size + x;
             let se = sw + 1;
-
-            indices.push(nw);
-            indices.push(se);
-            indices.push(ne);
-
-            indices.push(nw);
-            indices.push(sw);
-            indices.push(se);
+            indices.extend_from_slice(&[nw, se, ne, nw, sw, se]);
         }
     }
 
-    // В Bevy 0.18.1 типы меша доступны через модули рендеринга
     use bevy::asset::RenderAssetUsages;
     use bevy::mesh::Indices;
     use bevy::render::render_resource::PrimitiveTopology;
@@ -137,15 +140,15 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh) {
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
     );
-    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone());
     terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     terrain_mesh.insert_indices(Indices::U32(indices));
     terrain_mesh.compute_normals();
 
+    // --- ВОДА ---
     let water_level = 0.2 * crate::map::zoning::MAX_HEIGHT;
     let w_size_x = width as f32;
     let w_size_z = height as f32;
-
     let mut water_mesh = Mesh::from(Plane3d::new(Vec3::Y, Vec2::new(w_size_x, w_size_z)));
     let water_vertices = vec![
         [-w_size_x / 2.0, water_level, -w_size_z / 2.0],
@@ -155,7 +158,40 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh) {
     ];
     water_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, water_vertices);
 
-    (terrain_mesh, water_mesh)
+    // --- КРЫШИ (ROOFS) ---
+    // Используем ту же сетку вершин, но поднимаем их на offset и фильтруем индексы
+    let mut roof_indices = Vec::new();
+    let roof_offset = 1.0;
+    let mut roof_vertices = vertices; // Начинаем с ландшафтных вершин
+    for v in &mut roof_vertices {
+        v[1] += roof_offset; // Поднимаем на метр
+    }
+
+    for z in 0..height {
+        for x in 0..width {
+            let wx = x as i32 - half_w;
+            let wz = z as i32 - half_h;
+            if let Some(tile) = map.get_tile(wx, wz) {
+                if tile.roofed {
+                    let nw = z * row_size + x;
+                    let ne = nw + 1;
+                    let sw = (z + 1) * row_size + x;
+                    let se = sw + 1;
+                    roof_indices.extend_from_slice(&[nw, se, ne, nw, sw, se]);
+                }
+            }
+        }
+    }
+
+    let mut roof_mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
+    roof_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, roof_vertices);
+    roof_mesh.insert_indices(Indices::U32(roof_indices));
+    roof_mesh.compute_normals();
+
+    (terrain_mesh, water_mesh, roof_mesh)
 }
 
 pub fn create_smooth_tile_mesh(h_nw: f32, h_ne: f32, h_sw: f32, h_se: f32) -> Mesh {

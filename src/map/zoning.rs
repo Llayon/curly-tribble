@@ -157,6 +157,15 @@ pub struct WaterBundle {
 }
 
 #[derive(Bundle)]
+pub struct MountainRoofBundle {
+    pub mesh: Mesh3d,
+    pub material: MeshMaterial3d<StandardMaterial>,
+    pub transform: Transform,
+    pub roof: Roof,
+    pub name: Name,
+}
+
+#[derive(Bundle)]
 pub struct LogicTileBundle {
     pub transform: Transform,
     pub tile: Tile,
