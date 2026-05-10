@@ -1,10 +1,10 @@
 use crate::game_state::GameState;
 use crate::sets::{GameSet, StartupSet};
 use bevy::anti_alias::taa::TemporalAntiAliasing;
+use bevy::post_process::bloom::Bloom;
 use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::pbr::ScreenSpaceAmbientOcclusion;
-use bevy::post_process::bloom::Bloom;
 use bevy::prelude::*;
 use bevy::render::view::Hdr;
 
@@ -46,9 +46,10 @@ impl Default for CameraConfig {
     }
 }
 
+/// Бандл для камеры.
+/// Мы убрали Camera (core), так как Camera3d автоматически добавит её с нужным RenderGraph.
 #[derive(Bundle)]
 pub struct OrbitCameraBundle {
-    pub camera_core: Camera,
     pub camera_3d: Camera3d,
     pub transform: Transform,
     pub focus: CameraFocus,
@@ -66,7 +67,6 @@ pub struct OrbitCameraBundle {
 
 fn setup_camera(mut commands: Commands) {
     commands.spawn(OrbitCameraBundle {
-        camera_core: Camera::default(),
         camera_3d: Camera3d::default(),
         transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
         focus: CameraFocus(Vec3::ZERO),
@@ -74,7 +74,7 @@ fn setup_camera(mut commands: Commands) {
         tonemapping: Tonemapping::TonyMcMapface,
         bloom: Bloom::NATURAL,
         hdr: Hdr,
-        msaa: Msaa::Off, // Disable MSAA for SSAO/TAA compatibility
+        msaa: Msaa::Off, // Отключаем для корректной работы SSAO и TAA
         depth_prepass: DepthPrepass,
         normal_prepass: NormalPrepass,
         motion_vector_prepass: MotionVectorPrepass,
@@ -155,7 +155,6 @@ mod tests {
         let entity = app
             .world_mut()
             .spawn(OrbitCameraBundle {
-                camera_core: Camera::default(),
                 camera_3d: Camera3d::default(),
                 transform: Transform::from_xyz(0.0, 0.0, 0.0),
                 focus: CameraFocus(Vec3::ZERO),
