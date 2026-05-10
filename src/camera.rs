@@ -1,22 +1,34 @@
 use crate::game_state::GameState;
 use crate::sets::{GameSet, StartupSet};
+use bevy::anti_alias::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing};
+use bevy::core_pipeline::core_3d::graph::Core3d;
+use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
+use bevy::core_pipeline::tonemapping::Tonemapping;
+use bevy::pbr::ScreenSpaceAmbientOcclusion;
+use bevy::post_process::bloom::{Bloom, BloomPlugin};
 use bevy::prelude::*;
+use bevy::render::camera::CameraRenderGraph;
+use bevy::render::view::Hdr;
 
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
+        if !app.is_plugin_added::<TemporalAntiAliasPlugin>() {
+            app.add_plugins(TemporalAntiAliasPlugin);
+        }
+        if !app.is_plugin_added::<BloomPlugin>() {
+            app.add_plugins(BloomPlugin);
+        }
+
         app.register_type::<CameraFocus>()
             .register_type::<CameraConfig>()
             .add_systems(Startup, setup_camera.in_set(StartupSet::SpawnEntities))
             .add_systems(
                 Update,
-                (
-                    move_camera
-                        .run_if(in_state(GameState::Playing))
-                        .in_set(GameSet::Input),
-                    debug_camera_system,
-                ),
+                move_camera
+                    .run_if(in_state(GameState::Playing))
+                    .in_set(GameSet::Input),
             );
     }
 }
@@ -38,37 +50,50 @@ impl Default for CameraConfig {
         Self {
             distance: 15.0,
             azimuth: 0.0,
-            pitch: 0.8, // Radian (~45 deg)
+            pitch: 0.8,
         }
     }
+}
+
+/// Основной бандл для 3D камеры со всеми премиальными эффектами
+#[derive(Bundle)]
+pub struct MainCameraBundle {
+    pub camera_3d: Camera3d,
+    pub render_graph: CameraRenderGraph,
+    pub transform: Transform,
+    pub focus: CameraFocus,
+    pub config: CameraConfig,
+    pub tonemapping: Tonemapping,
+    pub bloom: Bloom,
+    pub hdr: Hdr,
+    pub msaa: Msaa,
+    pub depth_prepass: DepthPrepass,
+    pub normal_prepass: NormalPrepass,
+    pub motion_vector_prepass: MotionVectorPrepass,
+    pub taa: TemporalAntiAliasing,
+    pub ssao: ScreenSpaceAmbientOcclusion,
+    pub name: Name,
 }
 
 fn setup_camera(mut commands: Commands) {
-    // МИНИМАЛЬНАЯ ИНИЦИАЛИЗАЦИЯ
-    // В Bevy 0.18.1 Camera3d::default() ДОЛЖНА сама добавить Camera и RenderGraph.
-    commands.spawn((
-        Camera3d::default(),
-        Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
-        CameraFocus(Vec3::ZERO),
-        CameraConfig::default(),
-        Name::new("Main Camera"),
-    ));
-}
-
-fn debug_camera_system(
-    query: Query<(
-        Entity,
-        &Camera,
-        Option<&bevy::render::camera::CameraRenderGraph>,
-    )>,
-) {
-    for (entity, _camera, graph) in &query {
-        if let Some(g) = graph {
-            info!("DEBUG: Camera {:?} has render graph: {:?}", entity, g);
-        } else {
-            warn!("DEBUG: Camera {:?} has NO render graph!", entity);
-        }
-    }
+    // В Bevy 0.18.1 используем именованный Bundle для соблюдения архитектурных гвардов.
+    commands.spawn(MainCameraBundle {
+        camera_3d: Camera3d::default(),
+        render_graph: CameraRenderGraph::new(Core3d),
+        transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+        focus: CameraFocus(Vec3::ZERO),
+        config: CameraConfig::default(),
+        tonemapping: Tonemapping::TonyMcMapface,
+        bloom: Bloom::NATURAL,
+        hdr: Hdr,
+        msaa: Msaa::Off,
+        depth_prepass: DepthPrepass,
+        normal_prepass: NormalPrepass,
+        motion_vector_prepass: MotionVectorPrepass,
+        taa: TemporalAntiAliasing::default(),
+        ssao: ScreenSpaceAmbientOcclusion::default(),
+        name: Name::new("Main Camera"),
+    });
 }
 
 fn move_camera(
@@ -126,4 +151,51 @@ fn move_camera(
 
     transform.translation = focus.0 + Vec3::new(x, y, z);
     transform.look_at(focus.0, Vec3::Y);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_camera_panning_w() {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins);
+        app.insert_resource(ButtonInput::<KeyCode>::default());
+        app.insert_resource(Time::<Real>::default());
+        app.add_message::<bevy::input::mouse::MouseWheel>();
+
+        let entity = app
+            .world_mut()
+            .spawn(MainCameraBundle {
+                camera_3d: Camera3d::default(),
+                render_graph: CameraRenderGraph::new(Core3d),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                focus: CameraFocus(Vec3::ZERO),
+                config: CameraConfig::default(),
+                tonemapping: Tonemapping::None,
+                bloom: Bloom::default(),
+                hdr: Hdr,
+                msaa: Msaa::Off,
+                depth_prepass: DepthPrepass,
+                normal_prepass: NormalPrepass,
+                motion_vector_prepass: MotionVectorPrepass,
+                taa: TemporalAntiAliasing::default(),
+                ssao: ScreenSpaceAmbientOcclusion::default(),
+                name: Name::new("Test Camera"),
+            })
+            .id();
+
+        let mut input = app.world_mut().resource_mut::<ButtonInput<KeyCode>>();
+        input.press(KeyCode::KeyW);
+
+        let mut time = app.world_mut().resource_mut::<Time<Real>>();
+        time.advance_by(std::time::Duration::from_secs_f32(0.1));
+
+        app.add_systems(Update, move_camera);
+        app.update();
+
+        let focus = app.world().get::<CameraFocus>(entity).unwrap();
+        assert!((focus.0.z - (-1.5)).abs() < 0.001);
+    }
 }
