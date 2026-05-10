@@ -51,41 +51,23 @@ impl Default for CameraConfig {
     }
 }
 
-/// Бандл для настроек камеры (без базового Camera и Camera3d)
-#[derive(Bundle)]
-pub struct OrbitCameraSettingsBundle {
-    pub transform: Transform,
-    pub focus: CameraFocus,
-    pub config: CameraConfig,
-    pub tonemapping: Tonemapping,
-    pub bloom: Bloom,
-    pub hdr: Hdr,
-    pub msaa: Msaa,
-    pub depth_prepass: DepthPrepass,
-    pub normal_prepass: NormalPrepass,
-    pub motion_vector_prepass: MotionVectorPrepass,
-    pub taa: TemporalAntiAliasing,
-    pub ssao: ScreenSpaceAmbientOcclusion,
-}
-
 fn setup_camera(mut commands: Commands) {
-    // Спавним через кортеж, где Camera3d автоматически добавит правильно настроенный Camera
-    commands.spawn((
-        Camera3d::default(),
-        OrbitCameraSettingsBundle {
-            transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
-            focus: CameraFocus(Vec3::ZERO),
-            config: CameraConfig::default(),
-            tonemapping: Tonemapping::TonyMcMapface,
-            bloom: Bloom::NATURAL,
-            hdr: Hdr,
-            msaa: Msaa::Off,
-            depth_prepass: DepthPrepass,
-            normal_prepass: NormalPrepass,
-            motion_vector_prepass: MotionVectorPrepass,
-            taa: TemporalAntiAliasing::default(),
-            ssao: ScreenSpaceAmbientOcclusion::default(),
-        },
+    // В Bevy 0.18.1 спавн через кортежи или бандлы может конфликтовать с RequiredComponents.
+    // Самый надежный способ: спавним базу и добавляем настройки цепочкой.
+    commands.spawn(Camera3d::default()).insert((
+        Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+        CameraFocus(Vec3::ZERO),
+        CameraConfig::default(),
+        Tonemapping::TonyMcMapface,
+        Bloom::NATURAL,
+        Hdr,
+        Msaa::Off,
+        DepthPrepass,
+        NormalPrepass,
+        MotionVectorPrepass,
+        TemporalAntiAliasing::default(),
+        ScreenSpaceAmbientOcclusion::default(),
+        Name::new("Main Camera"),
     ));
 }
 
@@ -156,22 +138,20 @@ mod tests {
 
         let entity = app
             .world_mut()
-            .spawn((
-                Camera3d::default(),
-                OrbitCameraSettingsBundle {
-                    transform: Transform::from_xyz(0.0, 0.0, 0.0),
-                    focus: CameraFocus(Vec3::ZERO),
-                    config: CameraConfig::default(),
-                    tonemapping: Tonemapping::None,
-                    bloom: Bloom::default(),
-                    hdr: Hdr,
-                    msaa: Msaa::Off,
-                    depth_prepass: DepthPrepass,
-                    normal_prepass: NormalPrepass,
-                    motion_vector_prepass: MotionVectorPrepass,
-                    taa: TemporalAntiAliasing::default(),
-                    ssao: ScreenSpaceAmbientOcclusion::default(),
-                },
+            .spawn(Camera3d::default())
+            .insert((
+                Transform::from_xyz(0.0, 0.0, 0.0),
+                CameraFocus(Vec3::ZERO),
+                CameraConfig::default(),
+                Tonemapping::None,
+                Bloom::default(),
+                Hdr,
+                Msaa::Off,
+                DepthPrepass,
+                NormalPrepass,
+                MotionVectorPrepass,
+                TemporalAntiAliasing::default(),
+                ScreenSpaceAmbientOcclusion::default(),
             ))
             .id();
 
