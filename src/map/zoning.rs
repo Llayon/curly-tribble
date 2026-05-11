@@ -45,9 +45,10 @@ pub struct MapData {
 }
 
 impl MapData {
+    #[must_use]
     pub fn get_tile(&self, x: i32, z: i32) -> Option<&TileData> {
-        let ux = (x + (self.width as i32 / 2)) as u32;
-        let uz = (z + (self.height as i32 / 2)) as u32;
+        let ux = (x + (self.width.cast_signed() / 2)).cast_unsigned();
+        let uz = (z + (self.height.cast_signed() / 2)).cast_unsigned();
         if ux < self.width && uz < self.height {
             Some(&self.tiles[(uz * self.width + ux) as usize])
         } else {
@@ -56,8 +57,8 @@ impl MapData {
     }
 
     pub fn get_tile_mut(&mut self, x: i32, z: i32) -> Option<&mut TileData> {
-        let ux = (x + (self.width as i32 / 2)) as u32;
-        let uz = (z + (self.height as i32 / 2)) as u32;
+        let ux = (x + (self.width.cast_signed() / 2)).cast_unsigned();
+        let uz = (z + (self.height.cast_signed() / 2)).cast_unsigned();
         if ux < self.width && uz < self.height {
             Some(&mut self.tiles[(uz * self.width + ux) as usize])
         } else {
@@ -65,6 +66,7 @@ impl MapData {
         }
     }
 
+    #[must_use]
     pub fn get_corner_height(&self, x: i32, z: i32) -> f32 {
         let mut total = 0.0;
         let mut count = 0;
@@ -85,8 +87,9 @@ impl MapData {
         }
     }
 
+    #[must_use]
     pub fn is_too_steep(&self, x: i32, z: i32) -> bool {
-        let current_elev = self.get_tile(x, z).map(|t| t.elevation).unwrap_or(0.0);
+        let current_elev = self.get_tile(x, z).map_or(0.0, |t| t.elevation);
         for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
             if let Some(neighbor) = self.get_tile(x + dx, z + dz) {
                 if (neighbor.elevation - current_elev).abs() > 0.3 {
@@ -102,9 +105,11 @@ impl MapData {
 pub struct WorldSeed(u32);
 
 impl WorldSeed {
+    #[must_use]
     pub fn new(seed: u32) -> Self {
         Self(seed)
     }
+    #[must_use]
     pub fn value(&self) -> u32 {
         self.0
     }

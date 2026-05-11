@@ -43,6 +43,7 @@ pub struct MapTileBundle {
     pub tile: Tile,
 }
 
+#[allow(clippy::cast_possible_truncation)] // Noise output f64 to f32 is intentional for terrain climate
 fn spawn_map(
     mut commands: Commands,
     _assets: Res<crate::economy::GameAssets>,
@@ -56,10 +57,8 @@ fn spawn_map(
 
     let width: u32 = 40;
     let height: u32 = 40;
-    #[allow(clippy::cast_possible_wrap)]
-    let half_w = (width / 2) as i32;
-    #[allow(clippy::cast_possible_wrap)]
-    let half_h = (height / 2) as i32;
+    let half_w = (width / 2).cast_signed();
+    let half_h = (height / 2).cast_signed();
 
     map_data.width = width;
     map_data.height = height;
@@ -70,10 +69,8 @@ fn spawn_map(
             let elevation = terrain_gen.get_elevation(x as f32, z as f32);
             let normalized_elevation = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
 
-            #[allow(clippy::cast_possible_truncation)]
             let temp_val =
                 ((temp_noise.get([f64::from(x) * 0.05, f64::from(z) * 0.05]) as f32) + 1.0) * 0.5;
-            #[allow(clippy::cast_possible_truncation)]
             let humid_val =
                 ((humid_noise.get([f64::from(x) * 0.05, f64::from(z) * 0.05]) as f32) + 1.0) * 0.5;
 

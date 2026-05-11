@@ -1,7 +1,10 @@
 use crate::map::zoning::{
     GlobalTerrainBundle, MapData, Roof, SmoothTileBundle, TerrainType, Tile, TileLayer, WaterBundle,
 };
+use bevy::asset::RenderAssetUsages;
+use bevy::mesh::Indices;
 use bevy::prelude::*;
+use bevy::render::render_resource::PrimitiveTopology;
 
 pub struct MeshGenPlugin;
 
@@ -91,11 +94,12 @@ impl Command for SpawnSmoothTileCommand {
     }
 }
 
+#[must_use]
 pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
     let width = map.width;
     let height = map.height;
-    let half_w = width as i32 / 2;
-    let half_h = height as i32 / 2;
+    let half_w = width.cast_signed() / 2;
+    let half_h = height.cast_signed() / 2;
 
     // --- ТЕРРЕЙН (ВЕРШИНЫ И ЦВЕТА) ---
     let mut vertices = Vec::new();
@@ -107,7 +111,7 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
             vertices.push([x as f32, h, z as f32]);
 
             let tile = map.get_tile(x, z).or_else(|| map.get_tile(x - 1, z - 1));
-            let color = match tile.map(|t| t.terrain).unwrap_or(TerrainType::Grass) {
+            let color = match tile.map_or(TerrainType::Grass, |t| t.terrain) {
                 TerrainType::Grass => [0.2, 0.5, 0.1, 1.0],
                 TerrainType::Mud => [0.3, 0.2, 0.1, 1.0],
                 TerrainType::Sand => [0.8, 0.7, 0.3, 1.0],
@@ -131,10 +135,6 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
             indices.extend_from_slice(&[nw, se, ne, nw, sw, se]);
         }
     }
-
-    use bevy::asset::RenderAssetUsages;
-    use bevy::mesh::Indices;
-    use bevy::render::render_resource::PrimitiveTopology;
 
     let mut terrain_mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
@@ -169,8 +169,8 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
 
     for z in 0..height {
         for x in 0..width {
-            let wx = x as i32 - half_w;
-            let wz = z as i32 - half_h;
+            let wx = x.cast_signed() - half_w;
+            let wz = z.cast_signed() - half_h;
             if let Some(tile) = map.get_tile(wx, wz) {
                 if tile.roofed {
                     let nw = z * row_size + x;
@@ -194,13 +194,19 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
     (terrain_mesh, water_mesh, roof_mesh)
 }
 
-pub fn create_smooth_tile_mesh(h_nw: f32, h_ne: f32, h_sw: f32, h_se: f32) -> Mesh {
+#[must_use]
+pub fn create_smooth_tile_mesh(
+    height_nw: f32,
+    height_ne: f32,
+    height_sw: f32,
+    height_se: f32,
+) -> Mesh {
     let mut mesh = Mesh::from(Plane3d::default());
     let vertices = vec![
-        [-0.5, h_nw, -0.5],
-        [0.5, h_ne, -0.5],
-        [-0.5, h_sw, 0.5],
-        [0.5, h_se, 0.5],
+        [-0.5, height_nw, -0.5],
+        [0.5, height_ne, -0.5],
+        [-0.5, height_sw, 0.5],
+        [0.5, height_se, 0.5],
     ];
     mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
     mesh.duplicate_vertices();

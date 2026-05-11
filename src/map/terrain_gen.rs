@@ -35,7 +35,7 @@ impl TerrainGenerator {
     }
 
     #[must_use]
-    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_possible_truncation)] // Noise output f64 to f32 is intentional for mesh attributes
     pub fn get_elevation(&self, x: f32, z: f32) -> f32 {
         let x64 = f64::from(x);
         let z64 = f64::from(z);
