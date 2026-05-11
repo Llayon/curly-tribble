@@ -43,47 +43,23 @@ pub struct MapTileBundle {
     pub tile: Tile,
 }
 
-fn generate_voronoi_heights(width: u32, height: u32, seed: u32) -> Vec<f32> {
-    let mut rng = rand::prelude::StdRng::seed_from_u64(u64::from(seed));
-    let points: Vec<Vec2> = (0..24)
-        .map(|_| {
-            Vec2::new(
-                rng.gen_range(0.0..width as f32),
-                rng.gen_range(0.0..height as f32),
-            )
-        })
-        .collect();
-
-    (0..width * height)
-        .map(|i| {
-            let x = (i % width) as f32;
-            let z = (i / width) as f32;
-            let mut min_dist = f32::MAX;
-            for p in &points {
-                min_dist = min_dist.min(p.distance(Vec2::new(x, z)));
-            }
-            (min_dist / 10.0).min(1.0)
-        })
-        .collect()
-}
-
 fn spawn_map(
     mut commands: Commands,
     _assets: Res<crate::economy::GameAssets>,
+    terrain_gen: Res<TerrainGenerator>,
     seed: Res<WorldSeed>,
     mut map_data: ResMut<MapData>,
     mut nav_map: ResMut<crate::map::navigation::NavigationMap>,
 ) {
-    let elev_noise = Fbm::<Perlin>::new(seed.value());
     let temp_noise = Fbm::<Perlin>::new(seed.value() + 1);
     let humid_noise = Fbm::<Perlin>::new(seed.value() + 2);
 
-    let width = 40;
-    let height = 40;
-    let half_w = width as i32 / 2;
-    let half_h = height as i32 / 2;
-
-    let voronoi_map = generate_voronoi_heights(width, height, seed.value());
+    let width: u32 = 40;
+    let height: u32 = 40;
+    #[allow(clippy::cast_possible_wrap)]
+    let half_w = (width / 2) as i32;
+    #[allow(clippy::cast_possible_wrap)]
+    let half_h = (height / 2) as i32;
 
     map_data.width = width;
     map_data.height = height;
@@ -91,23 +67,21 @@ fn spawn_map(
 
     for x in -half_w..half_w {
         for z in -half_h..half_h {
-            let ux = (x + half_w) as u32;
-            let uz = (z + half_h) as u32;
-            let idx = (uz * width + ux) as usize;
-            let voronoi_val = voronoi_map[idx];
+            let elevation = terrain_gen.get_elevation(x as f32, z as f32);
+            let normalized_elevation = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
 
-            let noise_val = elev_noise.get([x as f64 * 0.05, z as f64 * 0.05]) as f32;
+            #[allow(clippy::cast_possible_truncation)]
             let temp_val =
-                ((temp_noise.get([x as f64 * 0.05, z as f64 * 0.05]) as f32) + 1.0) * 0.5;
+                ((temp_noise.get([f64::from(x) * 0.05, f64::from(z) * 0.05]) as f32) + 1.0) * 0.5;
+            #[allow(clippy::cast_possible_truncation)]
             let humid_val =
-                ((humid_noise.get([x as f64 * 0.05, z as f64 * 0.05]) as f32) + 1.0) * 0.5;
+                ((humid_noise.get([f64::from(x) * 0.05, f64::from(z) * 0.05]) as f32) + 1.0) * 0.5;
 
-            let combined_elevation = (voronoi_val + noise_val * 0.2).clamp(0.0, 1.0);
-            let terrain = get_terrain_from_climate(temp_val, humid_val, combined_elevation);
+            let terrain = get_terrain_from_climate(temp_val, humid_val, normalized_elevation);
 
             if let Some(tile_data) = map_data.get_tile_mut(x, z) {
                 tile_data.terrain = terrain;
-                tile_data.elevation = combined_elevation;
+                tile_data.elevation = normalized_elevation;
                 tile_data.temperature = temp_val;
                 tile_data.humidity = humid_val;
                 tile_data.roofed = false;
@@ -132,14 +106,14 @@ fn spawn_map(
 
     for x in -half_w..half_w {
         for z in -half_h..half_h {
-            let tile_data = map_data.get_tile(x, z).cloned().unwrap_or_default();
+            let tile_data = map_data.get_tile(x, z).copied().unwrap_or_default();
             let terrain = tile_data.terrain;
 
             // Логическая сущность тайла (без меша) для кликов и ИИ
             commands.spawn(zoning::LogicTileBundle {
                 transform: Transform::from_xyz(x as f32, 0.0, z as f32),
                 tile: Tile { terrain },
-                name: Name::new(format!("Tile {},{}", x, z)),
+                name: Name::new(format!("Tile {x},{z}")),
             });
 
             let mut cost = crate::map::navigation::COST_BASE;

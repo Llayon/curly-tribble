@@ -90,7 +90,7 @@ mod tests {
         let e2 = gen.get_elevation(10.0, 10.0);
 
         // Check that it produces some value and is deterministic
-        assert_eq!(e1, gen.get_elevation(0.0, 0.0));
+        assert!((e1 - gen.get_elevation(0.0, 0.0)).abs() < f32::EPSILON);
         assert!(e1 >= 0.0);
         assert!(e2 >= 0.0);
     }

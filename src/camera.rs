@@ -80,7 +80,7 @@ fn setup_camera(mut commands: Commands) {
     commands.spawn(MainCameraBundle {
         camera_3d: Camera3d::default(),
         render_graph: CameraRenderGraph::new(Core3d),
-        transform: Transform::from_xyz(0.0, 15.0, 15.0).looking_at(Vec3::ZERO, Vec3::Y),
+        transform: Transform::from_xyz(0.0, 30.0, 30.0).looking_at(Vec3::ZERO, Vec3::Y),
         focus: CameraFocus(Vec3::ZERO),
         config: CameraConfig::default(),
         tonemapping: Tonemapping::TonyMcMapface,
