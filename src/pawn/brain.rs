@@ -15,24 +15,24 @@ impl Plugin for BrainPlugin {
         app.add_systems(
             FixedUpdate,
             (
-                think,
-                find_resources,
-                collect_berries,
-                eat_from_stockpile,
-                decide_construction,
+                // 1. Сначала обрабатываем существующие задачи
+                (collect_berries, eat_from_stockpile).in_set(GameSet::Logic),
+                // 2. Затем ПРИМЕНЯЕМ команды (смена поведения), чтобы системы ниже видели актуальное состояние
+                ApplyDeferred, 
+                // 3. И только потом ищем новые задачи для тех, кто стал Idle
+                (think, find_resources, decide_construction).chain().in_set(GameSet::Logic),
             )
-                .chain()
-                .in_set(GameSet::Logic),
+                .chain(),
         );
     }
 }
 
 fn think(
     mut commands: Commands,
-    query: Query<Entity, (With<Settler>, With<Hungry>, With<Idle>, Without<Targeting>, Without<ComputingPath>)>,
+    query: Query<Entity, (With<Settler>, With<Idle>, Without<Targeting>, Without<ComputingPath>)>,
 ) {
     for entity in &query {
-        // Если мы голодны и ничего не делаем — сбрасываем состояние чтобы форсировать поиск
+        // Гарантируем чистоту состояния для поиска
         commands.entity(entity).remove::<Targeting>();
     }
 }
