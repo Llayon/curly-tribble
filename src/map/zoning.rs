@@ -68,8 +68,8 @@ impl MapData {
     pub fn get_corner_height(&self, x: i32, z: i32) -> f32 {
         let mut total = 0.0;
         let mut count = 0;
-        for dx in -1..0 {
-            for dz in -1..0 {
+        for dx in -1..=0 {
+            for dz in -1..=0 {
                 if let Some(tile) = self.get_tile(x + dx, z + dz) {
                     total += tile.elevation;
                     count += 1;

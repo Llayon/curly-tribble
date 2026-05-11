@@ -38,7 +38,7 @@ fn think(
 fn find_resources(
     mut commands: Commands,
     idlers: Query<
-        (Entity, &Hunger),
+        (Entity, &Hunger, &Transform),
         (
             With<Settler>,
             With<Idle>,
@@ -49,7 +49,7 @@ fn find_resources(
     bushes: Query<(Entity, &Transform), With<BerryBush>>,
     resources: Res<GlobalResources>,
 ) {
-    for (settler, hunger) in &idlers {
+    for (settler, hunger, settler_transform) in &idlers {
         // Поселенец идет за едой если:
         // 1. Он голоден (>10%)
         // 2. В колонии мало еды (<200)
@@ -60,7 +60,16 @@ fn find_resources(
             continue;
         }
 
-        if let Some((bush_entity, bush_transform)) = bushes.iter().next() {
+        // Ищем БЛИЖАЙШИЙ куст
+        if let Some((bush_entity, bush_transform)) = bushes.iter().min_by(|a, b| {
+            let da = settler_transform
+                .translation
+                .distance_squared(a.1.translation);
+            let db = settler_transform
+                .translation
+                .distance_squared(b.1.translation);
+            da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+        }) {
             // ВАЖНО: Сначала переключаем поведение, т.к. switch_behavior очищает Targeting
             commands.entity(settler).switch_behavior::<Gathering>();
 
@@ -88,12 +97,15 @@ fn collect_berries(
 ) {
     for (entity, mut hunger, target, settler_transform) in &mut settlers {
         if let Ok((mut bush, bush_transform)) = bushes.get_mut(target.0) {
-            let dist = settler_transform
-                .translation
-                .distance(bush_transform.translation);
+            // Используем 2D дистанцию (игнорируем Y) чтобы избежать проблем с вертикальностью
+            let mut s_pos = settler_transform.translation;
+            let mut b_pos = bush_transform.translation;
+            s_pos.y = 0.0;
+            b_pos.y = 0.0;
+            let dist_2d = s_pos.distance(b_pos);
 
             // Увеличиваем зону сбора до 1.5м (было 1.2м)
-            if dist < 1.5 {
+            if dist_2d < 1.5 {
                 let amount = 5.0 * time.delta_secs();
                 if amount > 0.0 {
                     bush.food_amount -= amount;

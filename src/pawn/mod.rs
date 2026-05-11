@@ -49,19 +49,22 @@ impl Plugin for PawnPlugin {
                 let lantern_material = assets.lantern_material.clone();
 
                 world.commands().entity(entity).with_children(|parent| {
-                    parent.spawn(LanternBundle {
-                        lantern: Lantern,
-                        mesh: Mesh3d(lantern_mesh),
-                        material: MeshMaterial3d(lantern_material),
-                        transform: Transform::from_xyz(0.4, 0.5, 0.3), // Позиция в "руке"
-                        light: PointLight {
-                            intensity: 100_000.0,
-                            range: 10.0,
-                            color: Color::srgb(1.0, 0.8, 0.4),
-                            shadows_enabled: true,
-                            ..default()
+                    parent.spawn((
+                        LanternBundle {
+                            lantern: Lantern,
+                            mesh: Mesh3d(lantern_mesh),
+                            material: MeshMaterial3d(lantern_material),
+                            transform: Transform::from_xyz(0.4, 0.5, 0.3), // Позиция в "руке"
+                            light: PointLight {
+                                intensity: 100_000.0,
+                                range: 10.0,
+                                color: Color::srgb(1.0, 0.8, 0.4),
+                                shadows_enabled: true,
+                                ..default()
+                            },
                         },
-                    });
+                        crate::map::atmosphere::LightSource { radius: 6.0 },
+                    ));
                 });
             });
 
