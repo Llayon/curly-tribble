@@ -83,19 +83,17 @@ fn find_resources(
 fn collect_berries(
     mut commands: Commands,
     mut settlers: Query<
-        (Entity, &mut Hunger, &Targeting, &Transform),
+        (Entity, &mut Hunger, &Targeting, &Transform, Option<&Path>, Option<&ComputingPath>),
         (
             With<Settler>,
             With<Gathering>,
-            Without<Path>,
-            Without<ComputingPath>,
         ),
     >,
     mut bushes: Query<(&mut BerryBush, &Transform), With<BerryBush>>,
     time: Res<Time<Fixed>>,
     _resources: Res<GlobalResources>,
 ) {
-    for (entity, mut hunger, target, settler_transform) in &mut settlers {
+    for (entity, mut hunger, target, settler_transform, path, computing) in &mut settlers {
         if let Ok((mut bush, bush_transform)) = bushes.get_mut(target.0) {
             // Используем 2D дистанцию (игнорируем Y) чтобы избежать проблем с вертикальностью
             let mut s_pos = settler_transform.translation;
@@ -104,7 +102,8 @@ fn collect_berries(
             b_pos.y = 0.0;
             let dist_2d = s_pos.distance(b_pos);
 
-            // Увеличиваем зону сбора до 1.5м (было 1.2м)
+            // Если мы в радиусе сбора, МЫ ЕДИМ. Игнорируем статус навигации.
+            // Это предотвращает зависание ИИ если путь не успел удалиться.
             if dist_2d < 1.5 {
                 let amount = 5.0 * time.delta_secs();
                 if amount > 0.0 {
@@ -117,8 +116,8 @@ fn collect_berries(
                         commands.entity(entity).switch_behavior::<Idle>();
                     }
                 }
-            } else {
-                // Если мы слишком далеко, запрашиваем путь снова (подходим на 1.1м)
+            } else if path.is_none() && computing.is_none() {
+                // Если мы НЕ в радиусе И НЕ идем — запрашиваем путь снова (подходим на 1.1м)
                 commands.interact_with(entity, bush_transform.translation, 1.1);
             }
         } else {

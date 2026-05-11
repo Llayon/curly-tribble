@@ -52,12 +52,18 @@ fn test_vertical_interaction_failure() {
         let period = time.timestep();
         time.advance_by(period);
     }
+    
+    // Эмулируем сильный голод чтобы увидеть логи если что-то не так
+    {
+        let mut h = app.world_mut().get_mut::<Hunger>(settler_entity).unwrap();
+        h.increase(45.0); // 50 + 45 = 95
+    }
+
     app.world_mut().run_schedule(FixedUpdate);
 
     // Проверяем результат
     let hunger = app.world().get::<Hunger>(settler_entity).unwrap();
     
     // ВАЖНО: Мы ожидаем что голод УМЕНЬШИТСЯ (т.е. сбор сработал)
-    // Но при баге он вырастет.
-    assert!(hunger.value() < 50.0, "Hunger should DECREASE if collection works. Current: {}", hunger.value());
+    assert!(hunger.value() < 95.0, "Hunger should DECREASE if collection works. Current: {}", hunger.value());
 }
