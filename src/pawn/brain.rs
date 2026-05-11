@@ -28,10 +28,12 @@ impl Plugin for BrainPlugin {
 }
 
 fn think(
-    query: Query<(Entity, &Hunger), (With<Settler>, With<Hungry>, With<Idle>, Changed<Hunger>)>,
+    mut commands: Commands,
+    query: Query<Entity, (With<Settler>, With<Hungry>, With<Idle>, Without<Targeting>, Without<ComputingPath>)>,
 ) {
-    for (_entity, _hunger) in &query {
-        // Здесь можно добавить сложную логику выбора целей
+    for entity in &query {
+        // Если мы голодны и ничего не делаем — сбрасываем состояние чтобы форсировать поиск
+        commands.entity(entity).remove::<Targeting>();
     }
 }
 
@@ -43,7 +45,8 @@ fn find_resources(
             With<Settler>,
             With<Idle>,
             Without<Targeting>,
-            Without<ComputingPath>,
+            // Убираем Without<ComputingPath>, чтобы ИИ мог передумать 
+            // или если поиск пути затянулся
         ),
     >,
     bushes: Query<(Entity, &Transform), With<BerryBush>>,
@@ -70,10 +73,10 @@ fn find_resources(
                 .distance_squared(b.1.translation);
             da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
         }) {
-            // ВАЖНО: Сначала переключаем поведение, т.к. switch_behavior очищает Targeting
+            // ВАЖНО: Сначала переключаем поведение, т.к. switch_behavior очищает Targeting и пути
             commands.entity(settler).switch_behavior::<Gathering>();
 
-            // Затем устанавливаем цель и приказ на перемещение (подходим на 1.1м для сетки 1х1)
+            // Затем устанавливаем цель и приказ на перемещение
             commands.entity(settler).insert(Targeting(bush_entity));
             commands.interact_with(settler, bush_transform.translation, 1.1);
         }
