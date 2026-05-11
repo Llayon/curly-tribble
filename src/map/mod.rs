@@ -6,6 +6,7 @@ use navigation::NavigationPlugin;
 use noise::{Fbm, NoiseFn, Perlin};
 use rand::prelude::*;
 use resources::ResourcesPlugin;
+use terrain_gen::TerrainGenerator;
 pub use zoning::{MapData, TerrainType, Tile, WorldSeed, MAX_HEIGHT};
 
 pub mod atmosphere;
@@ -20,15 +21,17 @@ pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        app.add_plugins((
-            zoning::ZoningPlugin,
-            ResourcesPlugin,
-            ConstructionPlugin,
-            NavigationPlugin,
-            visibility::VisibilityPlugin,
-            MeshGenPlugin,
-        ))
-        .add_systems(Startup, spawn_map.in_set(StartupSet::SpawnEntities));
+        let seed_val = 42; // or get from WorldSeed if already initialized
+        app.insert_resource(TerrainGenerator::new(seed_val))
+            .add_plugins((
+                zoning::ZoningPlugin,
+                ResourcesPlugin,
+                ConstructionPlugin,
+                NavigationPlugin,
+                visibility::VisibilityPlugin,
+                MeshGenPlugin,
+            ))
+            .add_systems(Startup, spawn_map.in_set(StartupSet::SpawnEntities));
     }
 }
 

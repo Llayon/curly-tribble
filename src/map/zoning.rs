@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 
-pub const MAX_HEIGHT: f32 = 8.0;
+pub const MAX_HEIGHT: f32 = 12.0;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
