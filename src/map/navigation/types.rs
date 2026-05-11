@@ -3,7 +3,7 @@ use bevy::tasks::Task;
 use std::collections::HashMap;
 
 pub struct NavigationTypesPlugin;
-impl Plugin for NavigationSystemsPlugin {
+impl Plugin for NavigationTypesPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
