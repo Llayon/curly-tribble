@@ -161,8 +161,8 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
     // --- КРЫШИ (ROOFS) ---
     // Используем ту же сетку вершин, но поднимаем их на offset и фильтруем индексы
     let mut roof_indices = Vec::new();
-    let roof_offset = 1.0;
-    let mut roof_vertices = vertices; // Начинаем с ландшафтных вершин
+    let roof_offset = 2.5; // Поднимаем крышу выше (было 1.0)
+    let mut roof_vertices = vertices.clone(); // Начинаем с ландшафтных вершин
     for v in &mut roof_vertices {
         v[1] += roof_offset; // Поднимаем на метр
     }

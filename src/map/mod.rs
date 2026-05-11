@@ -114,9 +114,14 @@ fn spawn_map(
     let mut rng = StdRng::seed_from_u64(u64::from(seed.value()) + 100);
     for x in -half_w..half_w {
         for z in -half_h..half_h {
-            let terrain = map_data.get_tile(x, z).map(|t| t.terrain);
-            if terrain == Some(TerrainType::Stone) && rng.gen_bool(0.2) {
-                apply_cave_stamp(&mut map_data, x, z);
+            if let Some(tile_data) = map_data.get_tile(x, z) {
+                // Пещеры стали реже (5% вместо 20%) и только на возвышенностях (> 0.6)
+                if tile_data.terrain == TerrainType::Stone
+                    && rng.gen_bool(0.05)
+                    && tile_data.elevation > 0.6
+                {
+                    apply_cave_stamp(&mut map_data, x, z);
+                }
             }
         }
     }
