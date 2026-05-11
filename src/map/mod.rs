@@ -6,7 +6,7 @@ use navigation::NavigationPlugin;
 use noise::{Fbm, NoiseFn, Perlin};
 use rand::prelude::*;
 use resources::ResourcesPlugin;
-use terrain_gen::TerrainGenerator;
+use terrain_gen::{TerrainConfig, TerrainGenerator};
 pub use zoning::{MapData, TerrainType, Tile, WorldSeed, MAX_HEIGHT};
 
 pub mod atmosphere;
@@ -17,12 +17,23 @@ pub mod terrain_gen;
 pub mod visibility;
 pub mod zoning;
 
+#[derive(Component, Default, Reflect)]
+#[reflect(Component)]
+pub struct MapEntity;
+
+#[derive(Message)]
+pub struct GenerateMapEvent;
+
 pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
     fn build(&self, app: &mut App) {
-        let seed_val = 42; // or get from WorldSeed if already initialized
-        app.insert_resource(TerrainGenerator::new(seed_val))
+        let config = TerrainConfig::default();
+        app.insert_resource(TerrainGenerator::new(config.seed))
+            .insert_resource(config)
+            .register_type::<TerrainConfig>()
+            .register_type::<MapEntity>()
+            .add_message::<GenerateMapEvent>()
             .add_plugins((
                 zoning::ZoningPlugin,
                 ResourcesPlugin,
@@ -48,6 +59,7 @@ fn spawn_map(
     mut commands: Commands,
     _assets: Res<crate::economy::GameAssets>,
     terrain_gen: Res<TerrainGenerator>,
+    terrain_config: Res<TerrainConfig>,
     seed: Res<WorldSeed>,
     mut map_data: ResMut<MapData>,
     mut nav_map: ResMut<crate::map::navigation::NavigationMap>,
@@ -66,7 +78,7 @@ fn spawn_map(
 
     for x in -half_w..half_w {
         for z in -half_h..half_h {
-            let elevation = terrain_gen.get_elevation(x as f32, z as f32);
+            let elevation = terrain_gen.get_elevation(&terrain_config, x as f32, z as f32);
             let normalized_elevation = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
 
             let temp_val =
@@ -107,11 +119,14 @@ fn spawn_map(
             let terrain = tile_data.terrain;
 
             // Логическая сущность тайла (без меша) для кликов и ИИ
-            commands.spawn(zoning::LogicTileBundle {
-                transform: Transform::from_xyz(x as f32, 0.0, z as f32),
-                tile: Tile { terrain },
-                name: Name::new(format!("Tile {x},{z}")),
-            });
+            commands.spawn((
+                zoning::LogicTileBundle {
+                    transform: Transform::from_xyz(x as f32, 0.0, z as f32),
+                    tile: Tile { terrain },
+                    name: Name::new(format!("Tile {x},{z}")),
+                },
+                MapEntity,
+            ));
 
             let mut cost = crate::map::navigation::COST_BASE;
             if map_data.is_too_steep(x, z) {

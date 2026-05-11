@@ -1,6 +1,7 @@
 use crate::map::zoning::{
     GlobalTerrainBundle, MapData, Roof, SmoothTileBundle, TerrainType, Tile, TileLayer, WaterBundle,
 };
+use crate::map::MapEntity;
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::Indices;
 use bevy::prelude::*;
@@ -31,29 +32,38 @@ impl Command for SpawnGlobalTerrainCommand {
         let mountain_mat = assets.mountain_material.clone();
 
         // Спавним основной ландшафт
-        world.spawn(GlobalTerrainBundle {
-            mesh: Mesh3d(terrain_handle),
-            material: MeshMaterial3d(ground_mat),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            name: Name::new("Global Terrain"),
-        });
+        world.spawn((
+            GlobalTerrainBundle {
+                mesh: Mesh3d(terrain_handle),
+                material: MeshMaterial3d(ground_mat),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                name: Name::new("Global Terrain"),
+            },
+            MapEntity,
+        ));
 
         // Спавним воду
-        world.spawn(WaterBundle {
-            mesh: Mesh3d(water_handle),
-            material: MeshMaterial3d(water_mat),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            name: Name::new("Water Layer"),
-        });
+        world.spawn((
+            WaterBundle {
+                mesh: Mesh3d(water_handle),
+                material: MeshMaterial3d(water_mat),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                name: Name::new("Water Layer"),
+            },
+            MapEntity,
+        ));
 
         // Спавним крыши пещер (единым мешем)
-        world.spawn(crate::map::zoning::MountainRoofBundle {
-            mesh: Mesh3d(roof_handle),
-            material: MeshMaterial3d(mountain_mat),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            roof: Roof,
-            name: Name::new("Global Mountain Roofs"),
-        });
+        world.spawn((
+            crate::map::zoning::MountainRoofBundle {
+                mesh: Mesh3d(roof_handle),
+                material: MeshMaterial3d(mountain_mat),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                roof: Roof,
+                name: Name::new("Global Mountain Roofs"),
+            },
+            MapEntity,
+        ));
     }
 }
 
@@ -76,14 +86,17 @@ impl Command for SpawnSmoothTileCommand {
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
         let mesh_handle = meshes.add(mesh);
 
-        let mut entity = world.spawn(SmoothTileBundle {
-            mesh: Mesh3d(mesh_handle),
-            material: MeshMaterial3d(self.material),
-            transform: Transform::from_xyz(self.x as f32, self.offset_y, self.z as f32),
-            tile: Tile {
-                terrain: self.terrain,
+        let mut entity = world.spawn((
+            SmoothTileBundle {
+                mesh: Mesh3d(mesh_handle),
+                material: MeshMaterial3d(self.material),
+                transform: Transform::from_xyz(self.x as f32, self.offset_y, self.z as f32),
+                tile: Tile {
+                    terrain: self.terrain,
+                },
             },
-        });
+            MapEntity,
+        ));
 
         match self.layer {
             TileLayer::Roof => {
