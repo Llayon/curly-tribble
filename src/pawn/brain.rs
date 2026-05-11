@@ -29,11 +29,15 @@ impl Plugin for BrainPlugin {
 
 fn think(
     mut commands: Commands,
-    query: Query<Entity, (With<Settler>, With<Idle>, Without<Targeting>, Without<ComputingPath>)>,
+    // Ищем всех бездельников, у которых потенциально могли остаться старые компоненты
+    query: Query<Entity, (With<Settler>, With<Idle>)>,
 ) {
     for entity in &query {
-        // Гарантируем чистоту состояния для поиска
+        // Очищаем всё, что могло остаться от прошлых задач, 
+        // чтобы find_resources гарантированно подхватил поселенца
         commands.entity(entity).remove::<Targeting>();
+        commands.entity(entity).remove::<Path>();
+        commands.entity(entity).remove::<ComputingPath>();
     }
 }
 
@@ -45,13 +49,13 @@ fn find_resources(
             With<Settler>,
             With<Idle>,
             Without<Targeting>,
-            // Убираем Without<ComputingPath>, чтобы ИИ мог передумать 
-            // или если поиск пути затянулся
         ),
     >,
     bushes: Query<(Entity, &Transform), With<BerryBush>>,
     resources: Res<GlobalResources>,
 ) {
+    let bush_count = bushes.iter().count();
+
     for (settler, hunger, settler_transform) in &idlers {
         // Поселенец идет за едой если:
         // 1. Он голоден (>10%)
@@ -60,6 +64,12 @@ fn find_resources(
         let is_hungry = hunger.value() > 10.0;
 
         if !is_hungry && !colony_needs_food {
+            continue;
+        }
+
+        if bush_count == 0 {
+            // Если кустов нет, выводим предупреждение (увидим в логах)
+            warn!("Settler {:?} wants food, but NO BUSHES found in world!", settler);
             continue;
         }
 
@@ -73,6 +83,8 @@ fn find_resources(
                 .distance_squared(b.1.translation);
             da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
         }) {
+            info!("Settler {:?} found new bush at {:?}. Colony food: {}", settler, bush_transform.translation, resources.food);
+            
             // ВАЖНО: Сначала переключаем поведение, т.к. switch_behavior очищает Targeting и пути
             commands.entity(settler).switch_behavior::<Gathering>();
 
