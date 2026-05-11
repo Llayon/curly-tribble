@@ -77,7 +77,7 @@ fn handle_regeneration(
 
         // 2. Cleanup
         for entity in &q_map_entities {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
 
         // 3. Spawn
