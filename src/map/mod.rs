@@ -12,6 +12,7 @@ pub mod atmosphere;
 pub mod construction;
 pub mod navigation;
 pub mod resources;
+pub mod river_gen;
 pub mod terrain_gen;
 pub mod visibility;
 pub mod zoning;
