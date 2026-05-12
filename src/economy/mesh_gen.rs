@@ -53,6 +53,7 @@ impl Command for SpawnGlobalTerrainCommand {
             MapEntity,
         ));
 
+
         // Спавним крыши пещер (единым мешем)
         world.spawn((
             crate::map::zoning::MountainRoofBundle {

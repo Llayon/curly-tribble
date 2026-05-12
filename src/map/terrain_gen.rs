@@ -9,6 +9,11 @@ pub struct TerrainConfig {
     pub map_width: u32,
     pub map_height: u32,
     pub seed: u32,
+    
+    // --- INTEGRATED TOOLS (appear as checkboxes/buttons in inspector) ---
+    pub randomize_seed: bool,
+    pub regenerate_world: bool,
+
     #[inspector(min = 0.001, max = 0.1)]
     pub macro_freq: f64,
     #[inspector(min = 1.0, max = 25.0)]
@@ -33,14 +38,16 @@ impl Default for TerrainConfig {
             map_width: 120,
             map_height: 120,
             seed: 42,
-            macro_freq: 0.03,
+            randomize_seed: false,
+            regenerate_world: false,
+            macro_freq: 0.04,
             macro_height: 12.0,
             macro_sharpness: 4.0,
-            plateau_freq: 0.04,
-            plateau_height: 4.0,
-            plateau_steps: 4.0,
+            plateau_freq: 0.03,
+            plateau_height: 5.0,
+            plateau_steps: 3.0,
             warp_freq: 0.02,
-            warp_strength: 5.0,
+            warp_strength: 2.0,
         }
     }
 }

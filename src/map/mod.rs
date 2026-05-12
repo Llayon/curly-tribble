@@ -1,5 +1,5 @@
-use crate::economy::mesh_gen::MeshGenPlugin;
 use bevy::prelude::*;
+use crate::economy::mesh_gen::MeshGenPlugin;
 use construction::ConstructionPlugin;
 use navigation::NavigationPlugin;
 use noise::{Fbm, NoiseFn, Perlin};
@@ -48,7 +48,13 @@ impl Plugin for MapPlugin {
                     ev.write(GenerateMapEvent);
                 },
             )
-            .add_systems(Update, (regeneration_ui, handle_regeneration));
+            .add_systems(
+                Update,
+                (
+                    handle_regeneration,
+                    monitor_inspector_triggers.run_if(resource_changed::<TerrainConfig>),
+                ),
+            );
     }
 }
 
@@ -71,16 +77,25 @@ fn handle_regeneration(
     mut nav_map: ResMut<crate::map::navigation::NavigationMap>,
 ) {
     for _ in ev_gen.read() {
-        // 1. Update resources
+        info!("MAP_GEN: Received GenerateMapEvent. Starting cleanup...");
+        
+        // 1. Очистка старого мира
+        let mut count = 0;
+        for entity in &q_map_entities {
+            commands.entity(entity).despawn(); // Т.к. иерархий нет, обычного despawn достаточно
+            count += 1;
+        }
+        info!("MAP_GEN: Despawned {} map entities.", count);
+        
+        nav_map.grid.clear();
+        info!("MAP_GEN: Navigation grid cleared.");
+
+        // 2. Обновление ресурсов на основе конфига
         *seed = WorldSeed::new(config.seed);
         *terrain_gen = TerrainGenerator::new(config.seed);
+        info!("MAP_GEN: Generator re-initialized with seed {}.", config.seed);
 
-        // 2. Cleanup
-        for entity in &q_map_entities {
-            commands.entity(entity).despawn();
-        }
-
-        // 3. Spawn
+        // 3. Спавн нового мира
         spawn_map_internal(
             &mut commands,
             &terrain_gen,
@@ -89,42 +104,33 @@ fn handle_regeneration(
             &mut map_data,
             &mut nav_map,
         );
+        info!("MAP_GEN: Regeneration complete.");
     }
 }
 
-fn regeneration_ui(
-    mut contexts: bevy_egui::EguiContexts,
+/// Система, которая следит за "кнопками-галками" в инспекторе TerrainConfig
+fn monitor_inspector_triggers(
     mut config: ResMut<TerrainConfig>,
     mut ev_gen: MessageWriter<GenerateMapEvent>,
 ) {
-    let Ok(ctx) = contexts.ctx_mut() else {
-        return;
-    };
+    let mut triggered = false;
 
-    // Styling: dark stone (#1A1A1A) and bronze (#CD7F32)
-    let mut visuals = bevy_egui::egui::Visuals::dark();
-    visuals.window_fill = bevy_egui::egui::Color32::from_rgb(26, 26, 26);
-    visuals.widgets.active.bg_fill = bevy_egui::egui::Color32::from_rgb(205, 127, 50);
-    visuals.widgets.hovered.bg_fill = bevy_egui::egui::Color32::from_rgb(180, 110, 40);
-    ctx.set_visuals(visuals);
+    if config.randomize_seed {
+        config.seed = rand::thread_rng().gen_range(0..999_999);
+        config.randomize_seed = false;
+        info!("INSPECTOR: Seed randomized to {}", config.seed);
+        triggered = true;
+    }
 
-    bevy_egui::egui::Window::new("World Architect")
-        .anchor(bevy_egui::egui::Align2::RIGHT_TOP, [-10.0, 10.0])
-        .show(ctx, |ui| {
-            ui.heading("Terrain Parameters");
+    if config.regenerate_world {
+        config.regenerate_world = false;
+        triggered = true;
+    }
 
-            ui.add(bevy_egui::egui::Slider::new(&mut config.seed, 0..=999_999).text("Seed"));
-
-            ui.horizontal(|ui| {
-                if ui.button("Randomize Seed").clicked() {
-                    config.seed = rand::thread_rng().gen_range(0..999_999);
-                }
-
-                if ui.button("Regenerate World").clicked() {
-                    ev_gen.write(GenerateMapEvent);
-                }
-            });
-        });
+    if triggered {
+        info!("INSPECTOR: Triggering regeneration event.");
+        ev_gen.write(GenerateMapEvent);
+    }
 }
 
 #[allow(clippy::cast_possible_truncation)] // Noise output f64 to f32 is intentional for terrain climate

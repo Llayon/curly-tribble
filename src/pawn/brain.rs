@@ -53,6 +53,8 @@ fn find_resources(
     >,
     bushes: Query<(Entity, &Transform), With<BerryBush>>,
     resources: Res<GlobalResources>,
+    time: Res<Time>,
+    mut last_log: Local<f32>,
 ) {
     let bush_count = bushes.iter().count();
 
@@ -68,8 +70,11 @@ fn find_resources(
         }
 
         if bush_count == 0 {
-            // Если кустов нет, выводим предупреждение (увидим в логах)
-            warn!("Settler {:?} wants food, but NO BUSHES found in world!", settler);
+            // Throttled logging: once every 5 seconds to prevent spam
+            if time.elapsed_secs() - *last_log > 5.0 {
+                warn!("Settler {:?} wants food, but NO BUSHES found in world!", settler);
+                *last_log = time.elapsed_secs();
+            }
             continue;
         }
 
