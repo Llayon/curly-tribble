@@ -102,3 +102,41 @@ pub fn apply_rivers(map_data: &mut MapData, config: &TerrainConfig, seed: u32) {
         }
     }
 }
+
+pub fn apply_mud_banks(map_data: &mut MapData) {
+    let half_w = (map_data.width / 2) as i32;
+    let half_h = (map_data.height / 2) as i32;
+    let mut mud_to_add = Vec::new();
+
+    for x in -half_w..half_w {
+        for z in -half_h..half_h {
+            if let Some(tile) = map_data.get_tile(x, z) {
+                if tile.terrain == TerrainType::Water {
+                    for dx in -1..=1 {
+                        for dz in -1..=1 {
+                            if dx == 0 && dz == 0 {
+                                continue;
+                            }
+                            let nx = x + dx;
+                            let nz = z + dz;
+                            if let Some(n_tile) = map_data.get_tile(nx, nz) {
+                                if matches!(
+                                    n_tile.terrain,
+                                    TerrainType::Grass | TerrainType::Sand | TerrainType::Stone
+                                ) {
+                                    mud_to_add.push(IVec2::new(nx, nz));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    for pos in mud_to_add {
+        if let Some(tile) = map_data.get_tile_mut(pos.x, pos.y) {
+            tile.terrain = TerrainType::Mud;
+        }
+    }
+}
