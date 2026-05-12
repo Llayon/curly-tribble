@@ -10,6 +10,9 @@ fn test_terrain_config_integration() {
     // Test default values
     assert_eq!(config.seed, 42);
     assert_eq!(config.map_width, 120);
+    assert_eq!(config.river_count, 5);
+    assert!((config.river_start_elevation - 0.6).abs() < f32::EPSILON);
+    assert!(config.generate_mud_banks);
     
     app.insert_resource(config);
     app.insert_resource(TerrainGenerator::new(42));

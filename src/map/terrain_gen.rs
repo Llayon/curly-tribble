@@ -30,6 +30,12 @@ pub struct TerrainConfig {
     pub warp_freq: f64,
     #[inspector(min = 0.0, max = 20.0)]
     pub warp_strength: f32,
+
+    #[inspector(min = 0, max = 30)]
+    pub river_count: u32,
+    #[inspector(min = 0.3, max = 0.9)]
+    pub river_start_elevation: f32,
+    pub generate_mud_banks: bool,
 }
 
 impl Default for TerrainConfig {
@@ -48,6 +54,9 @@ impl Default for TerrainConfig {
             plateau_steps: 3.0,
             warp_freq: 0.02,
             warp_strength: 2.0,
+            river_count: 5,
+            river_start_elevation: 0.6,
+            generate_mud_banks: true,
         }
     }
 }
