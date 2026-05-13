@@ -129,12 +129,15 @@ pub struct Tile {
 #[derive(Component)]
 pub struct Roof;
 
+use crate::map::MapEntity;
+
 #[derive(Bundle)]
 pub struct RoofBundle {
     pub mesh: Mesh3d,
     pub material: MeshMaterial3d<StandardMaterial>,
     pub transform: Transform,
     pub roof: Roof,
+    pub marker: MapEntity,
 }
 
 #[derive(Bundle)]
@@ -143,6 +146,7 @@ pub struct SmoothTileBundle {
     pub material: MeshMaterial3d<StandardMaterial>,
     pub transform: Transform,
     pub tile: Tile,
+    pub marker: MapEntity,
 }
 
 #[derive(Bundle)]
@@ -151,6 +155,7 @@ pub struct GlobalTerrainBundle {
     pub material: MeshMaterial3d<StandardMaterial>,
     pub transform: Transform,
     pub name: Name,
+    pub marker: MapEntity,
 }
 
 #[derive(Bundle)]
@@ -159,6 +164,7 @@ pub struct WaterBundle {
     pub material: MeshMaterial3d<StandardMaterial>,
     pub transform: Transform,
     pub name: Name,
+    pub marker: MapEntity,
 }
 
 #[derive(Bundle)]
@@ -168,6 +174,7 @@ pub struct MountainRoofBundle {
     pub transform: Transform,
     pub roof: Roof,
     pub name: Name,
+    pub marker: MapEntity,
 }
 
 #[derive(Bundle)]
@@ -175,6 +182,7 @@ pub struct LogicTileBundle {
     pub transform: Transform,
     pub tile: Tile,
     pub name: Name,
+    pub marker: MapEntity,
 }
 
 #[derive(Component)]

@@ -27,8 +27,8 @@ pub type AllBehaviors = (Idle, Gathering, Eating);
 // БЕЗОПАСНЫЙ ПЕРЕКЛЮЧАТЕЛЬ (Safe Switcher)
 // ============================================================================
 
+use crate::map::navigation::{ComputingPath, Path};
 use crate::pawn::relations::Targeting;
-use crate::map::navigation::{Path, ComputingPath};
 
 pub trait BehaviorExt {
     fn switch_behavior<T: Component + Default>(&mut self);

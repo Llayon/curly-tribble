@@ -1,4 +1,4 @@
-use super::types::{AGENT_HEIGHT, ComputingPath, Path, PathBlockEvent, world_to_grid};
+use super::types::{world_to_grid, ComputingPath, Path, PathBlockEvent, AGENT_HEIGHT};
 use bevy::prelude::*;
 use futures_lite::future;
 

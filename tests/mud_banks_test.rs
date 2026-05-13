@@ -1,6 +1,6 @@
 use bevy::prelude::*;
-use savage_fantasy::map::zoning::{MapData, TerrainType, TileData};
 use savage_fantasy::map::river_gen::apply_mud_banks;
+use savage_fantasy::map::zoning::{MapData, TerrainType, TileData};
 
 #[test]
 fn test_apply_mud_banks() {
@@ -23,5 +23,9 @@ fn test_apply_mud_banks() {
     apply_mud_banks(&mut map_data);
 
     let tile = map_data.get_tile(1, 1).expect("Tile (1,1) should exist");
-    assert_eq!(tile.terrain, TerrainType::Mud, "Grass neighbor of water should be mud");
+    assert_eq!(
+        tile.terrain,
+        TerrainType::Mud,
+        "Grass neighbor of water should be mud"
+    );
 }

@@ -3,13 +3,19 @@ use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
 use noise::{Fbm, NoiseFn, Perlin};
 
+pub struct TerrainGenPlugin;
+
+impl Plugin for TerrainGenPlugin {
+    fn build(&self, _app: &mut App) {}
+}
+
 #[derive(Resource, Reflect, InspectorOptions)]
 #[reflect(Resource, InspectorOptions)]
 pub struct TerrainConfig {
     pub map_width: u32,
     pub map_height: u32,
     pub seed: u32,
-    
+
     // --- INTEGRATED TOOLS (appear as checkboxes/buttons in inspector) ---
     pub randomize_seed: bool,
     pub regenerate_world: bool,
@@ -92,7 +98,9 @@ impl TerrainGenerator {
         let z64 = f64::from(z);
 
         // 1. MACRO: Ridged Mountains with Pass Mask
-        let ridge_val = self.macro_noise.get([x64 * config.macro_freq, z64 * config.macro_freq]);
+        let ridge_val = self
+            .macro_noise
+            .get([x64 * config.macro_freq, z64 * config.macro_freq]);
         let ridge = (1.0 - ridge_val.abs()).powf(f64::from(config.macro_sharpness)) as f32;
 
         let pass_val = self.pass_noise.get([x64 * PASS_FREQ, z64 * PASS_FREQ]);
@@ -101,10 +109,14 @@ impl TerrainGenerator {
         let mountains = ridge * pass_mask * config.macro_height;
 
         // 2. MICRO: Domain Warped Terraced Plateaus
-        let wx = self.warp_noise_x.get([x64 * config.warp_freq, z64 * config.warp_freq]) as f32 * config.warp_strength;
-        let wz = self
-            .warp_noise_z
-            .get([x64 * config.warp_freq + 100.0, z64 * config.warp_freq + 100.0]) as f32
+        let wx = self
+            .warp_noise_x
+            .get([x64 * config.warp_freq, z64 * config.warp_freq]) as f32
+            * config.warp_strength;
+        let wz = self.warp_noise_z.get([
+            x64 * config.warp_freq + 100.0,
+            z64 * config.warp_freq + 100.0,
+        ]) as f32
             * config.warp_strength;
 
         let plateau_val = self.plateau_noise.get([
@@ -113,7 +125,8 @@ impl TerrainGenerator {
         ]);
         let plateau_base = ((plateau_val + 1.0) * 0.5) as f32;
 
-        let plateaus = Self::smoothstep_terracing(plateau_base, config.plateau_steps) * config.plateau_height;
+        let plateaus =
+            Self::smoothstep_terracing(plateau_base, config.plateau_steps) * config.plateau_height;
 
         // 3. BLENDING: Max() for predictable range
         mountains.max(plateaus)

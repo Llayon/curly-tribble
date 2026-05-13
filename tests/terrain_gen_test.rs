@@ -7,7 +7,13 @@ fn test_terrain_height_ranges() {
     for x in -100..100 {
         for z in -100..100 {
             let h = gen.get_elevation(&config, x as f32, z as f32);
-            assert!(h >= 0.0 && h <= 25.0, "Height {} out of range at ({}, {})", h, x, z);
+            assert!(
+                h >= 0.0 && h <= 25.0,
+                "Height {} out of range at ({}, {})",
+                h,
+                x,
+                z
+            );
         }
     }
 }

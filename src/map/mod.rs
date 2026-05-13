@@ -1,10 +1,13 @@
-use bevy::prelude::*;
 use crate::economy::mesh_gen::MeshGenPlugin;
+use crate::events::{GameLogMessage, LogSeverity};
+use crate::sets::{GameSet, StartupSet};
+use bevy::prelude::*;
 use construction::ConstructionPlugin;
 use navigation::NavigationPlugin;
 use noise::{Fbm, NoiseFn, Perlin};
 use rand::prelude::*;
 use resources::ResourcesPlugin;
+use river_gen::RiverGenPlugin;
 use terrain_gen::{TerrainConfig, TerrainGenerator};
 pub use zoning::{MapData, TerrainType, Tile, WorldSeed, MAX_HEIGHT};
 
@@ -33,7 +36,9 @@ impl Plugin for MapPlugin {
             .insert_resource(config)
             .register_type::<TerrainConfig>()
             .register_type::<MapEntity>()
-            .add_plugins(bevy_inspector_egui::quick::ResourceInspectorPlugin::<TerrainConfig>::default())
+            .add_plugins(bevy_inspector_egui::quick::ResourceInspectorPlugin::<
+                TerrainConfig,
+            >::default())
             .add_message::<GenerateMapEvent>()
             .add_plugins((
                 zoning::ZoningPlugin,
@@ -42,19 +47,23 @@ impl Plugin for MapPlugin {
                 NavigationPlugin,
                 visibility::VisibilityPlugin,
                 MeshGenPlugin,
+                RiverGenPlugin,
+                terrain_gen::TerrainGenPlugin,
             ))
             .add_systems(
                 Startup,
-                |mut ev: MessageWriter<GenerateMapEvent>| {
+                (|mut ev: MessageWriter<GenerateMapEvent>| {
                     ev.write(GenerateMapEvent);
-                },
+                })
+                .in_set(StartupSet::SpawnEntities),
             )
             .add_systems(
                 Update,
                 (
                     handle_regeneration,
                     monitor_inspector_triggers.run_if(resource_changed::<TerrainConfig>),
-                ),
+                )
+                    .in_set(GameSet::Logic),
             );
     }
 }
@@ -76,25 +85,29 @@ fn handle_regeneration(
     mut terrain_gen: ResMut<TerrainGenerator>,
     mut map_data: ResMut<MapData>,
     mut nav_map: ResMut<crate::map::navigation::NavigationMap>,
+    mut log_writer: MessageWriter<GameLogMessage>,
 ) {
     for _ in ev_gen.read() {
-        info!("MAP_GEN: Received GenerateMapEvent. Starting cleanup...");
-        
+        debug!("MAP_GEN: Received GenerateMapEvent. Starting cleanup...");
+
         // 1. Очистка старого мира
         let mut count = 0;
         for entity in &q_map_entities {
             commands.entity(entity).despawn(); // Т.к. иерархий нет, обычного despawn достаточно
             count += 1;
         }
-        info!("MAP_GEN: Despawned {} map entities.", count);
-        
+        debug!("MAP_GEN: Despawned {} map entities.", count);
+
         nav_map.grid.clear();
-        info!("MAP_GEN: Navigation grid cleared.");
+        debug!("MAP_GEN: Navigation grid cleared.");
 
         // 2. Обновление ресурсов на основе конфига
         *seed = WorldSeed::new(config.seed);
         *terrain_gen = TerrainGenerator::new(config.seed);
-        info!("MAP_GEN: Generator re-initialized with seed {}.", config.seed);
+        debug!(
+            "MAP_GEN: Generator re-initialized with seed {}.",
+            config.seed
+        );
 
         // 3. Спавн нового мира
         spawn_map_internal(
@@ -105,7 +118,11 @@ fn handle_regeneration(
             &mut map_data,
             &mut nav_map,
         );
-        info!("MAP_GEN: Regeneration complete.");
+
+        log_writer.write(GameLogMessage {
+            message: format!("World regenerated with seed {}", config.seed),
+            severity: LogSeverity::Info,
+        });
     }
 }
 
@@ -119,7 +136,7 @@ fn monitor_inspector_triggers(
     if config.randomize_seed {
         config.seed = rand::thread_rng().gen_range(0..999_999);
         config.randomize_seed = false;
-        info!("INSPECTOR: Seed randomized to {}", config.seed);
+        debug!("INSPECTOR: Seed randomized to {}", config.seed);
         triggered = true;
     }
 
@@ -129,7 +146,7 @@ fn monitor_inspector_triggers(
     }
 
     if triggered {
-        info!("INSPECTOR: Triggering regeneration event.");
+        debug!("INSPECTOR: Triggering regeneration event.");
         ev_gen.write(GenerateMapEvent);
     }
 }
@@ -202,14 +219,12 @@ fn spawn_map_internal(
             let terrain = tile_data.terrain;
 
             // Логическая сущность тайла (без меша) для кликов и ИИ
-            commands.spawn((
-                zoning::LogicTileBundle {
-                    transform: Transform::from_xyz(x as f32, 0.0, z as f32),
-                    tile: Tile { terrain },
-                    name: Name::new(format!("Tile {x},{z}")),
-                },
-                MapEntity,
-            ));
+            commands.spawn(zoning::LogicTileBundle {
+                transform: Transform::from_xyz(x as f32, 0.0, z as f32),
+                tile: Tile { terrain },
+                name: Name::new(format!("Tile {x},{z}")),
+                marker: MapEntity,
+            });
 
             let mut cost = crate::map::navigation::COST_BASE;
             if map_data.is_too_steep(x, z) {

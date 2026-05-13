@@ -1,9 +1,9 @@
 // src/map/river_gen.rs
+use crate::map::terrain_gen::TerrainConfig;
+use crate::map::zoning::{MapData, TerrainType};
 use bevy::prelude::*;
 use rand::prelude::*;
 use std::collections::{BinaryHeap, HashMap};
-use crate::map::zoning::{MapData, TerrainType};
-use crate::map::terrain_gen::TerrainConfig;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 struct Node {
@@ -21,6 +21,12 @@ impl PartialOrd for Node {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         Some(self.cmp(other))
     }
+}
+
+pub struct RiverGenPlugin;
+
+impl Plugin for RiverGenPlugin {
+    fn build(&self, _app: &mut App) {}
 }
 
 pub fn apply_rivers(map_data: &mut MapData, config: &TerrainConfig, seed: u32) {
@@ -42,31 +48,45 @@ pub fn apply_rivers(map_data: &mut MapData, config: &TerrainConfig, seed: u32) {
             }
         }
 
-        let Some(start_pos) = source else { continue; };
+        let Some(start_pos) = source else {
+            continue;
+        };
 
         // 2. Dijkstra
         let mut pq = BinaryHeap::new();
         let mut came_from = HashMap::new();
         let mut cost_so_far = HashMap::new();
 
-        pq.push(Node { pos: start_pos, cost: 0 });
+        pq.push(Node {
+            pos: start_pos,
+            cost: 0,
+        });
         cost_so_far.insert(start_pos, 0);
 
         let mut target_pos = None;
 
         while let Some(Node { pos, cost }) = pq.pop() {
-            let current_tile = map_data.get_tile(pos.x, pos.y).unwrap();
-            
+            let Some(current_tile) = map_data.get_tile(pos.x, pos.y) else {
+                continue;
+            };
+
             // Check termination: Edge of map, low elevation (ocean/lake), or existing Water
-            if pos.x <= -half_w || pos.x >= half_w - 1 || pos.y <= -half_h || pos.y >= half_h - 1 ||
-               current_tile.elevation < 0.2 || current_tile.terrain == TerrainType::Water {
+            if pos.x <= -half_w
+                || pos.x >= half_w - 1
+                || pos.y <= -half_h
+                || pos.y >= half_h - 1
+                || current_tile.elevation < 0.2
+                || current_tile.terrain == TerrainType::Water
+            {
                 target_pos = Some(pos);
                 break;
             }
 
             for neighbor in [
-                IVec2::new(pos.x + 1, pos.y), IVec2::new(pos.x - 1, pos.y),
-                IVec2::new(pos.x, pos.y + 1), IVec2::new(pos.x, pos.y - 1),
+                IVec2::new(pos.x + 1, pos.y),
+                IVec2::new(pos.x - 1, pos.y),
+                IVec2::new(pos.x, pos.y + 1),
+                IVec2::new(pos.x, pos.y - 1),
             ] {
                 if let Some(n_tile) = map_data.get_tile(neighbor.x, neighbor.y) {
                     let step_cost = if n_tile.elevation < current_tile.elevation {
@@ -78,10 +98,15 @@ pub fn apply_rivers(map_data: &mut MapData, config: &TerrainConfig, seed: u32) {
                     };
 
                     let new_cost = cost + step_cost;
-                    if !cost_so_far.contains_key(&neighbor) || new_cost < *cost_so_far.get(&neighbor).unwrap() {
+                    let current_best = cost_so_far.get(&neighbor).copied().unwrap_or(u32::MAX);
+
+                    if new_cost < current_best {
                         cost_so_far.insert(neighbor, new_cost);
                         came_from.insert(neighbor, pos);
-                        pq.push(Node { pos: neighbor, cost: new_cost });
+                        pq.push(Node {
+                            pos: neighbor,
+                            cost: new_cost,
+                        });
                     }
                 }
             }

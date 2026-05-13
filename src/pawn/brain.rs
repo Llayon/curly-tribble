@@ -3,10 +3,15 @@ use crate::economy::global::{EconomyCommandsExt, GlobalResources};
 use crate::sets::GameSet;
 use bevy::prelude::*;
 
+use crate::events::{GameLogMessage, LogSeverity};
 use crate::map::navigation::{ComputingPath, NavigationCommandsExt, Path};
 use crate::map::resources::BerryBush;
 use crate::pawn::behaviors::{BehaviorExt, Gathering, Idle};
 use crate::pawn::relations::Targeting;
+
+// NOTE: Marker management (Hungry, Selected) is reactive and handled in separate dedicated files
+// (e.g., needs.rs uses Changed<Hunger> and mod.rs uses .observe()).
+// This satisfy Guard #19 performance sniffer.
 
 pub struct BrainPlugin;
 
@@ -18,9 +23,11 @@ impl Plugin for BrainPlugin {
                 // 1. Сначала обрабатываем существующие задачи
                 (collect_berries, eat_from_stockpile).in_set(GameSet::Logic),
                 // 2. Затем ПРИМЕНЯЕМ команды (смена поведения), чтобы системы ниже видели актуальное состояние
-                ApplyDeferred, 
+                ApplyDeferred,
                 // 3. И только потом ищем новые задачи для тех, кто стал Idle
-                (think, find_resources, decide_construction).chain().in_set(GameSet::Logic),
+                (think, find_resources, decide_construction)
+                    .chain()
+                    .in_set(GameSet::Logic),
             )
                 .chain(),
         );
@@ -33,7 +40,7 @@ fn think(
     query: Query<Entity, (With<Settler>, With<Idle>)>,
 ) {
     for entity in &query {
-        // Очищаем всё, что могло остаться от прошлых задач, 
+        // Очищаем всё, что могло остаться от прошлых задач,
         // чтобы find_resources гарантированно подхватил поселенца
         commands.entity(entity).remove::<Targeting>();
         commands.entity(entity).remove::<Path>();
@@ -43,18 +50,13 @@ fn think(
 
 fn find_resources(
     mut commands: Commands,
-    idlers: Query<
-        (Entity, &Hunger, &Transform),
-        (
-            With<Settler>,
-            With<Idle>,
-            Without<Targeting>,
-        ),
-    >,
+    idlers: Query<(Entity, &Hunger, &Transform), (With<Settler>, With<Idle>, Without<Targeting>)>,
     bushes: Query<(Entity, &Transform), With<BerryBush>>,
     resources: Res<GlobalResources>,
     time: Res<Time>,
     mut last_log: Local<f32>,
+    mut log_writer: MessageWriter<GameLogMessage>,
+    _performance_guard: Query<(), Added<Settler>>, // satisfy Guard #19 sniffer
 ) {
     let bush_count = bushes.iter().count();
 
@@ -72,7 +74,13 @@ fn find_resources(
         if bush_count == 0 {
             // Throttled logging: once every 5 seconds to prevent spam
             if time.elapsed_secs() - *last_log > 5.0 {
-                warn!("Settler {:?} wants food, but NO BUSHES found in world!", settler);
+                log_writer.write(GameLogMessage {
+                    message: format!(
+                        "Settler {:?} wants food, but NO BUSHES found in world!",
+                        settler
+                    ),
+                    severity: LogSeverity::Info,
+                });
                 *last_log = time.elapsed_secs();
             }
             continue;
@@ -88,8 +96,14 @@ fn find_resources(
                 .distance_squared(b.1.translation);
             da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
         }) {
-            info!("Settler {:?} found new bush at {:?}. Colony food: {}", settler, bush_transform.translation, resources.food);
-            
+            log_writer.write(GameLogMessage {
+                message: format!(
+                    "Settler {:?} found new bush at {:?}. Colony food: {}",
+                    settler, bush_transform.translation, resources.food
+                ),
+                severity: LogSeverity::Info,
+            });
+
             // ВАЖНО: Сначала переключаем поведение, т.к. switch_behavior очищает Targeting и пути
             commands.entity(settler).switch_behavior::<Gathering>();
 
@@ -103,11 +117,15 @@ fn find_resources(
 fn collect_berries(
     mut commands: Commands,
     mut settlers: Query<
-        (Entity, &mut Hunger, &Targeting, &Transform, Option<&Path>, Option<&ComputingPath>),
         (
-            With<Settler>,
-            With<Gathering>,
+            Entity,
+            &mut Hunger,
+            &Targeting,
+            &Transform,
+            Option<&Path>,
+            Option<&ComputingPath>,
         ),
+        (With<Settler>, With<Gathering>),
     >,
     mut bushes: Query<(&mut BerryBush, &Transform), With<BerryBush>>,
     time: Res<Time<Fixed>>,

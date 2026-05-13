@@ -44,9 +44,7 @@ pub fn world_to_grid(pos: Vec3) -> IVec2 {
 
 #[must_use]
 pub fn grid_to_world(cell: IVec2, map: &crate::map::MapData) -> Vec3 {
-    let elevation = map
-        .get_tile(cell.x, cell.y)
-        .map_or(0.0, |t| t.elevation);
+    let elevation = map.get_tile(cell.x, cell.y).map_or(0.0, |t| t.elevation);
 
     Vec3::new(
         cell.x as f32,
