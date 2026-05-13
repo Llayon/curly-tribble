@@ -10,6 +10,8 @@ use resources::ResourcesPlugin;
 use river_gen::RiverGenPlugin;
 use terrain_gen::{TerrainConfig, TerrainGenerator};
 pub use zoning::{MapData, TerrainType, Tile, WorldSeed, MAX_HEIGHT};
+pub mod hex_math;
+pub use hex_math::HexCoord;
 
 pub mod atmosphere;
 pub mod construction;
@@ -170,66 +172,55 @@ fn spawn_map_internal(
 
     map_data.width = width;
     map_data.height = height;
-    map_data.tiles = vec![crate::map::zoning::TileData::default(); (width * height) as usize];
+    map_data.tiles.clear();
 
-    for x in -half_w..half_w {
-        for z in -half_h..half_h {
-            let elevation = terrain_gen.get_elevation(terrain_config, x as f32, z as f32);
+    for q in -half_w..half_w {
+        for r in -half_h..half_h {
+            let coord = HexCoord::new(q, r);
+            let world_pos = coord.to_world(zoning::HEX_SIZE);
+            
+            let elevation = terrain_gen.get_elevation(terrain_config, world_pos.x, world_pos.z);
             let normalized_elevation = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
 
             let temp_val =
-                ((temp_noise.get([f64::from(x) * 0.05, f64::from(z) * 0.05]) as f32) + 1.0) * 0.5;
+                ((temp_noise.get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05]) as f32) + 1.0) * 0.5;
             let humid_val =
-                ((humid_noise.get([f64::from(x) * 0.05, f64::from(z) * 0.05]) as f32) + 1.0) * 0.5;
+                ((humid_noise.get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05]) as f32) + 1.0) * 0.5;
 
             let terrain = get_terrain_from_climate(temp_val, humid_val, normalized_elevation);
 
-            if let Some(tile_data) = map_data.get_tile_mut(x, z) {
-                tile_data.terrain = terrain;
-                tile_data.elevation = normalized_elevation;
-                tile_data.temperature = temp_val;
-                tile_data.humidity = humid_val;
-                tile_data.roofed = false;
-            }
+            let tile_data = crate::map::zoning::TileData {
+                terrain,
+                elevation: normalized_elevation,
+                temperature: temp_val,
+                humidity: humid_val,
+                roofed: false,
+            };
+            map_data.tiles.insert(coord, tile_data);
         }
     }
 
-    // Apply Rivers and Mud Banks
-    river_gen::apply_rivers(map_data, terrain_config, seed.value());
-    river_gen::apply_mud_banks(map_data);
+    // Apply Rivers and Mud Banks (Temporarily disabled for Hex refactor)
+    // river_gen::apply_rivers(map_data, terrain_config, seed.value());
+    // river_gen::apply_mud_banks(map_data);
 
-    /*
-    let mut rng = StdRng::seed_from_u64(u64::from(seed.value()) + 100);
-    for x in -half_w..half_w {
-        for z in -half_h..half_h {
-            if let Some(tile_data) = map_data.get_tile(x, z) {
-                // ПРИМЕЧАНИЕ: Пещеры временно отключены для исправления визуальных багов геометрии.
-                if tile_data.terrain == TerrainType::Stone
-                    && rng.gen_bool(0.05)
-                    && tile_data.elevation > 0.6
-                {
-                    apply_cave_stamp(map_data, x, z);
-                }
-            }
-        }
-    }
-    */
-
-    for x in -half_w..half_w {
-        for z in -half_h..half_h {
-            let tile_data = map_data.get_tile(x, z).copied().unwrap_or_default();
+    for q in -half_w..half_w {
+        for r in -half_h..half_h {
+            let coord = HexCoord::new(q, r);
+            let tile_data = map_data.get_tile(q, r).copied().unwrap_or_default();
             let terrain = tile_data.terrain;
+            let world_pos = coord.to_world(zoning::HEX_SIZE);
 
             // Логическая сущность тайла (без меша) для кликов и ИИ
             commands.spawn(zoning::LogicTileBundle {
-                transform: Transform::from_xyz(x as f32, 0.0, z as f32),
+                transform: Transform::from_translation(world_pos),
                 tile: Tile { terrain },
-                name: Name::new(format!("Tile {x},{z}")),
+                name: Name::new(format!("Tile {q},{r}")),
                 marker: MapEntity,
             });
 
             let mut cost = crate::map::navigation::COST_BASE;
-            if map_data.is_too_steep(x, z) {
+            if map_data.is_too_steep(q, r) {
                 cost = crate::map::navigation::COST_BLOCKER;
             } else {
                 match terrain {
@@ -245,7 +236,7 @@ fn spawn_map_internal(
                     TerrainType::Grass | TerrainType::Sand | TerrainType::CaveFloor => {}
                 }
             }
-            nav_map.grid.insert(IVec2::new(x, z), cost);
+            nav_map.grid.insert(IVec2::new(q, r), cost);
         }
     }
 

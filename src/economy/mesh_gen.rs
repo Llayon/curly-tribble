@@ -1,5 +1,5 @@
 use crate::map::zoning::{
-    GlobalTerrainBundle, MapData, Roof, SmoothTileBundle, TerrainType, Tile, TileLayer, WaterBundle,
+    GlobalTerrainBundle, MapData, Roof, TerrainType, WaterBundle,
 };
 use crate::map::MapEntity;
 use bevy::asset::RenderAssetUsages;
@@ -36,6 +36,8 @@ impl Command for SpawnGlobalTerrainCommand {
             mesh: Mesh3d(terrain_handle),
             material: MeshMaterial3d(ground_mat),
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            visibility: Visibility::default(),
+            inherited_visibility: InheritedVisibility::default(),
             name: Name::new("Global Terrain"),
             marker: MapEntity,
         });
@@ -45,6 +47,8 @@ impl Command for SpawnGlobalTerrainCommand {
             mesh: Mesh3d(water_handle),
             material: MeshMaterial3d(water_mat),
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            visibility: Visibility::default(),
+            inherited_visibility: InheritedVisibility::default(),
             name: Name::new("Water Layer"),
             marker: MapEntity,
         });
@@ -54,6 +58,8 @@ impl Command for SpawnGlobalTerrainCommand {
             mesh: Mesh3d(roof_handle),
             material: MeshMaterial3d(mountain_mat),
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
+            visibility: Visibility::default(),
+            inherited_visibility: InheritedVisibility::default(),
             roof: Roof,
             name: Name::new("Global Mountain Roofs"),
             marker: MapEntity,
@@ -61,134 +67,110 @@ impl Command for SpawnGlobalTerrainCommand {
     }
 }
 
-pub struct SpawnSmoothTileCommand {
-    pub x: i32,
-    pub z: i32,
-    pub h_nw: f32,
-    pub h_ne: f32,
-    pub h_sw: f32,
-    pub h_se: f32,
-    pub offset_y: f32,
-    pub material: Handle<StandardMaterial>,
-    pub terrain: TerrainType,
-    pub layer: TileLayer,
-}
-
-impl Command for SpawnSmoothTileCommand {
-    fn apply(self, world: &mut World) {
-        let mesh = create_smooth_tile_mesh(self.h_nw, self.h_ne, self.h_sw, self.h_se);
-        let mut meshes = world.resource_mut::<Assets<Mesh>>();
-        let mesh_handle = meshes.add(mesh);
-
-        let mut entity = world.spawn(SmoothTileBundle {
-            mesh: Mesh3d(mesh_handle),
-            material: MeshMaterial3d(self.material),
-            transform: Transform::from_xyz(self.x as f32, self.offset_y, self.z as f32),
-            tile: Tile {
-                terrain: self.terrain,
-            },
-            marker: MapEntity,
-        });
-
-        match self.layer {
-            TileLayer::Roof => {
-                entity.insert(Roof);
-            }
-            TileLayer::Ground => {}
-        }
-    }
-}
-
 #[must_use]
 pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
-    let width = map.width;
-    let height = map.height;
-    let half_w = width.cast_signed() / 2;
-    let half_h = height.cast_signed() / 2;
-
-    // --- ТЕРРЕЙН (ВЕРШИНЫ И ЦВЕТА) ---
+    debug!("MESH_GEN: Starting global mesh generation for {} tiles.", map.tiles.len());
     let mut vertices = Vec::new();
     let mut colors = Vec::new();
+    let mut indices = Vec::new();
 
-    for z in -half_h..=half_h {
-        for x in -half_w..=half_w {
-            let h = map.get_corner_height(x, z);
-            vertices.push([x as f32, h, z as f32]);
+    let mut water_vertices = Vec::new();
+    let mut water_indices = Vec::new();
 
-            let tile = map.get_tile(x, z).or_else(|| map.get_tile(x - 1, z - 1));
-            let color = match tile.map_or(TerrainType::Grass, |t| t.terrain) {
-                TerrainType::Grass => [0.2, 0.5, 0.1, 1.0],
-                TerrainType::Mud => [0.3, 0.2, 0.1, 1.0],
-                TerrainType::Sand => [0.8, 0.7, 0.3, 1.0],
-                TerrainType::Stone => [0.4, 0.4, 0.4, 1.0],
-                TerrainType::Water => [0.1, 0.2, 0.5, 1.0],
-                TerrainType::CaveFloor => [0.1, 0.1, 0.1, 1.0],
-            };
+    let mut roof_vertices = Vec::new();
+    let mut roof_indices = Vec::new();
+
+    let size = crate::map::zoning::HEX_SIZE;
+    let mut vertex_count = 0;
+    let mut water_vertex_count = 0;
+    let mut roof_vertex_count = 0;
+
+    for (&coord, tile_data) in &map.tiles {
+        let center_world = coord.to_world(size);
+        let center_y = tile_data.elevation * crate::map::zoning::MAX_HEIGHT;
+        let color = match tile_data.terrain {
+            TerrainType::Grass => [0.2, 0.5, 0.1, 1.0],
+            TerrainType::Mud => [0.3, 0.2, 0.1, 1.0],
+            TerrainType::Sand => [0.8, 0.7, 0.3, 1.0],
+            TerrainType::Stone => [0.4, 0.4, 0.4, 1.0],
+            TerrainType::Water => [0.1, 0.2, 0.5, 1.0],
+            TerrainType::CaveFloor => [0.1, 0.1, 0.1, 1.0],
+        };
+
+        // Center vertex
+        vertices.push([center_world.x, center_y, center_world.z]);
+        colors.push(color);
+
+        // 6 Corner vertices
+        for i in 0..6 {
+            let angle_deg = 60.0 * i as f32 + 30.0;
+            let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
+            let vx = center_world.x + size * angle_rad.cos();
+            let vz = center_world.z + size * angle_rad.sin();
+            
+            // For now, use the same elevation as the center for corners
+            // In a more advanced version, we would average heights with neighbors
+            vertices.push([vx, center_y, vz]);
             colors.push(color);
         }
-    }
 
-    // --- ТЕРРЕЙН (ИНДЕКСЫ) ---
-    let mut indices = Vec::new();
-    let row_size = width + 1;
-    for z in 0..height {
-        for x in 0..width {
-            let nw = z * row_size + x;
-            let ne = nw + 1;
-            let sw = (z + 1) * row_size + x;
-            let se = sw + 1;
-            indices.extend_from_slice(&[nw, se, ne, nw, sw, se]);
+        // 6 Triangles
+        let base = vertex_count;
+        for i in 1..=6 {
+            let next = if i == 6 { 1 } else { i + 1 };
+            // Winding order: center, next_corner, current_corner (for normal pointing up in Y-up system)
+            indices.extend_from_slice(&[base, base + next, base + i]);
+        }
+        vertex_count += 7;
+
+        // --- WATER LAYER ---
+        if tile_data.terrain == TerrainType::Water {
+            water_vertices.push([center_world.x, center_y, center_world.z]);
+            for i in 0..6 {
+                let angle_deg = 60.0 * i as f32 + 30.0;
+                let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
+                let vx = center_world.x + size * angle_rad.cos();
+                let vz = center_world.z + size * angle_rad.sin();
+                water_vertices.push([vx, center_y, vz]);
+            }
+            let base_w = water_vertex_count;
+            for i in 1..=6 {
+                let next = if i == 6 { 1 } else { i + 1 };
+                water_indices.extend_from_slice(&[base_w, base_w + next, base_w + i]);
+            }
+            water_vertex_count += 7;
+        }
+
+        // --- ROOF LAYER ---
+        if tile_data.roofed {
+            let roof_y = center_y + 2.5;
+            roof_vertices.push([center_world.x, roof_y, center_world.z]);
+            for i in 0..6 {
+                let angle_deg = 60.0 * i as f32 + 30.0;
+                let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
+                let vx = center_world.x + size * angle_rad.cos();
+                let vz = center_world.z + size * angle_rad.sin();
+                roof_vertices.push([vx, roof_y, vz]);
+            }
+            let base_r = roof_vertex_count;
+            for i in 1..=6 {
+                let next = if i == 6 { 1 } else { i + 1 };
+                roof_indices.extend_from_slice(&[base_r, base_r + next, base_r + i]);
+            }
+            roof_vertex_count += 7;
         }
     }
+
+    debug!("MESH_GEN: Generated {} vertices for terrain.", vertices.len());
 
     let mut terrain_mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
     );
-    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices.clone());
+    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
     terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     terrain_mesh.insert_indices(Indices::U32(indices));
     terrain_mesh.compute_normals();
-
-    // --- ВОДА ---
-    let mut water_vertices = Vec::new();
-    let mut water_indices = Vec::new();
-    let mut water_vertex_count = 0;
-
-    for z in 0..height {
-        for x in 0..width {
-            let wx = x.cast_signed() - half_w;
-            let wz = z.cast_signed() - half_h;
-
-            if let Some(tile) = map.get_tile(wx, wz) {
-                if tile.terrain == TerrainType::Water {
-                    // Corners for this tile
-                    let nw_h = map.get_corner_height(wx, wz);
-                    let ne_h = map.get_corner_height(wx + 1, wz);
-                    let sw_h = map.get_corner_height(wx, wz + 1);
-                    let se_h = map.get_corner_height(wx + 1, wz + 1);
-
-                    let base = water_vertex_count;
-                    water_vertices.push([wx as f32, nw_h, wz as f32]);
-                    water_vertices.push([(wx + 1) as f32, ne_h, wz as f32]);
-                    water_vertices.push([wx as f32, sw_h, (wz + 1) as f32]);
-                    water_vertices.push([(wx + 1) as f32, se_h, (wz + 1) as f32]);
-
-                    // Two triangles for the quad
-                    // nw, se, ne
-                    water_indices.push(base);
-                    water_indices.push(base + 3);
-                    water_indices.push(base + 1);
-                    // nw, sw, se
-                    water_indices.push(base);
-                    water_indices.push(base + 2);
-                    water_indices.push(base + 3);
-
-                    water_vertex_count += 4;
-                }
-            }
-        }
-    }
 
     let mut water_mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
@@ -197,31 +179,6 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
     water_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, water_vertices);
     water_mesh.insert_indices(Indices::U32(water_indices));
     water_mesh.compute_normals();
-
-    // --- КРЫШИ (ROOFS) ---
-    // Используем ту же сетку вершин, но поднимаем их на offset и фильтруем индексы
-    let mut roof_indices = Vec::new();
-    let roof_offset = 2.5; // Поднимаем крышу выше (было 1.0)
-    let mut roof_vertices = vertices.clone(); // Начинаем с ландшафтных вершин
-    for v in &mut roof_vertices {
-        v[1] += roof_offset; // Поднимаем на метр
-    }
-
-    for z in 0..height {
-        for x in 0..width {
-            let wx = x.cast_signed() - half_w;
-            let wz = z.cast_signed() - half_h;
-            if let Some(tile) = map.get_tile(wx, wz) {
-                if tile.roofed {
-                    let nw = z * row_size + x;
-                    let ne = nw + 1;
-                    let sw = (z + 1) * row_size + x;
-                    let se = sw + 1;
-                    roof_indices.extend_from_slice(&[nw, se, ne, nw, sw, se]);
-                }
-            }
-        }
-    }
 
     let mut roof_mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
@@ -232,24 +189,4 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
     roof_mesh.compute_normals();
 
     (terrain_mesh, water_mesh, roof_mesh)
-}
-
-#[must_use]
-pub fn create_smooth_tile_mesh(
-    height_nw: f32,
-    height_ne: f32,
-    height_sw: f32,
-    height_se: f32,
-) -> Mesh {
-    let mut mesh = Mesh::from(Plane3d::default());
-    let vertices = vec![
-        [-0.5, height_nw, -0.5],
-        [0.5, height_ne, -0.5],
-        [-0.5, height_sw, 0.5],
-        [0.5, height_se, 0.5],
-    ];
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-    mesh.duplicate_vertices();
-    mesh.compute_flat_normals();
-    mesh
 }

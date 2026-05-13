@@ -21,14 +21,11 @@ pub fn update_cave_visibility(
 ) {
     let mut any_pawn_in_cave = false;
     for transform in &pawns {
-        let x = transform.translation.x.round() as i32;
-        let z = transform.translation.z.round() as i32;
-        if x >= -20 && z >= -20 {
-            if let Some(tile) = map.get_tile(x, z) {
-                if tile.roofed {
-                    any_pawn_in_cave = true;
-                    break;
-                }
+        let grid_pos = crate::map::navigation::types::world_to_grid(transform.translation);
+        if let Some(tile) = map.get_tile(grid_pos.x, grid_pos.y) {
+            if tile.roofed {
+                any_pawn_in_cave = true;
+                break;
             }
         }
     }

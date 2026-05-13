@@ -146,10 +146,11 @@ fn spawn_starting_settler(
     assets: Res<GameAssets>,
     map_data: Res<crate::map::zoning::MapData>,
 ) {
-    let spawn_x = 0;
-    let spawn_z = 0;
-    let elevation = map_data.get_corner_height(spawn_x, spawn_z);
-    let spawn_y = elevation + 0.5;
+    let spawn_q = 0;
+    let spawn_r = 0;
+    let mut spawn_pos = crate::map::HexCoord::new(spawn_q, spawn_r).to_world(crate::map::zoning::HEX_SIZE);
+    let elevation = map_data.get_hex_height(spawn_q, spawn_r);
+    spawn_pos.y = elevation + 0.5;
 
     let mut settler = commands.spawn(SettlerBundle {
         settler: Settler,
@@ -160,7 +161,7 @@ fn spawn_starting_settler(
         name: Name::new("Erik the Red"),
         mesh: Mesh3d(assets.settler_mesh.clone()),
         material: MeshMaterial3d(assets.settler_material.clone()),
-        transform: Transform::from_xyz(spawn_x as f32, spawn_y, spawn_z as f32),
+        transform: Transform::from_translation(spawn_pos),
     });
 
     // Инициализируем стартовое поведение через безопасный переключатель

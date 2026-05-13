@@ -1,6 +1,9 @@
+use crate::map::HexCoord;
 use bevy::prelude::*;
+use std::collections::HashMap;
 
 pub const MAX_HEIGHT: f32 = 12.0;
+pub const HEX_SIZE: f32 = 1.0;
 
 #[derive(Component, Debug, Clone, Copy, PartialEq, Eq)]
 #[allow(dead_code)]
@@ -10,7 +13,7 @@ pub enum ZoneType {
     Housing,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 pub enum TerrainType {
     #[default]
     Grass,
@@ -28,7 +31,7 @@ pub enum TileLayer {
     Roof,
 }
 
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Reflect)]
 pub struct TileData {
     pub terrain: TerrainType,
     pub elevation: f32,
@@ -41,57 +44,30 @@ pub struct TileData {
 pub struct MapData {
     pub width: u32,
     pub height: u32,
-    pub tiles: Vec<TileData>,
+    pub tiles: HashMap<HexCoord, TileData>,
 }
 
 impl MapData {
     #[must_use]
-    pub fn get_tile(&self, x: i32, z: i32) -> Option<&TileData> {
-        let ux = (x + (self.width.cast_signed() / 2)).cast_unsigned();
-        let uz = (z + (self.height.cast_signed() / 2)).cast_unsigned();
-        if ux < self.width && uz < self.height {
-            Some(&self.tiles[(uz * self.width + ux) as usize])
-        } else {
-            None
-        }
+    pub fn get_tile(&self, q: i32, r: i32) -> Option<&TileData> {
+        self.tiles.get(&HexCoord::new(q, r))
     }
 
-    pub fn get_tile_mut(&mut self, x: i32, z: i32) -> Option<&mut TileData> {
-        let ux = (x + (self.width.cast_signed() / 2)).cast_unsigned();
-        let uz = (z + (self.height.cast_signed() / 2)).cast_unsigned();
-        if ux < self.width && uz < self.height {
-            Some(&mut self.tiles[(uz * self.width + ux) as usize])
-        } else {
-            None
-        }
+    pub fn get_tile_mut(&mut self, q: i32, r: i32) -> Option<&mut TileData> {
+        self.tiles.get_mut(&HexCoord::new(q, r))
     }
 
     #[must_use]
-    pub fn get_corner_height(&self, x: i32, z: i32) -> f32 {
-        let mut total = 0.0;
-        let mut count = 0;
-        for dx in -1..=0 {
-            for dz in -1..=0 {
-                if let Some(tile) = self.get_tile(x + dx, z + dz) {
-                    total += tile.elevation;
-                    count += 1;
-                }
-            }
-        }
-        if count > 0 {
-            (total / count as f32) * MAX_HEIGHT
-        } else if let Some(tile) = self.get_tile(x, z) {
-            tile.elevation * MAX_HEIGHT
-        } else {
-            0.0
-        }
+    pub fn get_hex_height(&self, q: i32, r: i32) -> f32 {
+        self.get_tile(q, r).map_or(0.0, |t| t.elevation * MAX_HEIGHT)
     }
 
     #[must_use]
-    pub fn is_too_steep(&self, x: i32, z: i32) -> bool {
-        let current_elev = self.get_tile(x, z).map_or(0.0, |t| t.elevation);
-        for (dx, dz) in [(1, 0), (-1, 0), (0, 1), (0, -1)] {
-            if let Some(neighbor) = self.get_tile(x + dx, z + dz) {
+    pub fn is_too_steep(&self, q: i32, r: i32) -> bool {
+        let current_elev = self.get_tile(q, r).map_or(0.0, |t| t.elevation);
+        let coord = HexCoord::new(q, r);
+        for neighbor_coord in coord.neighbors() {
+            if let Some(neighbor) = self.tiles.get(&neighbor_coord) {
                 if (neighbor.elevation - current_elev).abs() > 0.3 {
                     return true;
                 }
@@ -154,6 +130,8 @@ pub struct GlobalTerrainBundle {
     pub mesh: Mesh3d,
     pub material: MeshMaterial3d<StandardMaterial>,
     pub transform: Transform,
+    pub visibility: Visibility,
+    pub inherited_visibility: InheritedVisibility,
     pub name: Name,
     pub marker: MapEntity,
 }
@@ -163,6 +141,8 @@ pub struct WaterBundle {
     pub mesh: Mesh3d,
     pub material: MeshMaterial3d<StandardMaterial>,
     pub transform: Transform,
+    pub visibility: Visibility,
+    pub inherited_visibility: InheritedVisibility,
     pub name: Name,
     pub marker: MapEntity,
 }
@@ -172,6 +152,8 @@ pub struct MountainRoofBundle {
     pub mesh: Mesh3d,
     pub material: MeshMaterial3d<StandardMaterial>,
     pub transform: Transform,
+    pub visibility: Visibility,
+    pub inherited_visibility: InheritedVisibility,
     pub roof: Roof,
     pub name: Name,
     pub marker: MapEntity,

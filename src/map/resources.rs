@@ -58,15 +58,15 @@ fn spawn_resources(
     let half_w = map_data.width as i32 / 2;
     let half_h = map_data.height as i32 / 2;
 
-    for x in -half_w..half_w {
-        for z in -half_h..half_h {
-            let tile = match map_data.get_tile(x, z) {
+    for q in -half_w..half_w {
+        for r in -half_h..half_h {
+            let tile = match map_data.get_tile(q, r) {
                 Some(t) => t,
                 None => continue,
             };
 
-            let elevation = map_data.get_corner_height(x, z);
-            let pos = Vec3::new(x as f32, elevation, z as f32);
+            let mut pos = crate::map::HexCoord::new(q, r).to_world(crate::map::zoning::HEX_SIZE);
+            pos.y = map_data.get_hex_height(q, r);
 
             match tile.terrain {
                 TerrainType::Grass => {

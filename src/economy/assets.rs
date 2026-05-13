@@ -45,7 +45,10 @@ pub fn setup_assets(
         settler_material: materials.add(Color::srgb(0.9, 0.7, 0.6)),
         settler_selected_material: materials.add(Color::srgb(1.0, 1.0, 0.2)),
         ground_mesh: meshes.add(Plane3d::default().mesh().size(1.0, 1.0)),
-        ground_material: materials.add(Color::srgb(0.3, 0.5, 0.3)),
+        ground_material: materials.add(StandardMaterial {
+            base_color: Color::WHITE,
+            ..default()
+        }),
         mud_material: materials.add(Color::srgb(0.4, 0.3, 0.2)),
         sand_material: materials.add(Color::srgb(0.8, 0.7, 0.4)),
         water_material: materials.add(StandardMaterial {
