@@ -29,8 +29,9 @@ impl Plugin for RiverGenPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
+#[allow(clippy::cast_possible_wrap)]
 pub fn apply_rivers(map_data: &mut MapData, config: &TerrainConfig, seed: u32) {
-    let mut rng = StdRng::seed_from_u64(seed as u64 + 500);
+    let mut rng = StdRng::seed_from_u64(u64::from(seed) + 500);
     let half_w = (map_data.width / 2) as i32;
     let half_h = (map_data.height / 2) as i32;
 
@@ -113,16 +114,26 @@ pub fn apply_rivers(map_data: &mut MapData, config: &TerrainConfig, seed: u32) {
         }
 
         // 3. Backtrack and mark water
-        if let Some(mut curr) = target_pos {
+        if let Some(target) = target_pos {
+            let mut path = Vec::new();
+            let mut curr = target;
             while let Some(&prev) = came_from.get(&curr) {
-                if let Some(tile) = map_data.get_tile_mut(curr.x, curr.y) {
-                    tile.terrain = TerrainType::Water;
-                }
+                path.push(curr);
                 curr = prev;
             }
-            // Mark the source itself if needed (the backtrack usually stops at the source's child)
-            if let Some(tile) = map_data.get_tile_mut(start_pos.x, start_pos.y) {
-                tile.terrain = TerrainType::Water;
+            path.push(start_pos);
+            path.reverse();
+
+            let mut prev_elev = 1.0; // Start high for normalized elevation
+            for pos in path {
+                if let Some(tile) = map_data.get_tile_mut(pos.x, pos.y) {
+                    tile.terrain = TerrainType::Water;
+                    // Carve: Lower elevation and ensure it never goes up (monotonically decreasing to sea)
+                    tile.elevation = (tile.elevation - config.river_depth)
+                        .min(prev_elev)
+                        .max(0.0);
+                    prev_elev = tile.elevation;
+                }
             }
         }
     }
@@ -160,8 +171,34 @@ pub fn apply_mud_banks(map_data: &mut MapData) {
     }
 
     for pos in mud_to_add {
+        let mut water_elevs = Vec::new();
+        let mut land_elevs = Vec::new();
+
+        for dx in -1..=1 {
+            for dz in -1..=1 {
+                if dx == 0 && dz == 0 {
+                    continue;
+                }
+                if let Some(n_tile) = map_data.get_tile(pos.x + dx, pos.y + dz) {
+                    if n_tile.terrain == TerrainType::Water {
+                        water_elevs.push(n_tile.elevation);
+                    } else if matches!(
+                        n_tile.terrain,
+                        TerrainType::Grass | TerrainType::Sand | TerrainType::Stone
+                    ) {
+                        land_elevs.push(n_tile.elevation);
+                    }
+                }
+            }
+        }
+
         if let Some(tile) = map_data.get_tile_mut(pos.x, pos.y) {
             tile.terrain = TerrainType::Mud;
+            if !water_elevs.is_empty() && !land_elevs.is_empty() {
+                let avg_water: f32 = water_elevs.iter().sum::<f32>() / water_elevs.len() as f32;
+                let avg_land: f32 = land_elevs.iter().sum::<f32>() / land_elevs.len() as f32;
+                tile.elevation = f32::midpoint(avg_water, avg_land);
+            }
         }
     }
 }
