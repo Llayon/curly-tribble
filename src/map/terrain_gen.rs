@@ -41,6 +41,8 @@ pub struct TerrainConfig {
     pub river_count: u32,
     #[inspector(min = 0.3, max = 0.9)]
     pub river_start_elevation: f32,
+    #[inspector(min = 0.0, max = 0.2)]
+    pub river_depth: f32,
     pub generate_mud_banks: bool,
 }
 
@@ -62,6 +64,7 @@ impl Default for TerrainConfig {
             warp_strength: 2.0,
             river_count: 5,
             river_start_elevation: 0.6,
+            river_depth: 0.05,
             generate_mud_banks: true,
         }
     }

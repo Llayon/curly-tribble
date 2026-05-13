@@ -126,7 +126,7 @@ fn handle_regeneration(
     }
 }
 
-/// Система, которая следит за "кнопками-галками" в инспекторе TerrainConfig
+/// Система, которая следит за "кнопками-галками" в инспекторе `TerrainConfig`
 fn monitor_inspector_triggers(
     mut config: ResMut<TerrainConfig>,
     mut ev_gen: MessageWriter<GenerateMapEvent>,
@@ -198,11 +198,12 @@ fn spawn_map_internal(
     river_gen::apply_rivers(map_data, terrain_config, seed.value());
     river_gen::apply_mud_banks(map_data);
 
+    /*
     let mut rng = StdRng::seed_from_u64(u64::from(seed.value()) + 100);
     for x in -half_w..half_w {
         for z in -half_h..half_h {
             if let Some(tile_data) = map_data.get_tile(x, z) {
-                // Пещеры стали реже (5% вместо 20%) и только на возвышенностях (> 0.6)
+                // ПРИМЕЧАНИЕ: Пещеры временно отключены для исправления визуальных багов геометрии.
                 if tile_data.terrain == TerrainType::Stone
                     && rng.gen_bool(0.05)
                     && tile_data.elevation > 0.6
@@ -212,6 +213,7 @@ fn spawn_map_internal(
             }
         }
     }
+    */
 
     for x in -half_w..half_w {
         for z in -half_h..half_h {
@@ -253,6 +255,7 @@ fn spawn_map_internal(
     });
 }
 
+#[allow(dead_code)]
 fn apply_cave_stamp(map: &mut MapData, x: i32, z: i32) {
     for dx in -1..=1 {
         for dz in -1..=1 {

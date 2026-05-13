@@ -91,29 +91,25 @@ fn spawn_resources(
                         });
                     }
                 }
-                TerrainType::Mud => {
-                    if rng.gen_bool(0.15) {
-                        commands.spawn(BerryBushBundle {
-                            bush: BerryBush { food_amount: 10.0 },
-                            scene: SceneRoot(assets.bush_scene.clone()),
-                            transform: Transform::from_translation(pos),
-                            obstacle: crate::map::navigation::NavObstacle {
-                                cost: crate::map::navigation::COST_BLOCKER,
-                            },
-                        });
-                    }
+                TerrainType::Mud if rng.gen_bool(0.15) => {
+                    commands.spawn(BerryBushBundle {
+                        bush: BerryBush { food_amount: 10.0 },
+                        scene: SceneRoot(assets.bush_scene.clone()),
+                        transform: Transform::from_translation(pos),
+                        obstacle: crate::map::navigation::NavObstacle {
+                            cost: crate::map::navigation::COST_BLOCKER,
+                        },
+                    });
                 }
-                TerrainType::Stone | TerrainType::Sand => {
-                    if rng.gen_bool(0.12) {
-                        commands.spawn(RockBundle {
-                            rock: Rock,
-                            scene: SceneRoot(assets.rock_scene.clone()),
-                            transform: Transform::from_translation(pos),
-                            obstacle: crate::map::navigation::NavObstacle {
-                                cost: crate::map::navigation::COST_BLOCKER,
-                            },
-                        });
-                    }
+                TerrainType::Stone | TerrainType::Sand if rng.gen_bool(0.12) => {
+                    commands.spawn(RockBundle {
+                        rock: Rock,
+                        scene: SceneRoot(assets.rock_scene.clone()),
+                        transform: Transform::from_translation(pos),
+                        obstacle: crate::map::navigation::NavObstacle {
+                            cost: crate::map::navigation::COST_BLOCKER,
+                        },
+                    });
                 }
                 _ => {}
             }

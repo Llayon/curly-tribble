@@ -1,6 +1,6 @@
 use bevy::prelude::*;
 use bevy_ai_remote::BevyAiRemotePlugin;
-use savage_fantasy::*;
+use savage_fantasy::{camera, economy, events, game_state, map, pawn, sets, ui};
 
 // --- CONSTANTS ---
 const WINDOW_TITLE: &str = "Savage Fantasy";

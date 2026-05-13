@@ -24,6 +24,7 @@ pub struct TargetedBy(Vec<Entity>);
 
 impl TargetedBy {
     #[allow(dead_code)]
+    #[must_use]
     pub fn entities(&self) -> &[Entity] {
         &self.0
     }
@@ -41,6 +42,7 @@ pub struct Illuminating(Vec<Entity>);
 
 impl Illuminating {
     #[allow(dead_code)]
+    #[must_use]
     pub fn entities(&self) -> &[Entity] {
         &self.0
     }

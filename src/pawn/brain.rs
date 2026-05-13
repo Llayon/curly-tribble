@@ -76,8 +76,7 @@ fn find_resources(
             if time.elapsed_secs() - *last_log > 5.0 {
                 log_writer.write(GameLogMessage {
                     message: format!(
-                        "Settler {:?} wants food, but NO BUSHES found in world!",
-                        settler
+                        "Settler {settler:?} wants food, but NO BUSHES found in world!"
                     ),
                     severity: LogSeverity::Info,
                 });

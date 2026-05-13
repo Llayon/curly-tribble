@@ -87,13 +87,16 @@ pub struct Hungry; // Состояние: нуждается в пище
 pub struct Hunger(f32); // Уровень голода (0 - сыт, 100 - истощен)
 
 impl Hunger {
+    #[must_use]
     pub fn new(value: f32) -> Self {
         Self(value.clamp(0.0, 100.0))
     }
+    #[must_use]
     pub fn value(self) -> f32 {
         self.0
     }
     #[allow(dead_code)]
+    #[must_use]
     pub fn is_starving(self) -> bool {
         self.0 >= 90.0
     }
@@ -109,9 +112,11 @@ impl Hunger {
 pub struct Morale(f32); // Боевой дух (100 - решимость, 0 - уныние)
 
 impl Morale {
+    #[must_use]
     pub fn new(value: f32) -> Self {
         Self(value.clamp(0.0, 100.0))
     }
+    #[must_use]
     pub fn value(self) -> f32 {
         self.0
     }

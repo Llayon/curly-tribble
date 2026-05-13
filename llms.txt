@@ -10,6 +10,11 @@
 - [SOP: Bevy 0.18.1 Patterns](docs/superpowers/patterns/bevy_018_standards.md): Standards for Hooks, Hierarchy, and Reactivity.
 - [SOP: Zenith Navigator](docs/superpowers/patterns/zenith_navigator.md): Standards for asynchronous, reactive pathfinding.
 - [ADR 0004: Procedural Generation](docs/superpowers/adr/0004-procedural-world-generation.md): Rules for Noise, Global Smooth Meshes, Biome Blending, Water Layer, and Premium PBR Lighting (CSM, SSAO, Bloom).
+- [SOP: A River Routing](docs/superpowers/patterns/a_river_routing.md): Pathfinding-based river generation on terraced terrain.
+- [Design: Advanced Terrain Generation](docs/superpowers/specs/2026-05-11-advanced-terrain-gen-design.md): Sharp ridges, pass masks, and terraced plateaus logic.
+- [Plan: Advanced Terrain Implementation](docs/superpowers/plans/2026-05-11-advanced-terrain-gen.md): Technical steps for the unified TerrainConfig inspector.
+- [Design: Procedural Rivers](docs/superpowers/specs/2026-05-12-pathfinding-rivers-design.md): Dijkstra-based river routing and mud banks.
+- [Plan: Procedural Rivers](docs/superpowers/plans/2026-05-12-procedural-rivers.md): Step-by-step implementation guide for the river system.
 - [Plan: Premium PBR Lighting](docs/superpowers/plans/2026-05-09-premium-pbr-lighting.md): Implementation of the 4-layer cinematic lighting system.
 - **Visual Stability**: Resolved "Gray Screen" by consolidating UI and World rendering into a single Camera3d and implementing TAA for SSAO compatibility.
 
