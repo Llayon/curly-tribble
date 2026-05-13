@@ -151,17 +151,52 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
     terrain_mesh.compute_normals();
 
     // --- ВОДА ---
-    let water_level = 0.2 * crate::map::zoning::MAX_HEIGHT;
-    let w_size_x = width as f32;
-    let w_size_z = height as f32;
-    let mut water_mesh = Mesh::from(Plane3d::new(Vec3::Y, Vec2::new(w_size_x, w_size_z)));
-    let water_vertices = vec![
-        [-w_size_x / 2.0, water_level, -w_size_z / 2.0],
-        [w_size_x / 2.0, water_level, -w_size_z / 2.0],
-        [-w_size_x / 2.0, water_level, w_size_z / 2.0],
-        [w_size_x / 2.0, water_level, w_size_z / 2.0],
-    ];
+    let mut water_vertices = Vec::new();
+    let mut water_indices = Vec::new();
+    let mut water_vertex_count = 0;
+
+    for z in 0..height {
+        for x in 0..width {
+            let wx = x.cast_signed() - half_w;
+            let wz = z.cast_signed() - half_h;
+
+            if let Some(tile) = map.get_tile(wx, wz) {
+                if tile.terrain == TerrainType::Water {
+                    // Corners for this tile
+                    let nw_h = map.get_corner_height(wx, wz);
+                    let ne_h = map.get_corner_height(wx + 1, wz);
+                    let sw_h = map.get_corner_height(wx, wz + 1);
+                    let se_h = map.get_corner_height(wx + 1, wz + 1);
+
+                    let base = water_vertex_count;
+                    water_vertices.push([wx as f32, nw_h, wz as f32]);
+                    water_vertices.push([(wx + 1) as f32, ne_h, wz as f32]);
+                    water_vertices.push([wx as f32, sw_h, (wz + 1) as f32]);
+                    water_vertices.push([(wx + 1) as f32, se_h, (wz + 1) as f32]);
+
+                    // Two triangles for the quad
+                    // nw, se, ne
+                    water_indices.push(base);
+                    water_indices.push(base + 3);
+                    water_indices.push(base + 1);
+                    // nw, sw, se
+                    water_indices.push(base);
+                    water_indices.push(base + 2);
+                    water_indices.push(base + 3);
+
+                    water_vertex_count += 4;
+                }
+            }
+        }
+    }
+
+    let mut water_mesh = Mesh::new(
+        PrimitiveTopology::TriangleList,
+        RenderAssetUsages::default(),
+    );
     water_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, water_vertices);
+    water_mesh.insert_indices(Indices::U32(water_indices));
+    water_mesh.compute_normals();
 
     // --- КРЫШИ (ROOFS) ---
     // Используем ту же сетку вершин, но поднимаем их на offset и фильтруем индексы
