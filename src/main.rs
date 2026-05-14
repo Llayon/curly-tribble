@@ -50,9 +50,10 @@ fn main() {
             map::MapPlugin,
             map::atmosphere::AtmospherePlugin,
             pawn::PawnPlugin,
-            ui::UiPlugin,
         ))
-        // 3. Conditional Debug Tools
+        // 3. UI and Finalization
+        .add_plugins(ui::UiPlugin)
+        // 4. Conditional Debug Tools
         .add_systems(Update, |_keyboard: Res<ButtonInput<KeyCode>>| {
             #[cfg(debug_assertions)]
             {

@@ -1,6 +1,8 @@
 use crate::economy::GlobalResources;
+use crate::game_state::EditorPhase;
 use crate::sets::{GameSet, StartupSet};
 use bevy::prelude::*;
+use bevy_egui::{egui, EguiContexts};
 
 pub mod details;
 pub mod logs;
@@ -24,9 +26,48 @@ impl Plugin for UiPlugin {
                         .run_if(resource_changed::<GlobalResources>)
                         .in_set(GameSet::Visuals),
                     details::update_settler_detail_ui.in_set(GameSet::Visuals),
+                    editor_phase_ui.before(GameSet::Input),
                 ),
             );
     }
+}
+
+fn editor_phase_ui(
+    mut contexts: EguiContexts,
+    current_phase: Res<State<EditorPhase>>,
+    mut next_phase: ResMut<NextState<EditorPhase>>,
+    mut frame_count: Local<u32>,
+) {
+    *frame_count += 1;
+    if *frame_count < 10 {
+        return;
+    }
+
+    let ctx = match contexts.ctx_mut().ok() {
+        Some(ctx) => ctx,
+        None => return,
+    };
+
+    egui::Window::new("Editor Phases").show(ctx, |ui| {
+        ui.horizontal(|ui| {
+            let phases = [
+                EditorPhase::Shape,
+                EditorPhase::Sediments,
+                EditorPhase::Flora,
+                EditorPhase::Height3D,
+            ];
+
+            for phase in phases {
+                let label = format!("{:?}", phase);
+                if ui
+                    .selectable_label(*current_phase.get() == phase, label)
+                    .clicked()
+                {
+                    next_phase.set(phase);
+                }
+            }
+        });
+    });
 }
 
 fn setup_ui(mut commands: Commands) {

@@ -64,10 +64,16 @@ impl Plugin for MapPlugin {
                 (
                     handle_regeneration,
                     monitor_inspector_triggers.run_if(resource_changed::<TerrainConfig>),
+                    rebuild_map_on_phase_change.run_if(state_changed::<crate::game_state::EditorPhase>),
                 )
                     .in_set(GameSet::Logic),
             );
     }
+}
+
+fn rebuild_map_on_phase_change(mut ev_gen: MessageWriter<GenerateMapEvent>) {
+    debug!("STATE_CHANGE: EditorPhase changed. Triggering map rebuild.");
+    ev_gen.write(GenerateMapEvent);
 }
 
 #[derive(Bundle)]
@@ -88,6 +94,7 @@ fn handle_regeneration(
     mut map_data: ResMut<MapData>,
     mut nav_map: ResMut<crate::map::navigation::NavigationMap>,
     mut log_writer: MessageWriter<GameLogMessage>,
+    phase: Res<State<crate::game_state::EditorPhase>>,
 ) {
     for _ in ev_gen.read() {
         debug!("MAP_GEN: Received GenerateMapEvent. Starting cleanup...");
@@ -119,6 +126,7 @@ fn handle_regeneration(
             &seed,
             &mut map_data,
             &mut nav_map,
+            *phase.get(),
         );
 
         log_writer.write(GameLogMessage {
@@ -161,6 +169,7 @@ fn spawn_map_internal(
     seed: &WorldSeed,
     map_data: &mut MapData,
     nav_map: &mut crate::map::navigation::NavigationMap,
+    phase: crate::game_state::EditorPhase,
 ) {
     let temp_noise = Fbm::<Perlin>::new(seed.value() + 1);
     let humid_noise = Fbm::<Perlin>::new(seed.value() + 2);
@@ -243,6 +252,7 @@ fn spawn_map_internal(
     // Создаем глобальный ландшафт, воду и крыши одной командой
     commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
         map_data: map_data.clone(),
+        phase,
     });
 }
 

@@ -11,6 +11,7 @@
 - [SOP: Zenith Navigator](docs/superpowers/patterns/zenith_navigator.md): Standards for asynchronous, reactive pathfinding.
 - [ADR 0004: Procedural Generation](docs/superpowers/adr/0004-procedural-world-generation.md): Rules for Noise, Global Smooth Meshes, Biome Blending, Water Layer, and Premium PBR Lighting (CSM, SSAO, Bloom).
 - [ADR 0005: Hexagonal Grid Transition](docs/superpowers/adr/0005-hexagonal-grid-transition.md): Transition from square grid to axial hexagonal grid.
+- **Editor Phases**: State-based rendering logic (`Shape`, `Sediments`, `Flora`, `Height3D`). Early phases use flat unlit meshes with black grid lines (Gizmos), while `Height3D` uses full elevation and PBR lighting.
 - [SOP: A River Routing](docs/superpowers/patterns/a_river_routing.md): Pathfinding-based river generation on terraced terrain.
 - [Design: Advanced Terrain Generation](docs/superpowers/specs/2026-05-11-advanced-terrain-gen-design.md): Sharp ridges, pass masks, and terraced plateaus logic.
 - [Plan: Advanced Terrain Implementation](docs/superpowers/plans/2026-05-11-advanced-terrain-gen.md): Technical steps for the unified TerrainConfig inspector.

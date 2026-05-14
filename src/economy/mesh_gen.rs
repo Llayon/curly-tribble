@@ -1,3 +1,4 @@
+use crate::game_state::EditorPhase;
 use crate::map::zoning::{
     GlobalTerrainBundle, MapData, Roof, TerrainType, WaterBundle,
 };
@@ -10,16 +11,24 @@ use bevy::render::render_resource::PrimitiveTopology;
 pub struct MeshGenPlugin;
 
 impl Plugin for MeshGenPlugin {
-    fn build(&self, _app: &mut App) {}
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            Update,
+            draw_hex_grid_gizmos.run_if(not(in_state(EditorPhase::Height3D))),
+        );
+    }
 }
 
 pub struct SpawnGlobalTerrainCommand {
     pub map_data: MapData,
+    pub phase: EditorPhase,
 }
 
 impl Command for SpawnGlobalTerrainCommand {
     fn apply(self, world: &mut World) {
-        let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(&self.map_data);
+        let is_flat = self.phase != EditorPhase::Height3D;
+
+        let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(&self.map_data, is_flat);
 
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
         let terrain_handle = meshes.add(mesh);
@@ -30,6 +39,14 @@ impl Command for SpawnGlobalTerrainCommand {
         let ground_mat = assets.ground_material.clone();
         let water_mat = assets.water_material.clone();
         let mountain_mat = assets.mountain_material.clone();
+
+        let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
+        if let Some(mat) = materials.get_mut(&ground_mat) {
+            mat.unlit = is_flat;
+        }
+        if let Some(mat) = materials.get_mut(&water_mat) {
+            mat.unlit = is_flat;
+        }
 
         // Спавним основной ландшафт
         world.spawn(GlobalTerrainBundle {
@@ -68,8 +85,12 @@ impl Command for SpawnGlobalTerrainCommand {
 }
 
 #[must_use]
-pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
-    debug!("MESH_GEN: Starting global mesh generation for {} tiles.", map.tiles.len());
+pub fn create_global_map_meshes(map: &MapData, is_flat: bool) -> (Mesh, Mesh, Mesh) {
+    debug!(
+        "MESH_GEN: Starting global mesh generation for {} tiles (Flat: {}).",
+        map.tiles.len(),
+        is_flat
+    );
     let mut vertices = Vec::new();
     let mut colors = Vec::new();
     let mut indices = Vec::new();
@@ -87,7 +108,11 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
 
     for (&coord, tile_data) in &map.tiles {
         let center_world = coord.to_world(size);
-        let center_y = tile_data.elevation * crate::map::zoning::MAX_HEIGHT;
+        let center_y = if is_flat {
+            0.0
+        } else {
+            tile_data.elevation * crate::map::zoning::MAX_HEIGHT
+        };
         let color = match tile_data.terrain {
             TerrainType::Grass => [0.2, 0.5, 0.1, 1.0],
             TerrainType::Mud => [0.3, 0.2, 0.1, 1.0],
@@ -107,9 +132,7 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
             let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
             let vx = center_world.x + size * angle_rad.cos();
             let vz = center_world.z + size * angle_rad.sin();
-            
-            // For now, use the same elevation as the center for corners
-            // In a more advanced version, we would average heights with neighbors
+
             vertices.push([vx, center_y, vz]);
             colors.push(color);
         }
@@ -118,7 +141,6 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
         let base = vertex_count;
         for i in 1..=6 {
             let next = if i == 6 { 1 } else { i + 1 };
-            // Winding order: center, next_corner, current_corner (for normal pointing up in Y-up system)
             indices.extend_from_slice(&[base, base + next, base + i]);
         }
         vertex_count += 7;
@@ -189,4 +211,28 @@ pub fn create_global_map_meshes(map: &MapData) -> (Mesh, Mesh, Mesh) {
     roof_mesh.compute_normals();
 
     (terrain_mesh, water_mesh, roof_mesh)
+}
+
+fn draw_hex_grid_gizmos(mut gizmos: Gizmos, map: Res<MapData>) {
+    let size = crate::map::zoning::HEX_SIZE;
+    let color = Color::BLACK;
+    let y = 0.01;
+
+    for &coord in map.tiles.keys() {
+        let center = coord.to_world(size);
+        let mut points = Vec::new();
+
+        for i in 0..6 {
+            let angle_deg = 60.0 * i as f32 + 30.0;
+            let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
+            let vx = center.x + size * angle_rad.cos();
+            let vz = center.z + size * angle_rad.sin();
+            points.push(Vec3::new(vx, y, vz));
+        }
+        // Замыкаем контур
+        let first = points[0];
+        points.push(first);
+
+        gizmos.linestrip(points, color);
+    }
 }
