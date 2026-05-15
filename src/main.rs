@@ -36,9 +36,9 @@ fn main() {
         // 2. Grouped Registration
         // External/Integration Plugins
         .add_plugins((
+            bevy_egui::EguiPlugin::default(),
             BevyAiRemotePlugin,
             MeshPickingPlugin,
-            bevy_egui::EguiPlugin::default(),
         ))
         // Internal Game Plugins
         .add_plugins((

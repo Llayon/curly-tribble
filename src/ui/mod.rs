@@ -1,8 +1,8 @@
 use crate::economy::GlobalResources;
-use crate::game_state::EditorPhase;
+use crate::game_state::{EditorPhase, GameState};
 use crate::sets::{GameSet, StartupSet};
 use bevy::prelude::*;
-use bevy_egui::{egui, EguiContexts};
+use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
 
 pub mod details;
 pub mod logs;
@@ -26,9 +26,14 @@ impl Plugin for UiPlugin {
                         .run_if(resource_changed::<GlobalResources>)
                         .in_set(GameSet::Visuals),
                     details::update_settler_detail_ui.in_set(GameSet::Visuals),
-                    editor_phase_ui.before(GameSet::Input),
                 ),
             );
+
+        // В Bevy 0.18.1 / bevy_egui 0.39 используем специальный Schedule для Egui
+        app.add_systems(
+            EguiPrimaryContextPass,
+            editor_phase_ui.run_if(in_state(GameState::Playing)),
+        );
     }
 }
 
@@ -36,38 +41,44 @@ fn editor_phase_ui(
     mut contexts: EguiContexts,
     current_phase: Res<State<EditorPhase>>,
     mut next_phase: ResMut<NextState<EditorPhase>>,
-    mut frame_count: Local<u32>,
 ) {
-    *frame_count += 1;
-    if *frame_count < 10 {
-        return;
-    }
-
     let ctx = match contexts.ctx_mut().ok() {
         Some(ctx) => ctx,
         None => return,
     };
 
-    egui::Window::new("Editor Phases").show(ctx, |ui| {
-        ui.horizontal(|ui| {
-            let phases = [
-                EditorPhase::Shape,
-                EditorPhase::Sediments,
-                EditorPhase::Flora,
-                EditorPhase::Height3D,
-            ];
+    egui::Window::new("Editor Phases")
+        .id(egui::Id::new("stable_editor_phases_window"))
+        .default_pos(egui::pos2(150.0, 150.0))
+        .default_size(egui::vec2(320.0, 100.0))
+        .movable(true)
+        .resizable(true)
+        .title_bar(true)
+        .collapsible(true)
+        .show(ctx, |ui| {
+            ui.vertical(|ui| {
+                ui.label("Window Status: Live & Draggable");
+                
+                ui.horizontal_wrapped(|ui| {
+                    let phases = [
+                        EditorPhase::Shape,
+                        EditorPhase::Sediments,
+                        EditorPhase::Flora,
+                        EditorPhase::Height3D,
+                    ];
 
-            for phase in phases {
-                let label = format!("{:?}", phase);
-                if ui
-                    .selectable_label(*current_phase.get() == phase, label)
-                    .clicked()
-                {
-                    next_phase.set(phase);
-                }
-            }
+                    for phase in phases {
+                        let label = format!("{:?}", phase);
+                        if ui
+                            .selectable_label(*current_phase.get() == phase, label)
+                            .clicked()
+                        {
+                            next_phase.set(phase);
+                        }
+                    }
+                });
+            });
         });
-    });
 }
 
 fn setup_ui(mut commands: Commands) {

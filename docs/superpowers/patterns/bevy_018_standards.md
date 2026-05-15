@@ -25,3 +25,12 @@
 ## Command Application (Race Conditions)
 - **Rule**: Bevy `Commands` are not applied immediately within chained systems. When a custom `Command`'s `apply` method runs, any further `world.commands()` queued inside it will suffer a 1-tick delay.
 - **Pattern**: When implementing `Command::apply(self, world: &mut World)`, use `world.get_entity_mut()` or `world.get_resource_mut()` to insert components or mutate resources *immediately*. This prevents race conditions where subsequent chained systems fail their query filters (e.g. `Without<ComputingPath>`).
+
+## Bevy Egui 0.39 Integration (Multi-Pass UI)
+- **Rule**: All `egui::Window` systems MUST be added to the `EguiPrimaryContextPass` schedule instead of standard `Update`.
+- **Why**: This ensures that font initialization is complete and input events are synchronized, preventing `No fonts available` panics and "stuck" non-interactive windows.
+- **Pattern**: 
+  ```rust
+  app.add_systems(EguiPrimaryContextPass, my_ui_system);
+  ```
+- **Interactivity**: Always use a stable `egui::Id` for windows and ensure `title_bar(true)` is set for draggability. Use `horizontal_wrapped` inside `ScrollArea` to prevent "shrink-wrap" layout locks.
