@@ -160,14 +160,6 @@ pub struct MountainRoofBundle {
     pub marker: MapEntity,
 }
 
-#[derive(Bundle)]
-pub struct LogicTileBundle {
-    pub transform: Transform,
-    pub tile: Tile,
-    pub name: Name,
-    pub marker: MapEntity,
-}
-
 #[derive(Component)]
 #[allow(dead_code)]
 pub struct Zone(pub ZoneType);

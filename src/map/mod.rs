@@ -108,26 +108,23 @@ fn handle_regeneration(
     for _ in ev_gen.read() {
         debug!("MAP_GEN: Received GenerateMapEvent. Starting cleanup...");
 
-        // 1. Очистка старого мира
-        let mut count = 0;
+        // 1. Глубокая очистка мира
         for entity in &q_map_entities {
-            commands.entity(entity).despawn(); // Т.к. иерархий нет, обычного despawn достаточно
-            count += 1;
+            commands.entity(entity).despawn_recursive();
         }
-        debug!("MAP_GEN: Despawned {} map entities.", count);
+        debug!("MAP_GEN: Map entities cleaned.");
 
         nav_map.grid.clear();
-        debug!("MAP_GEN: Navigation grid cleared.");
 
-        // 2. Обновление ресурсов на основе конфига
+        // 2. Обновление ресурсов
         *seed = WorldSeed::new(config.seed);
         *terrain_gen = TerrainGenerator::new(config.seed);
-        debug!(
-            "MAP_GEN: Generator re-initialized with seed {}.",
-            config.seed
-        );
+        
+        // Синхронизируем размеры в MapData
+        map_data.width = config.map_width;
+        map_data.height = config.map_height;
 
-        // 3. Спавн нового мира
+        // 3. Полный цикл спавна
         spawn_map_internal(
             &mut commands,
             &terrain_gen,
@@ -139,7 +136,7 @@ fn handle_regeneration(
         );
 
         log_writer.write(GameLogMessage {
-            message: format!("World regenerated with seed {}", config.seed),
+            message: format!("World regenerated: {}x{}, seed {}", config.map_width, config.map_height, config.seed),
             severity: LogSeverity::Info,
         });
     }
@@ -298,18 +295,8 @@ fn spawn_map_internal(
 
     for q in -half_w..half_w {
         for r in -half_h..half_h {
-            let coord = HexCoord::new(q, r);
             let tile_data = map_data.get_tile(q, r).copied().unwrap_or_default();
             let terrain = tile_data.terrain;
-            let world_pos = coord.to_world(zoning::HEX_SIZE);
-
-            // Логическая сущность тайла (без меша) для кликов и ИИ
-            commands.spawn(zoning::LogicTileBundle {
-                transform: Transform::from_translation(world_pos),
-                tile: Tile { terrain },
-                name: Name::new(format!("Tile {q},{r}")),
-                marker: MapEntity,
-            });
 
             let mut cost = crate::map::navigation::COST_BASE;
             if tile_data.is_ocean {

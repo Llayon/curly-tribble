@@ -37,6 +37,9 @@ pub struct TerrainConfig {
     #[inspector(min = 0.0, max = 20.0)]
     pub warp_strength: f32,
 
+    #[inspector(min = 0.0, max = 2.0)]
+    pub island_shape_weight: f32,
+
     #[inspector(min = 0, max = 30)]
     pub river_count: u32,
     #[inspector(min = 0.3, max = 0.9)]
@@ -62,6 +65,7 @@ impl Default for TerrainConfig {
             plateau_steps: 3.0,
             warp_freq: 0.02,
             warp_strength: 2.0,
+            island_shape_weight: 1.0,
             river_count: 5,
             river_start_elevation: 0.6,
             river_depth: 0.05,
@@ -100,6 +104,15 @@ impl TerrainGenerator {
         let x64 = f64::from(x);
         let z64 = f64::from(z);
 
+        // 0. DISTANCE MASK (Inspired by mapgen4)
+        // Normalized coordinates [-1, 1]
+        let size = config.map_width as f32 * crate::map::zoning::HEX_SIZE;
+        let nx = (x / (size * 0.5)).clamp(-1.0, 1.0);
+        let nz = (z / (size * 0.5)).clamp(-1.0, 1.0);
+        let distance = (nx * nx + nz * nz).sqrt().min(1.0);
+        // "Dome" mask: 1.0 at center, 0.0 at edges
+        let mask = (1.0 - distance * distance).max(0.0);
+
         // 1. MACRO: Ridged Mountains with Pass Mask
         let ridge_val = self
             .macro_noise
@@ -131,8 +144,12 @@ impl TerrainGenerator {
         let plateaus =
             Self::smoothstep_terracing(plateau_base, config.plateau_steps) * config.plateau_height;
 
-        // 3. BLENDING: Max() for predictable range
-        mountains.max(plateaus)
+        // 3. BLENDING & MASKING
+        let base_elevation = mountains.max(plateaus);
+        
+        // Apply distance mask weighted by config
+        // This ensures the island shape dominates the edges
+        (base_elevation * (1.0 + config.island_shape_weight * (mask - 0.5))).max(0.0)
     }
 
     fn smoothstep_terracing(val: f32, steps: f32) -> f32 {
