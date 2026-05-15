@@ -29,6 +29,9 @@ pub struct MapEntity;
 #[derive(Message)]
 pub struct GenerateMapEvent;
 
+#[derive(Message)]
+pub struct RebuildMeshEvent;
+
 pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
@@ -42,6 +45,7 @@ impl Plugin for MapPlugin {
                 TerrainConfig,
             >::default())
             .add_message::<GenerateMapEvent>()
+            .add_message::<RebuildMeshEvent>()
             .add_plugins((
                 zoning::ZoningPlugin,
                 ResourcesPlugin,
@@ -62,11 +66,16 @@ impl Plugin for MapPlugin {
             .add_systems(
                 Update,
                 (
-                    handle_regeneration,
-                    monitor_inspector_triggers.run_if(resource_changed::<TerrainConfig>),
-                    rebuild_map_on_phase_change.run_if(state_changed::<crate::game_state::EditorPhase>),
-                )
-                    .in_set(GameSet::Logic),
+                    handle_regeneration.in_set(GameSet::Logic),
+                    handle_rebuild_mesh.in_set(GameSet::Logic),
+                    handle_shape_tools.in_set(GameSet::Logic),
+                    monitor_inspector_triggers
+                        .run_if(resource_changed::<TerrainConfig>)
+                        .in_set(GameSet::Logic),
+                    rebuild_map_on_phase_change
+                        .run_if(state_changed::<crate::game_state::EditorPhase>)
+                        .in_set(GameSet::Logic),
+                ),
             );
     }
 }
@@ -136,6 +145,71 @@ fn handle_regeneration(
     }
 }
 
+fn handle_rebuild_mesh(
+    mut commands: Commands,
+    mut ev_rebuild: MessageReader<RebuildMeshEvent>,
+    q_map_entities: Query<Entity, With<MapEntity>>,
+    map_data: Res<MapData>,
+    phase: Res<State<crate::game_state::EditorPhase>>,
+) {
+    for _ in ev_rebuild.read() {
+        // Очистка только мешей (MapEntity)
+        for entity in &q_map_entities {
+            commands.entity(entity).despawn();
+        }
+
+        // Спавн только мешей на основе существующих MapData
+        commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
+            map_data: map_data.clone(),
+            phase: *phase.get(),
+        });
+    }
+}
+
+fn handle_shape_tools(
+    mouse: Res<ButtonInput<MouseButton>>,
+    q_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    q_window: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    mut map_data: ResMut<MapData>,
+    current_tool: Res<crate::game_state::CurrentTool>,
+    phase: Res<State<crate::game_state::EditorPhase>>,
+    mut ev_rebuild: MessageWriter<RebuildMeshEvent>,
+) {
+    if *phase.get() != crate::game_state::EditorPhase::Shape
+        || current_tool.shape == crate::game_state::ShapeTool::None
+    {
+        return;
+    }
+
+    if mouse.pressed(MouseButton::Left) || mouse.pressed(MouseButton::Right) {
+        let Ok((camera, camera_transform)) = q_camera.single() else {
+            return;
+        };
+        let Ok(window) = q_window.single() else {
+            return;
+        };
+
+        if let Some(cursor_pos) = window.cursor_position() {
+            if let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
+                // Плейн на высоте 0 для кликов
+                let distance = ray.origin.y / -ray.direction.y;
+                if distance > 0.0 {
+                    let world_pos = ray.origin + ray.direction * distance;
+
+                    let coord = crate::map::hex_math::HexCoord::from_world(world_pos, zoning::HEX_SIZE);
+                    if let Some(tile) = map_data.get_tile_mut(coord.q, coord.r) {
+                        let is_ocean = mouse.pressed(MouseButton::Left);
+                        if tile.is_ocean != is_ocean {
+                            tile.is_ocean = is_ocean;
+                            ev_rebuild.write(RebuildMeshEvent);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Система, которая следит за "кнопками-галками" в инспекторе `TerrainConfig`
 fn monitor_inspector_triggers(
     mut config: ResMut<TerrainConfig>,
@@ -191,12 +265,20 @@ fn spawn_map_internal(
             let elevation = terrain_gen.get_elevation(terrain_config, world_pos.x, world_pos.z);
             let normalized_elevation = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
 
-            let temp_val =
-                ((temp_noise.get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05]) as f32) + 1.0) * 0.5;
-            let humid_val =
-                ((humid_noise.get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05]) as f32) + 1.0) * 0.5;
+            // Обязательный океан по краям (минимум 2 гекса)
+            let is_ocean_border = q <= -half_w + 1 || q >= half_w - 2 || r <= -half_h + 1 || r >= half_h - 2;
 
-            let terrain = get_terrain_from_climate(temp_val, humid_val, normalized_elevation);
+            // На фазе Shape мы используем только базовый ландшафт (Grass) или Ocean
+            // Климат и сложные типы почв (Mud, Sand, Stone) подключатся позже
+            let (terrain, temp_val, humid_val) = if phase == crate::game_state::EditorPhase::Shape {
+                (TerrainType::Grass, 0.5, 0.5)
+            } else {
+                let temp =
+                    ((temp_noise.get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05]) as f32) + 1.0) * 0.5;
+                let humid =
+                    ((humid_noise.get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05]) as f32) + 1.0) * 0.5;
+                (get_terrain_from_climate(temp, humid, normalized_elevation), temp, humid)
+            };
 
             let tile_data = crate::map::zoning::TileData {
                 terrain,
@@ -204,6 +286,7 @@ fn spawn_map_internal(
                 temperature: temp_val,
                 humidity: humid_val,
                 roofed: false,
+                is_ocean: is_ocean_border,
             };
             map_data.tiles.insert(coord, tile_data);
         }
@@ -229,7 +312,9 @@ fn spawn_map_internal(
             });
 
             let mut cost = crate::map::navigation::COST_BASE;
-            if map_data.is_too_steep(q, r) {
+            if tile_data.is_ocean {
+                cost = crate::map::navigation::COST_BLOCKER;
+            } else if map_data.is_too_steep(q, r) {
                 cost = crate::map::navigation::COST_BLOCKER;
             } else {
                 match terrain {

@@ -108,18 +108,22 @@ pub fn create_global_map_meshes(map: &MapData, is_flat: bool) -> (Mesh, Mesh, Me
 
     for (&coord, tile_data) in &map.tiles {
         let center_world = coord.to_world(size);
-        let center_y = if is_flat {
+        let center_y = if is_flat || tile_data.is_ocean {
             0.0
         } else {
             tile_data.elevation * crate::map::zoning::MAX_HEIGHT
         };
-        let color = match tile_data.terrain {
-            TerrainType::Grass => [0.2, 0.5, 0.1, 1.0],
-            TerrainType::Mud => [0.3, 0.2, 0.1, 1.0],
-            TerrainType::Sand => [0.8, 0.7, 0.3, 1.0],
-            TerrainType::Stone => [0.4, 0.4, 0.4, 1.0],
-            TerrainType::Water => [0.1, 0.2, 0.5, 1.0],
-            TerrainType::CaveFloor => [0.1, 0.1, 0.1, 1.0],
+        let color = if tile_data.is_ocean {
+            [0.02, 0.05, 0.3, 1.0] // Deep Ocean Blue
+        } else {
+            match tile_data.terrain {
+                TerrainType::Grass => [0.2, 0.5, 0.1, 1.0],
+                TerrainType::Mud => [0.3, 0.2, 0.1, 1.0],
+                TerrainType::Sand => [0.8, 0.7, 0.3, 1.0],
+                TerrainType::Stone => [0.4, 0.4, 0.4, 1.0],
+                TerrainType::Water => [0.1, 0.2, 0.5, 1.0],
+                TerrainType::CaveFloor => [0.1, 0.1, 0.1, 1.0],
+            }
         };
 
         // Center vertex

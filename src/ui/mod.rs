@@ -1,5 +1,5 @@
 use crate::economy::GlobalResources;
-use crate::game_state::{EditorPhase, GameState};
+use crate::game_state::{CurrentTool, EditorPhase, GameState, ShapeTool};
 use crate::sets::{GameSet, StartupSet};
 use bevy::prelude::*;
 use bevy_egui::{egui, EguiContexts, EguiPrimaryContextPass};
@@ -41,6 +41,7 @@ fn editor_phase_ui(
     mut contexts: EguiContexts,
     current_phase: Res<State<EditorPhase>>,
     mut next_phase: ResMut<NextState<EditorPhase>>,
+    mut current_tool: ResMut<CurrentTool>,
 ) {
     let ctx = match contexts.ctx_mut().ok() {
         Some(ctx) => ctx,
@@ -57,8 +58,7 @@ fn editor_phase_ui(
         .collapsible(true)
         .show(ctx, |ui| {
             ui.vertical(|ui| {
-                ui.label("Window Status: Live & Draggable");
-                
+                ui.label("Phases:");
                 ui.horizontal_wrapped(|ui| {
                     let phases = [
                         EditorPhase::Shape,
@@ -77,6 +77,25 @@ fn editor_phase_ui(
                         }
                     }
                 });
+
+                if *current_phase.get() == EditorPhase::Shape {
+                    ui.separator();
+                    ui.label("Shape Tools:");
+                    ui.horizontal(|ui| {
+                        if ui
+                            .selectable_label(current_tool.shape == ShapeTool::None, "None")
+                            .clicked()
+                        {
+                            current_tool.shape = ShapeTool::None;
+                        }
+                        if ui
+                            .selectable_label(current_tool.shape == ShapeTool::Ocean, "Ocean")
+                            .clicked()
+                        {
+                            current_tool.shape = ShapeTool::Ocean;
+                        }
+                    });
+                }
             });
         });
 }

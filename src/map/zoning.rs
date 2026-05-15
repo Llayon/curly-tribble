@@ -38,6 +38,7 @@ pub struct TileData {
     pub humidity: f32,
     pub temperature: f32,
     pub roofed: bool,
+    pub is_ocean: bool,
 }
 
 #[derive(Resource, Default, Clone)]
