@@ -34,3 +34,13 @@
   app.add_systems(EguiPrimaryContextPass, my_ui_system);
   ```
 - **Interactivity**: Always use a stable `egui::Id` for windows and ensure `title_bar(true)` is set for draggability. Use `horizontal_wrapped` inside `ScrollArea` to prevent "shrink-wrap" layout locks.
+
+## Procedural Mesh Management (VRAM Leaks)
+- **Rule**: All procedural meshes created at runtime MUST be tracked and manually removed from `Assets<Mesh>` when replaced.
+- **Why**: Bevy's `Assets` collection does not automatically garbage collect GPU memory when handles are dropped if those handles are stored in `Mesh3d` components or other resources. Frequent world regeneration without manual `remove()` will lead to VRAM exhaustion and renderer panics.
+- **Pattern**: Use a dedicated `Resource` (e.g., `GeneratedMapAssets`) to store `Option<Handle<Mesh>>` and call `meshes.remove(&h)` before spawning a new map.
+
+## Phased Map Generation
+- **Rule**: Separate 2D shape probability (Shape Phase) from 3D elevation and micro-details (Detail Phases).
+- **Optimization**: Phase 1 MUST use a lightweight 2D pass (e.g., `get_shape_value`) to determine land/ocean boundaries. Full 3D calculations (terracing, plateaus, warping) should only trigger once the user leaves the shaping phase.
+- **Persistence**: User-painted data (like `is_ocean`) MUST be preserved across phase transitions and only reset upon explicit world regeneration (new seed).
