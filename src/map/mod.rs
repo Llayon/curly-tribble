@@ -2,7 +2,7 @@ use crate::economy::mesh_gen::MeshGenPlugin;
 use crate::events::{GameLogMessage, LogSeverity};
 use crate::sets::{GameSet, StartupSet};
 use bevy::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 use construction::ConstructionPlugin;
 use navigation::NavigationPlugin;
 use noise::{Fbm, NoiseFn, OpenSimplex};
@@ -72,6 +72,7 @@ impl Plugin for MapPlugin {
                     handle_regeneration.in_set(GameSet::Logic),
                     handle_rebuild_mesh.in_set(GameSet::Logic),
                     handle_shape_tools.in_set(GameSet::Logic),
+                    validate_faction_placements.in_set(GameSet::Logic),
                     monitor_inspector_triggers
                         .run_if(resource_changed::<TerrainConfig>)
                         .in_set(GameSet::Logic),
@@ -100,6 +101,7 @@ fn handle_regeneration(
     mut commands: Commands,
     mut ev_gen: MessageReader<GenerateMapEvent>,
     q_map_entities: Query<Entity, With<MapEntity>>,
+    q_faction_markers: Query<Entity, With<zoning::FactionMarker>>,
     config: Res<TerrainConfig>,
     mut seed: ResMut<WorldSeed>,
     mut terrain_gen: ResMut<TerrainGenerator>,
@@ -114,6 +116,13 @@ fn handle_regeneration(
         // 1. Глубокая очистка мира
         for entity in &q_map_entities {
             commands.entity(entity).despawn();
+        }
+        
+        // Если это полный сброс, удаляем и фракции
+        if ev.force_reset {
+            for entity in &q_faction_markers {
+                commands.entity(entity).despawn();
+            }
         }
         debug!("MAP_GEN: Map entities cleaned.");
 
@@ -139,12 +148,99 @@ fn handle_regeneration(
             ev.force_reset,
         );
 
+        if ev.force_reset {
+            spawn_factions(&mut commands, &map_data, config.seed);
+        }
+
         map_data.run_validation();
 
         log_writer.write(GameLogMessage {
             message: format!("World regenerated: {}x{}, seed {}", config.map_width, config.map_height, config.seed),
             severity: LogSeverity::Info,
         });
+    }
+}
+
+fn spawn_factions(commands: &mut Commands, map_data: &MapData, seed: u32) {
+    use crate::game_state::FactionType;
+    use crate::map::zoning::{FactionMarker, FactionMarkerBundle};
+    
+    let mut rng = rand::rngs::StdRng::seed_from_u64(u64::from(seed));
+    let land_tiles: Vec<_> = map_data.tiles.iter()
+        .filter(|(_, t)| !t.is_ocean)
+        .map(|(c, _)| *c)
+        .collect();
+
+    if land_tiles.is_empty() { return; }
+
+    let factions = [
+        (FactionType::Player, "Player Start"),
+        (FactionType::Neutral, "Neutral Village 1"),
+        (FactionType::Neutral, "Neutral Village 2"),
+        (FactionType::Enemy, "Enemy Camp 1"),
+        (FactionType::Enemy, "Enemy Camp 2"),
+    ];
+
+    for (f_type, name) in factions {
+        if let Some(coord) = land_tiles.choose(&mut rng) {
+            commands.spawn(FactionMarkerBundle {
+                marker: FactionMarker {
+                    faction_type: f_type,
+                    hex_coord: *coord,
+                },
+                name: Name::new(name.to_string()),
+                transform: Transform::from_translation(coord.to_world(zoning::HEX_SIZE)),
+                visibility: Visibility::Visible,
+                inherited_visibility: InheritedVisibility::default(),
+            });
+        }
+    }
+}
+
+fn validate_faction_placements(
+    map_data: Res<MapData>,
+    mut q_factions: Query<(&mut zoning::FactionMarker, &mut Transform)>,
+) {
+    if map_data.is_changed() {
+        for (mut marker, mut transform) in &mut q_factions {
+            let coord = marker.hex_coord;
+            let is_invalid = map_data.get_tile(coord.q, coord.r).map_or(true, |t| t.is_ocean);
+
+            if is_invalid {
+                // Реактивная релокация: BFS поиск ближайшей суши
+                let mut visited = HashSet::new();
+                let mut queue = VecDeque::new();
+                queue.push_back(coord);
+                visited.insert(coord);
+
+                let mut found_coord = None;
+                while let Some(curr) = queue.pop_front() {
+                    if let Some(tile) = map_data.get_tile(curr.q, curr.r) {
+                        if !tile.is_ocean {
+                            found_coord = Some(curr);
+                            break;
+                        }
+                    }
+                    
+                    if visited.len() > 400 { break; }
+
+                    for neighbor in curr.neighbors() {
+                        if !visited.contains(&neighbor) {
+                            visited.insert(neighbor);
+                            queue.push_back(neighbor);
+                        }
+                    }
+                }
+
+                if let Some(new_coord) = found_coord {
+                    marker.hex_coord = new_coord;
+                    transform.translation = new_coord.to_world(zoning::HEX_SIZE);
+                    debug!("FACTION: Relocated faction to {:?}", new_coord);
+                }
+            } else {
+                transform.translation = coord.to_world(zoning::HEX_SIZE);
+            }
+        }
     }
 }
 
@@ -156,12 +252,10 @@ fn handle_rebuild_mesh(
     phase: Res<State<crate::game_state::EditorPhase>>,
 ) {
     for _ in ev_rebuild.read() {
-        // Очистка только мешей (MapEntity)
         for entity in &q_map_entities {
             commands.entity(entity).despawn();
         }
 
-        // Спавн только мешей на основе существующих MapData
         commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
             map_data: map_data.clone(),
             phase: *phase.get(),
@@ -194,7 +288,6 @@ fn handle_shape_tools(
 
         if let Some(cursor_pos) = window.cursor_position() {
             if let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
-                // Плейн на высоте 0 для кликов
                 let distance = ray.origin.y / -ray.direction.y;
                 if distance > 0.0 {
                     let world_pos = ray.origin + ray.direction * distance;
@@ -214,7 +307,6 @@ fn handle_shape_tools(
     }
 }
 
-/// Система, которая следит за "кнопками-галками" в инспекторе `TerrainConfig`
 fn monitor_inspector_triggers(
     mut config: ResMut<TerrainConfig>,
     mut ev_gen: MessageWriter<GenerateMapEvent>,
@@ -268,7 +360,6 @@ fn spawn_map_internal(
             let coord = HexCoord::new(q, r);
             let world_pos = coord.to_world(zoning::HEX_SIZE);
             
-            // 1. Сохраняем состояние океана, если это НЕ форсированный сброс
             let is_border = q <= -half_w + 1 || q >= half_w - 2 || r <= -half_h + 1 || r >= half_h - 2;
             
             let mut is_ocean = if force_reset {
@@ -286,9 +377,7 @@ fn spawn_map_internal(
 
             if is_border { is_ocean = true; }
 
-            // 2. Расчет высоты и климата
             let (terrain, temp_val, humid_val, normalized_elevation) = if phase == crate::game_state::EditorPhase::Shape {
-                // На фазе Shape мы НЕ считаем сложную 3D-высоту, только форму
                 (TerrainType::Grass, 0.5, 0.5, 0.1)
             } else {
                 let elevation = terrain_gen.get_elevation(terrain_config, world_pos.x, world_pos.z);

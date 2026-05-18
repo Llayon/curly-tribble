@@ -13,9 +13,18 @@ pub enum GameState {
 pub enum EditorPhase {
     #[default]
     Shape,
+    Factions,
+    Landscape,
     Sediments,
-    Flora,
     Height3D,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum FactionType {
+    #[default]
+    Player,
+    Neutral,
+    Enemy,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
@@ -25,10 +34,18 @@ pub enum ShapeTool {
     Ocean,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum FactionTool {
+    #[default]
+    None,
+    Move,
+}
+
 #[derive(Resource, Default, Reflect)]
 #[reflect(Resource)]
 pub struct CurrentTool {
     pub shape: ShapeTool,
+    pub faction: FactionTool,
 }
 
 pub struct GameStatePlugin;
@@ -39,7 +56,9 @@ impl Plugin for GameStatePlugin {
             .init_state::<EditorPhase>()
             .init_resource::<CurrentTool>()
             .register_type::<EditorPhase>()
+            .register_type::<FactionType>()
             .register_type::<ShapeTool>()
+            .register_type::<FactionTool>()
             .register_type::<CurrentTool>()
             .add_systems(PostStartup, start_game);
     }

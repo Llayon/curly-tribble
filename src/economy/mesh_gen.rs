@@ -1,6 +1,6 @@
-use crate::game_state::EditorPhase;
+use crate::game_state::{EditorPhase, FactionType};
 use crate::map::zoning::{
-    GlobalTerrainBundle, MapData, Roof, TerrainType, WaterBundle,
+    FactionMarker, GlobalTerrainBundle, MapData, Roof, TerrainType, WaterBundle,
 };
 use crate::map::MapEntity;
 use bevy::asset::RenderAssetUsages;
@@ -22,7 +22,10 @@ impl Plugin for MeshGenPlugin {
         app.init_resource::<GeneratedMapAssets>()
             .add_systems(
                 Update,
-                draw_hex_grid_gizmos.run_if(not(in_state(EditorPhase::Height3D))),
+                (
+                    draw_hex_grid_gizmos.run_if(not(in_state(EditorPhase::Height3D))),
+                    draw_factions_gizmos.run_if(in_state(EditorPhase::Factions)),
+                ),
             );
     }
 }
@@ -49,7 +52,7 @@ impl Command for SpawnGlobalTerrainCommand {
         if let Some(h) = old_handles.2 { meshes.remove(&h); }
 
         // 2. Генерация новых мешей
-        let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(&self.map_data, is_flat);
+        let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(&self.map_data, self.phase);
         
         // Повторно берем meshes т.к. remove мог его дропнуть (но Command имеет &mut World)
         let terrain_handle = meshes.add(mesh);
@@ -111,11 +114,15 @@ impl Command for SpawnGlobalTerrainCommand {
 }
 
 #[must_use]
-pub fn create_global_map_meshes(map: &MapData, is_flat: bool) -> (Mesh, Mesh, Mesh) {
+pub fn create_global_map_meshes(map: &MapData, phase: EditorPhase) -> (Mesh, Mesh, Mesh) {
+    let is_flat = phase != EditorPhase::Height3D;
+    let is_factions_filter = phase == EditorPhase::Factions;
+
     debug!(
-        "MESH_GEN: Starting global mesh generation for {} tiles (Flat: {}).",
+        "MESH_GEN: Starting global mesh generation for {} tiles (Flat: {}, FactionsFilter: {}).",
         map.tiles.len(),
-        is_flat
+        is_flat,
+        is_factions_filter
     );
     let mut vertices = Vec::new();
     let mut colors = Vec::new();
@@ -139,8 +146,11 @@ pub fn create_global_map_meshes(map: &MapData, is_flat: bool) -> (Mesh, Mesh, Me
         } else {
             tile_data.elevation * crate::map::zoning::MAX_HEIGHT
         };
+        
         let color = if tile_data.is_ocean {
             [0.02, 0.05, 0.3, 1.0] // Deep Ocean Blue
+        } else if is_factions_filter {
+            [0.15, 0.15, 0.18, 1.0] // Dark Gray for Factions Phase
         } else {
             match tile_data.terrain {
                 TerrainType::Grass => [0.2, 0.5, 0.1, 1.0],
@@ -176,7 +186,7 @@ pub fn create_global_map_meshes(map: &MapData, is_flat: bool) -> (Mesh, Mesh, Me
         vertex_count += 7;
 
         // --- WATER LAYER ---
-        if tile_data.terrain == TerrainType::Water {
+        if tile_data.terrain == TerrainType::Water && !tile_data.is_ocean {
             water_vertices.push([center_world.x, center_y, center_world.z]);
             for i in 0..6 {
                 let angle_deg = 60.0 * i as f32 + 30.0;
@@ -241,6 +251,37 @@ pub fn create_global_map_meshes(map: &MapData, is_flat: bool) -> (Mesh, Mesh, Me
     roof_mesh.compute_normals();
 
     (terrain_mesh, water_mesh, roof_mesh)
+}
+
+fn draw_factions_gizmos(mut gizmos: Gizmos, q_factions: Query<&FactionMarker>) {
+    let size = crate::map::zoning::HEX_SIZE;
+    let y = 0.05; // Slightly above mesh
+
+    for marker in &q_factions {
+        let center = marker.hex_coord.to_world(size);
+        let color = match marker.faction_type {
+            FactionType::Player => Color::srgba(0.2, 0.4, 1.0, 0.8),   // Bright Blue
+            FactionType::Neutral => Color::srgba(0.8, 0.8, 0.2, 0.8),  // Yellow
+            FactionType::Enemy => Color::srgba(1.0, 0.2, 0.2, 0.8),    // Red
+        };
+
+        let mut points = Vec::new();
+        for i in 0..6 {
+            let angle_deg = 60.0 * i as f32 + 30.0;
+            let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
+            let vx = center.x + size * 0.9 * angle_rad.cos();
+            let vz = center.z + size * 0.9 * angle_rad.sin();
+            points.push(Vec3::new(vx, y, vz));
+        }
+        
+        let first = points[0];
+        points.push(first);
+        gizmos.linestrip(points.clone(), color);
+        
+        gizmos.line(points[0], points[3], color);
+        gizmos.line(points[1], points[4], color);
+        gizmos.line(points[2], points[5], color);
+    }
 }
 
 fn draw_hex_grid_gizmos(mut gizmos: Gizmos, map: Res<MapData>) {

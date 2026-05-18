@@ -66,8 +66,9 @@ fn editor_phase_ui(
                 ui.horizontal_wrapped(|ui| {
                     let phases = [
                         EditorPhase::Shape,
+                        EditorPhase::Factions,
+                        EditorPhase::Landscape,
                         EditorPhase::Sediments,
-                        EditorPhase::Flora,
                         EditorPhase::Height3D,
                     ];
 
@@ -75,9 +76,13 @@ fn editor_phase_ui(
                         let label = format!("{:?}", phase);
                         let is_current = *current_phase.get() == phase;
                         
-                        // Кнопку текущей фазы или Shape всегда можно нажать.
-                        // Другие фазы доступны только если остров валиден.
-                        let can_click = is_current || phase == EditorPhase::Shape || is_valid;
+                        // Фазы после Factions требуют валидации острова
+                        let needs_validation = match phase {
+                            EditorPhase::Shape | EditorPhase::Factions => false,
+                            _ => true,
+                        };
+                        
+                        let can_click = is_current || !needs_validation || is_valid;
 
                         ui.add_enabled_ui(can_click, |ui| {
                             if ui.selectable_label(is_current, label).clicked() {
