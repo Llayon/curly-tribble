@@ -4,7 +4,7 @@ use bevy::anti_alias::taa::TemporalAntiAliasPlugin;
 use bevy::core_pipeline::core_3d::graph::Core3d;
 use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
 use bevy::core_pipeline::tonemapping::Tonemapping;
-use bevy::post_process::bloom::{Bloom, BloomPlugin};
+use bevy::post_process::bloom::BloomPlugin;
 use bevy::prelude::*;
 use bevy::render::camera::CameraRenderGraph;
 use bevy::render::view::Hdr;
@@ -63,7 +63,6 @@ pub struct MainCameraBundle {
     pub focus: CameraFocus,
     pub config: CameraConfig,
     pub tonemapping: Tonemapping,
-    pub bloom: Bloom,
     pub hdr: Hdr,
     pub msaa: Msaa,
     pub depth_prepass: DepthPrepass,
@@ -81,7 +80,6 @@ fn setup_camera(mut commands: Commands) {
         focus: CameraFocus(Vec3::ZERO),
         config: CameraConfig::default(),
         tonemapping: Tonemapping::TonyMcMapface,
-        bloom: Bloom::NATURAL,
         hdr: Hdr,
         msaa: Msaa::Off,
         depth_prepass: DepthPrepass,

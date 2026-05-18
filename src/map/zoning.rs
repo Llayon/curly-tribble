@@ -1,6 +1,6 @@
 use crate::map::HexCoord;
 use bevy::prelude::*;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet, VecDeque};
 
 pub const MAX_HEIGHT: f32 = 12.0;
 pub const HEX_SIZE: f32 = 1.0;
@@ -46,6 +46,7 @@ pub struct MapData {
     pub width: u32,
     pub height: u32,
     pub tiles: HashMap<HexCoord, TileData>,
+    pub validation_errors: Vec<String>,
 }
 
 impl MapData {
@@ -75,6 +76,85 @@ impl MapData {
             }
         }
         false
+    }
+
+    pub fn run_validation(&mut self) {
+        self.validation_errors.clear();
+        
+        let mut total_land = 0;
+        let mut total_ocean = 0;
+        let mut first_land = None;
+        let mut first_border_ocean = None;
+        
+        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+        let half_w = (self.width / 2) as i32;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+        let half_h = (self.height / 2) as i32;
+        
+        for (coord, tile) in &self.tiles {
+            if tile.is_ocean {
+                total_ocean += 1;
+                if first_border_ocean.is_none() && (coord.q <= -half_w + 1 || coord.q >= half_w - 2 || coord.r <= -half_h + 1 || coord.r >= half_h - 2) {
+                    first_border_ocean = Some(*coord);
+                }
+            } else {
+                total_land += 1;
+                if first_land.is_none() {
+                    first_land = Some(*coord);
+                }
+            }
+        }
+
+        if total_land == 0 {
+            self.validation_errors.push("Остров должен содержать хотя бы один гекс суши.".to_string());
+            return;
+        }
+
+        // 1. Проверка на разорванность (Единый континент)
+        if let Some(start) = first_land {
+            let mut visited = HashSet::new();
+            let mut queue = VecDeque::new();
+            queue.push_back(start);
+            visited.insert(start);
+            
+            while let Some(curr) = queue.pop_front() {
+                for n in curr.neighbors() {
+                    if let Some(t) = self.tiles.get(&n) {
+                        if !t.is_ocean && !visited.contains(&n) {
+                            visited.insert(n);
+                            queue.push_back(n);
+                        }
+                    }
+                }
+            }
+            
+            if visited.len() < total_land {
+                self.validation_errors.push("Остров должен быть единым континентом. Разорванные участки суши не допускаются.".to_string());
+            }
+        }
+
+        // 2. Проверка на изолированные озера из океана
+        if let Some(start) = first_border_ocean {
+            let mut visited = HashSet::new();
+            let mut queue = VecDeque::new();
+            queue.push_back(start);
+            visited.insert(start);
+            
+            while let Some(curr) = queue.pop_front() {
+                for n in curr.neighbors() {
+                    if let Some(t) = self.tiles.get(&n) {
+                        if t.is_ocean && !visited.contains(&n) {
+                            visited.insert(n);
+                            queue.push_back(n);
+                        }
+                    }
+                }
+            }
+            
+            if visited.len() < total_ocean {
+                self.validation_errors.push("Внутри континента найдены изолированные озера. Океан должен соединяться с краем карты.".to_string());
+            }
+        }
     }
 }
 

@@ -10,12 +10,20 @@ use bevy::render::render_resource::PrimitiveTopology;
 
 pub struct MeshGenPlugin;
 
+#[derive(Resource, Default)]
+pub struct GeneratedMapAssets {
+    pub terrain: Option<Handle<Mesh>>,
+    pub water: Option<Handle<Mesh>>,
+    pub roof: Option<Handle<Mesh>>,
+}
+
 impl Plugin for MeshGenPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(
-            Update,
-            draw_hex_grid_gizmos.run_if(not(in_state(EditorPhase::Height3D))),
-        );
+        app.init_resource::<GeneratedMapAssets>()
+            .add_systems(
+                Update,
+                draw_hex_grid_gizmos.run_if(not(in_state(EditorPhase::Height3D))),
+            );
     }
 }
 
@@ -28,12 +36,32 @@ impl Command for SpawnGlobalTerrainCommand {
     fn apply(self, world: &mut World) {
         let is_flat = self.phase != EditorPhase::Height3D;
 
-        let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(&self.map_data, is_flat);
+        // 1. Очистка старых ресурсов из VRAM
+        let old_handles = if let Some(mut gen_assets) = world.get_resource_mut::<GeneratedMapAssets>() {
+            (gen_assets.terrain.take(), gen_assets.water.take(), gen_assets.roof.take())
+        } else {
+            (None, None, None)
+        };
 
         let mut meshes = world.resource_mut::<Assets<Mesh>>();
+        if let Some(h) = old_handles.0 { meshes.remove(&h); }
+        if let Some(h) = old_handles.1 { meshes.remove(&h); }
+        if let Some(h) = old_handles.2 { meshes.remove(&h); }
+
+        // 2. Генерация новых мешей
+        let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(&self.map_data, is_flat);
+        
+        // Повторно берем meshes т.к. remove мог его дропнуть (но Command имеет &mut World)
         let terrain_handle = meshes.add(mesh);
         let water_handle = meshes.add(water_mesh);
         let roof_handle = meshes.add(roof_mesh);
+
+        // 3. Сохранение новых хэндлов для будущего удаления
+        if let Some(mut gen_assets) = world.get_resource_mut::<GeneratedMapAssets>() {
+            gen_assets.terrain = Some(terrain_handle.clone());
+            gen_assets.water = Some(water_handle.clone());
+            gen_assets.roof = Some(roof_handle.clone());
+        }
 
         let assets = world.resource::<crate::economy::GameAssets>();
         let ground_mat = assets.ground_material.clone();
@@ -48,7 +76,7 @@ impl Command for SpawnGlobalTerrainCommand {
             mat.unlit = is_flat;
         }
 
-        // Спавним основной ландшафт
+        // 4. Спавн сущностей с новыми мешами
         world.spawn(GlobalTerrainBundle {
             mesh: Mesh3d(terrain_handle),
             material: MeshMaterial3d(ground_mat),
@@ -59,7 +87,6 @@ impl Command for SpawnGlobalTerrainCommand {
             marker: MapEntity,
         });
 
-        // Спавним воду
         world.spawn(WaterBundle {
             mesh: Mesh3d(water_handle),
             material: MeshMaterial3d(water_mat),
@@ -70,7 +97,6 @@ impl Command for SpawnGlobalTerrainCommand {
             marker: MapEntity,
         });
 
-        // Спавним крыши пещер (единым мешем)
         world.spawn(crate::map::zoning::MountainRoofBundle {
             mesh: Mesh3d(roof_handle),
             material: MeshMaterial3d(mountain_mat),

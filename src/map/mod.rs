@@ -2,9 +2,10 @@ use crate::economy::mesh_gen::MeshGenPlugin;
 use crate::events::{GameLogMessage, LogSeverity};
 use crate::sets::{GameSet, StartupSet};
 use bevy::prelude::*;
+use std::collections::HashMap;
 use construction::ConstructionPlugin;
 use navigation::NavigationPlugin;
-use noise::{Fbm, NoiseFn, Perlin};
+use noise::{Fbm, NoiseFn, OpenSimplex};
 use rand::prelude::*;
 use resources::ResourcesPlugin;
 use river_gen::RiverGenPlugin;
@@ -27,7 +28,9 @@ pub mod zoning;
 pub struct MapEntity;
 
 #[derive(Message)]
-pub struct GenerateMapEvent;
+pub struct GenerateMapEvent {
+    pub force_reset: bool,
+}
 
 #[derive(Message)]
 pub struct RebuildMeshEvent;
@@ -59,7 +62,7 @@ impl Plugin for MapPlugin {
             .add_systems(
                 Startup,
                 (|mut ev: MessageWriter<GenerateMapEvent>| {
-                    ev.write(GenerateMapEvent);
+                    ev.write(GenerateMapEvent { force_reset: true });
                 })
                 .in_set(StartupSet::SpawnEntities),
             )
@@ -81,8 +84,8 @@ impl Plugin for MapPlugin {
 }
 
 fn rebuild_map_on_phase_change(mut ev_gen: MessageWriter<GenerateMapEvent>) {
-    debug!("STATE_CHANGE: EditorPhase changed. Triggering map rebuild.");
-    ev_gen.write(GenerateMapEvent);
+    debug!("STATE_CHANGE: EditorPhase changed. Triggering map rebuild (preserving edits).");
+    ev_gen.write(GenerateMapEvent { force_reset: false });
 }
 
 #[derive(Bundle)]
@@ -105,12 +108,12 @@ fn handle_regeneration(
     mut log_writer: MessageWriter<GameLogMessage>,
     phase: Res<State<crate::game_state::EditorPhase>>,
 ) {
-    for _ in ev_gen.read() {
-        debug!("MAP_GEN: Received GenerateMapEvent. Starting cleanup...");
+    for ev in ev_gen.read() {
+        debug!("MAP_GEN: Received GenerateMapEvent (ForceReset: {}). Starting cleanup...", ev.force_reset);
 
         // 1. Глубокая очистка мира
         for entity in &q_map_entities {
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).despawn();
         }
         debug!("MAP_GEN: Map entities cleaned.");
 
@@ -133,7 +136,10 @@ fn handle_regeneration(
             &mut map_data,
             &mut nav_map,
             *phase.get(),
+            ev.force_reset,
         );
+
+        map_data.run_validation();
 
         log_writer.write(GameLogMessage {
             message: format!("World regenerated: {}x{}, seed {}", config.map_width, config.map_height, config.seed),
@@ -198,6 +204,7 @@ fn handle_shape_tools(
                         let is_ocean = mouse.pressed(MouseButton::Left);
                         if tile.is_ocean != is_ocean {
                             tile.is_ocean = is_ocean;
+                            map_data.run_validation();
                             ev_rebuild.write(RebuildMeshEvent);
                         }
                     }
@@ -227,8 +234,8 @@ fn monitor_inspector_triggers(
     }
 
     if triggered {
-        debug!("INSPECTOR: Triggering regeneration event.");
-        ev_gen.write(GenerateMapEvent);
+        debug!("INSPECTOR: Triggering regeneration event (Force Reset).");
+        ev_gen.write(GenerateMapEvent { force_reset: true });
     }
 }
 
@@ -241,9 +248,10 @@ fn spawn_map_internal(
     map_data: &mut MapData,
     nav_map: &mut crate::map::navigation::NavigationMap,
     phase: crate::game_state::EditorPhase,
+    force_reset: bool,
 ) {
-    let temp_noise = Fbm::<Perlin>::new(seed.value() + 1);
-    let humid_noise = Fbm::<Perlin>::new(seed.value() + 2);
+    let temp_noise = Fbm::<OpenSimplex>::new(seed.value() + 1);
+    let humid_noise = Fbm::<OpenSimplex>::new(seed.value() + 2);
 
     let width = terrain_config.map_width;
     let height = terrain_config.map_height;
@@ -252,29 +260,56 @@ fn spawn_map_internal(
 
     map_data.width = width;
     map_data.height = height;
-    map_data.tiles.clear();
+    
+    let mut new_tiles = HashMap::new();
 
     for q in -half_w..half_w {
         for r in -half_h..half_h {
             let coord = HexCoord::new(q, r);
             let world_pos = coord.to_world(zoning::HEX_SIZE);
             
-            let elevation = terrain_gen.get_elevation(terrain_config, world_pos.x, world_pos.z);
-            let normalized_elevation = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
-
-            // Обязательный океан по краям (минимум 2 гекса)
-            let is_ocean_border = q <= -half_w + 1 || q >= half_w - 2 || r <= -half_h + 1 || r >= half_h - 2;
-
-            // На фазе Shape мы используем только базовый ландшафт (Grass) или Ocean
-            // Климат и сложные типы почв (Mud, Sand, Stone) подключатся позже
-            let (terrain, temp_val, humid_val) = if phase == crate::game_state::EditorPhase::Shape {
-                (TerrainType::Grass, 0.5, 0.5)
+            // 1. Сохраняем состояние океана, если это НЕ форсированный сброс
+            let is_border = q <= -half_w + 1 || q >= half_w - 2 || r <= -half_h + 1 || r >= half_h - 2;
+            
+            let mut is_ocean = if force_reset {
+                let shape_val = terrain_gen.get_shape_value(terrain_config, world_pos.x, world_pos.z);
+                is_border || shape_val <= 0.0
             } else {
+                map_data.get_tile(q, r).map_or_else(
+                    || {
+                        let shape_val = terrain_gen.get_shape_value(terrain_config, world_pos.x, world_pos.z);
+                        is_border || shape_val <= 0.0
+                    },
+                    |t| t.is_ocean
+                )
+            };
+
+            if is_border { is_ocean = true; }
+
+            // 2. Расчет высоты и климата
+            let (terrain, temp_val, humid_val, normalized_elevation) = if phase == crate::game_state::EditorPhase::Shape {
+                // На фазе Shape мы НЕ считаем сложную 3D-высоту, только форму
+                (TerrainType::Grass, 0.5, 0.5, 0.1)
+            } else {
+                let elevation = terrain_gen.get_elevation(terrain_config, world_pos.x, world_pos.z);
+                let norm_elev = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
+                
                 let temp =
                     ((temp_noise.get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05]) as f32) + 1.0) * 0.5;
                 let humid =
                     ((humid_noise.get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05]) as f32) + 1.0) * 0.5;
-                (get_terrain_from_climate(temp, humid, normalized_elevation), temp, humid)
+                
+                let t = if is_ocean {
+                    TerrainType::Water
+                } else {
+                    let climate_terrain = get_terrain_from_climate(temp, humid, norm_elev);
+                    if climate_terrain == TerrainType::Water {
+                        TerrainType::Sand
+                    } else {
+                        climate_terrain
+                    }
+                };
+                (t, temp, humid, norm_elev)
             };
 
             let tile_data = crate::map::zoning::TileData {
@@ -283,15 +318,12 @@ fn spawn_map_internal(
                 temperature: temp_val,
                 humidity: humid_val,
                 roofed: false,
-                is_ocean: is_ocean_border,
+                is_ocean,
             };
-            map_data.tiles.insert(coord, tile_data);
+            new_tiles.insert(coord, tile_data);
         }
     }
-
-    // Apply Rivers and Mud Banks (Temporarily disabled for Hex refactor)
-    // river_gen::apply_rivers(map_data, terrain_config, seed.value());
-    // river_gen::apply_mud_banks(map_data);
+    map_data.tiles = new_tiles;
 
     for q in -half_w..half_w {
         for r in -half_h..half_h {
@@ -321,7 +353,6 @@ fn spawn_map_internal(
         }
     }
 
-    // Создаем глобальный ландшафт, воду и крыши одной командой
     commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
         map_data: map_data.clone(),
         phase,

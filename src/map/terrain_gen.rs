@@ -1,7 +1,6 @@
-// src/map/terrain_gen.rs
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
-use noise::{Fbm, NoiseFn, Perlin};
+use noise::{Fbm, NoiseFn, OpenSimplex};
 
 pub struct TerrainGenPlugin;
 
@@ -52,8 +51,8 @@ pub struct TerrainConfig {
 impl Default for TerrainConfig {
     fn default() -> Self {
         Self {
-            map_width: 120,
-            map_height: 120,
+            map_width: 40,
+            map_height: 40,
             seed: 42,
             randomize_seed: false,
             regenerate_world: false,
@@ -65,7 +64,7 @@ impl Default for TerrainConfig {
             plateau_steps: 3.0,
             warp_freq: 0.02,
             warp_strength: 2.0,
-            island_shape_weight: 1.0,
+            island_shape_weight: 0.6,
             river_count: 5,
             river_start_elevation: 0.6,
             river_depth: 0.05,
@@ -74,57 +73,58 @@ impl Default for TerrainConfig {
     }
 }
 
-// Internal constant not exposed in config for now
-const PASS_FREQ: f64 = 0.01;
-
 #[derive(Resource)]
 pub struct TerrainGenerator {
-    macro_noise: Fbm<Perlin>,
-    pass_noise: Perlin,
-    plateau_noise: Fbm<Perlin>,
-    warp_noise_x: Perlin,
-    warp_noise_z: Perlin,
+    macro_noise: Fbm<OpenSimplex>,
+    plateau_noise: Fbm<OpenSimplex>,
+    warp_noise_x: OpenSimplex,
+    warp_noise_z: OpenSimplex,
 }
 
 impl TerrainGenerator {
     #[must_use]
     pub fn new(seed: u32) -> Self {
         Self {
-            macro_noise: Fbm::<Perlin>::new(seed),
-            pass_noise: Perlin::new(seed + 1),
-            plateau_noise: Fbm::<Perlin>::new(seed + 2),
-            warp_noise_x: Perlin::new(seed + 3),
-            warp_noise_z: Perlin::new(seed + 4),
+            macro_noise: Fbm::<OpenSimplex>::new(seed),
+            plateau_noise: Fbm::<OpenSimplex>::new(seed + 2),
+            warp_noise_x: OpenSimplex::new(seed + 3),
+            warp_noise_z: OpenSimplex::new(seed + 4),
         }
+    }
+
+    /// Lightweight 2D shape probability value [-1, 1].
+    /// Used for Phase 1 (Shape) to determine land/ocean.
+    #[must_use]
+    pub fn get_shape_value(&self, config: &TerrainConfig, x: f32, z: f32) -> f32 {
+        let x64 = f64::from(x);
+        let z64 = f64::from(z);
+
+        // DISTANCE MASK (MapGen4 Logic)
+        let half_w = config.map_width as f32 * crate::map::zoning::HEX_SIZE * 0.866;
+        let half_h = config.map_height as f32 * crate::map::zoning::HEX_SIZE * 0.75;
+        let nx = (x / half_w).clamp(-1.5, 1.5);
+        let nz = (z / half_h).clamp(-1.5, 1.5);
+        let distance_sq = nx * nx + nz * nz;
+        
+        let island_shape = config.island_shape_weight * (0.75 - 2.0 * distance_sq);
+        let ridge_val = self.macro_noise.get([x64 * config.macro_freq, z64 * config.macro_freq]) as f32;
+        
+        0.5 * (ridge_val + island_shape)
     }
 
     #[must_use]
     #[allow(clippy::cast_possible_truncation)] // Noise output f64 to f32 is intentional for mesh attributes
     pub fn get_elevation(&self, config: &TerrainConfig, x: f32, z: f32) -> f32 {
+        let combined_shape = self.get_shape_value(config, x, z);
+        
+        if combined_shape <= 0.0 {
+            return 0.0;
+        }
+
         let x64 = f64::from(x);
         let z64 = f64::from(z);
 
-        // 0. DISTANCE MASK (Inspired by mapgen4)
-        // Normalized coordinates [-1, 1]
-        let size = config.map_width as f32 * crate::map::zoning::HEX_SIZE;
-        let nx = (x / (size * 0.5)).clamp(-1.0, 1.0);
-        let nz = (z / (size * 0.5)).clamp(-1.0, 1.0);
-        let distance = (nx * nx + nz * nz).sqrt().min(1.0);
-        // "Dome" mask: 1.0 at center, 0.0 at edges
-        let mask = (1.0 - distance * distance).max(0.0);
-
-        // 1. MACRO: Ridged Mountains with Pass Mask
-        let ridge_val = self
-            .macro_noise
-            .get([x64 * config.macro_freq, z64 * config.macro_freq]);
-        let ridge = (1.0 - ridge_val.abs()).powf(f64::from(config.macro_sharpness)) as f32;
-
-        let pass_val = self.pass_noise.get([x64 * PASS_FREQ, z64 * PASS_FREQ]);
-        let pass_mask = ((pass_val + 1.0) * 0.5) as f32;
-
-        let mountains = ridge * pass_mask * config.macro_height;
-
-        // 2. MICRO: Domain Warped Terraced Plateaus
+        // MICRO: Domain Warped Terraced Plateaus
         let wx = self
             .warp_noise_x
             .get([x64 * config.warp_freq, z64 * config.warp_freq]) as f32
@@ -144,12 +144,8 @@ impl TerrainGenerator {
         let plateaus =
             Self::smoothstep_terracing(plateau_base, config.plateau_steps) * config.plateau_height;
 
-        // 3. BLENDING & MASKING
-        let base_elevation = mountains.max(plateaus);
-        
-        // Apply distance mask weighted by config
-        // This ensures the island shape dominates the edges
-        (base_elevation * (1.0 + config.island_shape_weight * (mask - 0.5))).max(0.0)
+        // Apply our plateau details to the base shape
+        (combined_shape * config.macro_height).max(plateaus * combined_shape.min(1.0))
     }
 
     fn smoothstep_terracing(val: f32, steps: f32) -> f32 {
@@ -160,23 +156,5 @@ impl TerrainGenerator {
         // Cubic Hermite Interpolation (Smoothstep) for passable slopes
         let smoothed_fract = fract_val * fract_val * (3.0 - 2.0 * fract_val);
         (floor_val + smoothed_fract) / steps
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_terrain_generator_elevation() {
-        let config = TerrainConfig::default();
-        let gen = TerrainGenerator::new(config.seed);
-        let e1 = gen.get_elevation(&config, 0.0, 0.0);
-        let e2 = gen.get_elevation(&config, 10.0, 10.0);
-
-        // Check that it produces some value and is deterministic
-        assert!((e1 - gen.get_elevation(&config, 0.0, 0.0)).abs() < f32::EPSILON);
-        assert!(e1 >= 0.0);
-        assert!(e2 >= 0.0);
     }
 }

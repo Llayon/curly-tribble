@@ -42,6 +42,7 @@ fn editor_phase_ui(
     current_phase: Res<State<EditorPhase>>,
     mut next_phase: ResMut<NextState<EditorPhase>>,
     mut current_tool: ResMut<CurrentTool>,
+    map_data: Res<crate::map::zoning::MapData>,
 ) {
     let ctx = match contexts.ctx_mut().ok() {
         Some(ctx) => ctx,
@@ -59,6 +60,9 @@ fn editor_phase_ui(
         .show(ctx, |ui| {
             ui.vertical(|ui| {
                 ui.label("Phases:");
+
+                let is_valid = map_data.validation_errors.is_empty();
+
                 ui.horizontal_wrapped(|ui| {
                     let phases = [
                         EditorPhase::Shape,
@@ -69,14 +73,26 @@ fn editor_phase_ui(
 
                     for phase in phases {
                         let label = format!("{:?}", phase);
-                        if ui
-                            .selectable_label(*current_phase.get() == phase, label)
-                            .clicked()
-                        {
-                            next_phase.set(phase);
-                        }
+                        let is_current = *current_phase.get() == phase;
+                        
+                        // Кнопку текущей фазы или Shape всегда можно нажать.
+                        // Другие фазы доступны только если остров валиден.
+                        let can_click = is_current || phase == EditorPhase::Shape || is_valid;
+
+                        ui.add_enabled_ui(can_click, |ui| {
+                            if ui.selectable_label(is_current, label).clicked() {
+                                next_phase.set(phase);
+                            }
+                        });
                     }
                 });
+
+                if !is_valid {
+                    ui.separator();
+                    for err in &map_data.validation_errors {
+                        ui.colored_label(egui::Color32::RED, format!("⚠️ {}", err));
+                    }
+                }
 
                 if *current_phase.get() == EditorPhase::Shape {
                     ui.separator();
