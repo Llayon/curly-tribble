@@ -38,7 +38,38 @@ pub enum ShapeTool {
 pub enum FactionTool {
     #[default]
     None,
-    Move,
+    Brush,
+}
+
+#[derive(Debug, Clone, Reflect)]
+pub struct Faction {
+    pub id: u32,
+    pub name: String,
+    pub faction_type: FactionType,
+    pub color: Color,
+    pub economy_focus: String,
+}
+
+#[derive(Resource, Reflect, Clone)]
+#[reflect(Resource)]
+pub struct FactionManager {
+    pub factions: Vec<Faction>,
+    pub selected_faction: Option<u32>,
+}
+
+impl Default for FactionManager {
+    fn default() -> Self {
+        Self {
+            factions: vec![Faction {
+                id: 1,
+                name: "Player".to_string(),
+                faction_type: FactionType::Player,
+                color: Color::srgb(0.6, 0.4, 0.2), // Brown-ish
+                economy_focus: "None".to_string(),
+            }],
+            selected_faction: Some(1),
+        }
+    }
 }
 
 #[derive(Resource, Default, Reflect)]
@@ -55,11 +86,14 @@ impl Plugin for GameStatePlugin {
         app.init_state::<GameState>()
             .init_state::<EditorPhase>()
             .init_resource::<CurrentTool>()
+            .init_resource::<FactionManager>()
             .register_type::<EditorPhase>()
             .register_type::<FactionType>()
             .register_type::<ShapeTool>()
             .register_type::<FactionTool>()
             .register_type::<CurrentTool>()
+            .register_type::<Faction>()
+            .register_type::<FactionManager>()
             .add_systems(PostStartup, start_game);
     }
 }

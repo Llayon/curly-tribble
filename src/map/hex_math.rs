@@ -70,4 +70,10 @@ impl HexCoord {
 
         Self::new(rq as i32, rr as i32)
     }
+
+    pub fn distance(&self, other: Self) -> i32 {
+        ((self.q - other.q).abs()
+            + (self.q + self.r - other.q - other.r).abs()
+            + (self.r - other.r).abs()) / 2
+    }
 }

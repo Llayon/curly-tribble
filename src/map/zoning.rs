@@ -39,6 +39,7 @@ pub struct TileData {
     pub temperature: f32,
     pub roofed: bool,
     pub is_ocean: bool,
+    pub faction_id: Option<u32>,
 }
 
 #[derive(Resource, Default, Clone)]
@@ -153,6 +154,76 @@ impl MapData {
             
             if visited.len() < total_ocean {
                 self.validation_errors.push("Внутри континента найдены изолированные озера. Океан должен соединяться с краем карты.".to_string());
+            }
+        }
+
+        // 3. Проверка непрерывности территорий фракций (Continuous Territory)
+        let mut factions_on_map = HashSet::new();
+        for tile in self.tiles.values() {
+            if let Some(f_id) = tile.faction_id {
+                factions_on_map.insert(f_id);
+            }
+        }
+
+        for f_id in factions_on_map {
+            let faction_tiles: Vec<_> = self.tiles.iter()
+                .filter(|(_, t)| t.faction_id == Some(f_id))
+                .map(|(c, _)| *c)
+                .collect();
+
+            if faction_tiles.is_empty() { continue; }
+
+            let mut components = Vec::new();
+            let mut unvisited: HashSet<_> = faction_tiles.iter().copied().collect();
+
+            while !unvisited.is_empty() {
+                let start = *unvisited.iter().next().unwrap();
+                let mut component = Vec::new();
+                let mut queue = VecDeque::new();
+                queue.push_back(start);
+                unvisited.remove(&start);
+                component.push(start);
+
+                while let Some(curr) = queue.pop_front() {
+                    for n in curr.neighbors() {
+                        if unvisited.contains(&n) {
+                            unvisited.remove(&n);
+                            component.push(n);
+                            queue.push_back(n);
+                        }
+                    }
+                }
+                components.push(component);
+            }
+
+            if components.len() > 1 {
+                // Если территория разорвана: оставляем только самый крупный кусок для любой фракции
+                components.sort_by_key(|c| c.len());
+                let _largest = components.pop().unwrap(); // Оставляем самый большой
+                for fragment in components {
+                    for coord in fragment {
+                        if let Some(tile) = self.tiles.get_mut(&coord) {
+                            tile.faction_id = None;
+                        }
+                    }
+                }
+                debug!("VALIDATION: Autocleaned isolated fragments for faction {}.", f_id);
+            }
+        }
+
+        // 4. Проверка правила '1-Hex Gap' (только для отчета, т.к. кисть сама его соблюдает)
+        for (coord, tile) in &self.tiles {
+            if let Some(f1) = tile.faction_id {
+                for n_coord in coord.neighbors() {
+                    if let Some(n_tile) = self.tiles.get(&n_coord) {
+                        if let Some(f2) = n_tile.faction_id {
+                            if f1 != f2 {
+                                // Ошибка возможна только если пользователь как-то обошел кисть или при генерации
+                                self.validation_errors.push(format!("Нарушено правило 1 гекса между фракциями {} и {} у координат {:?}.", f1, f2, coord));
+                            }
+                        }
+                    }
+                }
             }
         }
     }

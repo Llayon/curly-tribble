@@ -42,6 +42,7 @@ fn editor_phase_ui(
     current_phase: Res<State<EditorPhase>>,
     mut next_phase: ResMut<NextState<EditorPhase>>,
     mut current_tool: ResMut<CurrentTool>,
+    mut faction_manager: ResMut<crate::game_state::FactionManager>,
     map_data: Res<crate::map::zoning::MapData>,
 ) {
     let ctx = match contexts.ctx_mut().ok() {
@@ -116,6 +117,98 @@ fn editor_phase_ui(
                             current_tool.shape = ShapeTool::Ocean;
                         }
                     });
+                }
+
+                if *current_phase.get() == EditorPhase::Factions {
+                    ui.separator();
+                    ui.label("Faction Tools:");
+                    ui.horizontal(|ui| {
+                        if ui
+                            .selectable_label(current_tool.faction == crate::game_state::FactionTool::None, "None")
+                            .clicked()
+                        {
+                            current_tool.faction = crate::game_state::FactionTool::None;
+                        }
+                        if ui
+                            .selectable_label(current_tool.faction == crate::game_state::FactionTool::Brush, "Brush")
+                            .clicked()
+                        {
+                            current_tool.faction = crate::game_state::FactionTool::Brush;
+                        }
+                    });
+
+                    ui.separator();
+                    ui.label("Faction Hierarchy:");
+                    
+                    let mut to_remove = None;
+                    let mut to_select = None;
+
+                    egui::ScrollArea::vertical().max_height(150.0).show(ui, |ui| {
+                        for (idx, faction) in faction_manager.factions.iter().enumerate() {
+                            let is_selected = faction_manager.selected_faction == Some(faction.id);
+                            ui.horizontal(|ui| {
+                                if ui.selectable_label(is_selected, &faction.name).clicked() {
+                                    to_select = Some(faction.id);
+                                }
+                                if faction.faction_type != crate::game_state::FactionType::Player {
+                                    if ui.button("🗑").clicked() {
+                                        to_remove = Some(idx);
+                                    }
+                                }
+                            });
+                        }
+                    });
+
+                    if let Some(id) = to_select {
+                        faction_manager.selected_faction = Some(id);
+                    }
+
+                    if let Some(idx) = to_remove {
+                        faction_manager.factions.remove(idx);
+                        faction_manager.selected_faction = None;
+                    }
+
+                    if ui.button("Add Neutral Faction").clicked() {
+                        let next_id = faction_manager.factions.iter().map(|f| f.id).max().unwrap_or(0) + 1;
+                        faction_manager.factions.push(crate::game_state::Faction {
+                            id: next_id,
+                            name: format!("Faction {}", next_id),
+                            faction_type: crate::game_state::FactionType::Neutral,
+                            color: Color::srgb(rand::random(), rand::random(), rand::random()),
+                            economy_focus: "None".to_string(),
+                        });
+                    }
+
+                    if let Some(selected_id) = faction_manager.selected_faction {
+                        if let Some(faction) = faction_manager.factions.iter_mut().find(|f| f.id == selected_id) {
+                            ui.separator();
+                            ui.label("Faction Properties:");
+                            ui.text_edit_singleline(&mut faction.name);
+                            
+                            ui.horizontal(|ui| {
+                                ui.label("Type:");
+                                egui::ComboBox::from_id_salt("faction_type")
+                                    .selected_text(format!("{:?}", faction.faction_type))
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(&mut faction.faction_type, crate::game_state::FactionType::Player, "Player");
+                                        ui.selectable_value(&mut faction.faction_type, crate::game_state::FactionType::Neutral, "Neutral");
+                                        ui.selectable_value(&mut faction.faction_type, crate::game_state::FactionType::Enemy, "Enemy");
+                                    });
+                            });
+
+                            ui.horizontal(|ui| {
+                                ui.label("Economy:");
+                                egui::ComboBox::from_id_salt("economy_focus")
+                                    .selected_text(&faction.economy_focus)
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(&mut faction.economy_focus, "None".to_string(), "None");
+                                        ui.selectable_value(&mut faction.economy_focus, "Mining".to_string(), "Mining");
+                                        ui.selectable_value(&mut faction.economy_focus, "Farming".to_string(), "Farming");
+                                        ui.selectable_value(&mut faction.economy_focus, "Woodcutting".to_string(), "Woodcutting");
+                                    });
+                            });
+                        }
+                    }
                 }
             });
         });
