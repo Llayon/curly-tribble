@@ -44,6 +44,7 @@ fn editor_phase_ui(
     mut current_tool: ResMut<CurrentTool>,
     mut faction_manager: ResMut<crate::game_state::FactionManager>,
     map_data: Res<crate::map::zoning::MapData>,
+    mut terrain_config: ResMut<crate::map::terrain_gen::TerrainConfig>,
 ) {
     let ctx = match contexts.ctx_mut().ok() {
         Some(ctx) => ctx,
@@ -66,24 +67,23 @@ fn editor_phase_ui(
 
                 ui.horizontal_wrapped(|ui| {
                     let phases = [
-                        EditorPhase::Shape,
-                        EditorPhase::Factions,
-                        EditorPhase::Landscape,
-                        EditorPhase::Sediments,
-                        EditorPhase::Height3D,
+                        (EditorPhase::Shape, "1. Shape"),
+                        (EditorPhase::Factions, "2. Factions"),
+                        (EditorPhase::Landscape, "3. Landscape"),
+                        (EditorPhase::Sediments, "4. Sediments"),
+                        (EditorPhase::Height3D, "5. Height3D"),
                     ];
 
-                    for phase in phases {
-                        let label = format!("{:?}", phase);
+                    let current_idx = phases.iter().position(|(p, _)| p == current_phase.get()).unwrap_or(0);
+
+                    for (idx, (phase, label)) in phases.into_iter().enumerate() {
                         let is_current = *current_phase.get() == phase;
                         
-                        // Фазы после Factions требуют валидации острова
-                        let needs_validation = match phase {
-                            EditorPhase::Shape | EditorPhase::Factions => false,
-                            _ => true,
-                        };
-                        
-                        let can_click = is_current || !needs_validation || is_valid;
+                        // Строгий конвейер: назад в любую, вперед только на +1
+                        // Также фазы после Factions требуют валидации
+                        let is_physically_reachable = idx <= current_idx + 1;
+                        let needs_validation = idx > 1;
+                        let can_click = is_physically_reachable && (!needs_validation || is_valid);
 
                         ui.add_enabled_ui(can_click, |ui| {
                             if ui.selectable_label(is_current, label).clicked() {
@@ -208,6 +208,69 @@ fn editor_phase_ui(
                                     });
                             });
                         }
+                    }
+                }
+
+                if *current_phase.get() == EditorPhase::Landscape {
+                    ui.separator();
+                    ui.label("Landscape Tools:");
+                    ui.horizontal_wrapped(|ui| {
+                        let tools = [
+                            (crate::game_state::LandscapeTool::None, "None"),
+                            (crate::game_state::LandscapeTool::Mountain, "Mountain"),
+                            (crate::game_state::LandscapeTool::Lake, "Lake"),
+                            (crate::game_state::LandscapeTool::River, "River"),
+                            (crate::game_state::LandscapeTool::Plateau, "Plateau"),
+                            (crate::game_state::LandscapeTool::Cliff, "Cliff"),
+                        ];
+
+                        for (tool, label) in tools {
+                            if ui
+                                .selectable_label(current_tool.landscape == tool, label)
+                                .clicked()
+                            {
+                                current_tool.landscape = tool;
+                            }
+                        }
+                    });
+                }
+
+                if *current_phase.get() == EditorPhase::Sediments {
+                    ui.separator();
+                    ui.label("Sediment Tool:");
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut current_tool.active_sediment_tool, "Active");
+                        egui::ComboBox::from_id_salt("sediment_type")
+                            .selected_text(format!("{:?}", current_tool.sediment))
+                            .show_ui(ui, |ui| {
+                                // Grass is default, not in list as per Pagonia
+                                ui.selectable_value(&mut current_tool.sediment, crate::map::zoning::TerrainType::Dirt, "Dirt");
+                                ui.selectable_value(&mut current_tool.sediment, crate::map::zoning::TerrainType::Dusty, "Dusty");
+                                ui.selectable_value(&mut current_tool.sediment, crate::map::zoning::TerrainType::Fertile, "Fertile");
+                                ui.selectable_value(&mut current_tool.sediment, crate::map::zoning::TerrainType::Mossy, "Mossy");
+                                ui.selectable_value(&mut current_tool.sediment, crate::map::zoning::TerrainType::Steppe, "Steppe");
+                                ui.selectable_value(&mut current_tool.sediment, crate::map::zoning::TerrainType::Stony, "Stony");
+                                ui.selectable_value(&mut current_tool.sediment, crate::map::zoning::TerrainType::Swamp, "Swamp");
+                            });
+                    });
+
+                    ui.separator();
+                    ui.label("Forest Tool:");
+                    ui.horizontal(|ui| {
+                        ui.checkbox(&mut current_tool.active_forest_tool, "Active");
+                        egui::ComboBox::from_id_salt("forest_type")
+                            .selected_text(format!("{:?}", current_tool.forest_type))
+                            .show_ui(ui, |ui| {
+                                ui.selectable_value(&mut current_tool.forest_type, crate::map::zoning::ForestType::None, "None");
+                                ui.selectable_value(&mut current_tool.forest_type, crate::map::zoning::ForestType::Deciduous, "Deciduous");
+                                ui.selectable_value(&mut current_tool.forest_type, crate::map::zoning::ForestType::Coniferous, "Coniferous");
+                            });
+                    });
+                    ui.add(egui::Slider::new(&mut current_tool.forest_density, 0.0..=1.0).text("Density"));
+
+                    ui.separator();
+                    if ui.checkbox(&mut terrain_config.show_build_area, "Show Build Area").changed() {
+                        // Triggers rebuild via handle_regeneration or manual event
                     }
                 }
             });

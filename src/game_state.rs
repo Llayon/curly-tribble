@@ -71,12 +71,28 @@ impl Default for FactionManager {
         }
     }
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum LandscapeTool {
+    #[default]
+    None,
+    Mountain,
+    Lake,
+    River,
+    Plateau,
+    Cliff,
+}
 
 #[derive(Resource, Default, Reflect)]
 #[reflect(Resource)]
 pub struct CurrentTool {
     pub shape: ShapeTool,
     pub faction: FactionTool,
+    pub landscape: LandscapeTool,
+    pub sediment: crate::map::zoning::TerrainType,
+    pub forest_type: crate::map::zoning::ForestType,
+    pub forest_density: f32,
+    pub active_sediment_tool: bool,
+    pub active_forest_tool: bool,
 }
 
 pub struct GameStatePlugin;
@@ -91,6 +107,7 @@ impl Plugin for GameStatePlugin {
             .register_type::<FactionType>()
             .register_type::<ShapeTool>()
             .register_type::<FactionTool>()
+            .register_type::<LandscapeTool>()
             .register_type::<CurrentTool>()
             .register_type::<Faction>()
             .register_type::<FactionManager>()

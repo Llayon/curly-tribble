@@ -73,6 +73,8 @@ impl Plugin for MapPlugin {
                     handle_rebuild_mesh.in_set(GameSet::Logic),
                     handle_shape_tools.in_set(GameSet::Logic),
                     handle_faction_tools.in_set(GameSet::Logic),
+                    handle_landscape_tools.in_set(GameSet::Logic),
+                    handle_sediment_tools.in_set(GameSet::Logic),
                     handle_faction_auto_relocation.in_set(GameSet::Logic),
                     validate_faction_placements.in_set(GameSet::Logic),
                     monitor_inspector_triggers
@@ -86,8 +88,25 @@ impl Plugin for MapPlugin {
     }
 }
 
-fn rebuild_map_on_phase_change(mut ev_gen: MessageWriter<GenerateMapEvent>) {
-    debug!("STATE_CHANGE: EditorPhase changed. Triggering map rebuild (preserving edits).");
+fn rebuild_map_on_phase_change(
+    mut ev_gen: MessageWriter<GenerateMapEvent>,
+    phase: Res<State<crate::game_state::EditorPhase>>,
+    map_data: Res<MapData>,
+) {
+    debug!("MAP_GEN: Phase changed to {:?}. Refreshing mesh...", *phase.get());
+    
+    // Авто-генерация при переходе ВПЕРЕД
+    let current_phase = *phase.get();
+    let _needs_auto_gen = match current_phase {
+        crate::game_state::EditorPhase::Landscape => {
+            !map_data.tiles.values().any(|t| t.landscape_feature != zoning::LandscapeFeature::None)
+        }
+        crate::game_state::EditorPhase::Sediments => {
+            !map_data.tiles.values().any(|t| t.terrain != zoning::TerrainType::Grass || t.forest_type != zoning::ForestType::None)
+        }
+        _ => false,
+    };
+
     ev_gen.write(GenerateMapEvent { force_reset: false });
 }
 
@@ -285,6 +304,7 @@ fn handle_rebuild_mesh(
     q_map_entities: Query<Entity, With<MapEntity>>,
     map_data: Res<MapData>,
     faction_manager: Res<crate::game_state::FactionManager>,
+    config: Res<TerrainConfig>,
     phase: Res<State<crate::game_state::EditorPhase>>,
 ) {
     for _ in ev_rebuild.read() {
@@ -296,6 +316,7 @@ fn handle_rebuild_mesh(
             map_data: map_data.clone(),
             phase: *phase.get(),
             faction_manager: faction_manager.clone(),
+            config: (*config).clone(),
         });
     }
 }
@@ -340,6 +361,173 @@ fn handle_shape_tools(
                             map_data.run_validation();
                             ev_rebuild.write(RebuildMeshEvent);
                         }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn handle_sediment_tools(
+    mouse: Res<ButtonInput<MouseButton>>,
+    q_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    q_window: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    mut map_data: ResMut<MapData>,
+    current_tool: Res<crate::game_state::CurrentTool>,
+    phase: Res<State<crate::game_state::EditorPhase>>,
+    mut ev_rebuild: MessageWriter<RebuildMeshEvent>,
+) {
+    if *phase.get() != crate::game_state::EditorPhase::Sediments {
+        return;
+    }
+
+    if mouse.pressed(MouseButton::Left) || mouse.pressed(MouseButton::Right) {
+        let Ok((camera, camera_transform)) = q_camera.single() else {
+            return;
+        };
+        let Ok(window) = q_window.single() else {
+            return;
+        };
+
+        if let Some(cursor_pos) = window.cursor_position() {
+            if let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
+                let distance = ray.origin.y / -ray.direction.y;
+                if distance > 0.0 {
+                    let world_pos = ray.origin + ray.direction * distance;
+                    let coord = crate::map::hex_math::HexCoord::from_world(world_pos, zoning::HEX_SIZE);
+                    
+                    if let Some(tile) = map_data.get_tile_mut(coord.q, coord.r) {
+                        let mut changed = false;
+
+                        // 1. Седименты
+                        if current_tool.active_sediment_tool {
+                            let target_sediment = if mouse.pressed(MouseButton::Left) {
+                                current_tool.sediment
+                            } else {
+                                zoning::TerrainType::Grass // RM removes to grass
+                            };
+
+                            if tile.terrain != target_sediment {
+                                tile.terrain = target_sediment;
+                                changed = true;
+                            }
+                        }
+
+                        // 2. Леса
+                        if current_tool.active_forest_tool {
+                            let (target_type, target_density) = if mouse.pressed(MouseButton::Left) {
+                                (current_tool.forest_type, current_tool.forest_density)
+                            } else {
+                                (zoning::ForestType::None, 0.0)
+                            };
+
+                            if tile.forest_type != target_type || (tile.forest_density - target_density).abs() > 0.01 {
+                                tile.forest_type = target_type;
+                                tile.forest_density = target_density;
+                                changed = true;
+                            }
+                        }
+
+                        if changed {
+                            ev_rebuild.write(RebuildMeshEvent);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn handle_landscape_tools(
+    mouse: Res<ButtonInput<MouseButton>>,
+    q_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    q_window: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    mut map_data: ResMut<MapData>,
+    current_tool: Res<crate::game_state::CurrentTool>,
+    phase: Res<State<crate::game_state::EditorPhase>>,
+    mut ev_rebuild: MessageWriter<RebuildMeshEvent>,
+) {
+    if *phase.get() != crate::game_state::EditorPhase::Landscape
+        || current_tool.landscape == crate::game_state::LandscapeTool::None
+    {
+        return;
+    }
+
+    if mouse.pressed(MouseButton::Left) || mouse.pressed(MouseButton::Right) {
+        let Ok((camera, camera_transform)) = q_camera.single() else {
+            return;
+        };
+        let Ok(window) = q_window.single() else {
+            return;
+        };
+
+        if let Some(cursor_pos) = window.cursor_position() {
+            if let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
+                let distance = ray.origin.y / -ray.direction.y;
+                if distance > 0.0 {
+                    let world_pos = ray.origin + ray.direction * distance;
+                    let coord = crate::map::hex_math::HexCoord::from_world(world_pos, zoning::HEX_SIZE);
+                    
+                    match current_tool.landscape {
+                        crate::game_state::LandscapeTool::Mountain | 
+                        crate::game_state::LandscapeTool::Lake | 
+                        crate::game_state::LandscapeTool::River |
+                        crate::game_state::LandscapeTool::Plateau => {
+                            if let Some(tile) = map_data.get_tile_mut(coord.q, coord.r) {
+                                let new_feature = if mouse.pressed(MouseButton::Left) {
+                                    match current_tool.landscape {
+                                        crate::game_state::LandscapeTool::Mountain => zoning::LandscapeFeature::Mountain,
+                                        crate::game_state::LandscapeTool::Lake => zoning::LandscapeFeature::Lake,
+                                        crate::game_state::LandscapeTool::River => zoning::LandscapeFeature::River,
+                                        crate::game_state::LandscapeTool::Plateau => zoning::LandscapeFeature::Plateau,
+                                        _ => zoning::LandscapeFeature::None,
+                                    }
+                                } else {
+                                    zoning::LandscapeFeature::None
+                                };
+
+                                if tile.landscape_feature != new_feature {
+                                    tile.landscape_feature = new_feature;
+                                    ev_rebuild.write(RebuildMeshEvent);
+                                }
+                            }
+                        }
+                        crate::game_state::LandscapeTool::Cliff => {
+                            let mut best_edge = None;
+                            let mut min_dist = f32::MAX;
+
+                            for neighbor in coord.neighbors() {
+                                let edge = zoning::EdgeCoord::new(coord, neighbor);
+                                let center_a = coord.to_world(zoning::HEX_SIZE);
+                                let center_b = neighbor.to_world(zoning::HEX_SIZE);
+                                let edge_midpoint = (center_a + center_b) * 0.5;
+                                
+                                let dist = world_pos.distance(edge_midpoint);
+                                if dist < min_dist && dist < zoning::HEX_SIZE * 0.6 {
+                                    min_dist = dist;
+                                    best_edge = Some(edge);
+                                }
+                            }
+
+                            if let Some(edge) = best_edge {
+                                if mouse.just_pressed(MouseButton::Left) {
+                                    let mut data = map_data.edges.get(&edge).copied().unwrap_or_default();
+                                    if !data.is_cliff {
+                                        data.is_cliff = true;
+                                        data.direction = true;
+                                    } else {
+                                        data.direction = !data.direction;
+                                    }
+                                    map_data.edges.insert(edge, data);
+                                    ev_rebuild.write(RebuildMeshEvent);
+                                } else if mouse.pressed(MouseButton::Right) {
+                                    if map_data.edges.remove(&edge).is_some() {
+                                        ev_rebuild.write(RebuildMeshEvent);
+                                    }
+                                }
+                            }
+                        }
+                        _ => {}
                     }
                 }
             }
@@ -506,8 +694,8 @@ fn spawn_map_internal(
                 map_data.get_tile(q, r).and_then(|t| t.faction_id)
             };
 
-            let (terrain, temp_val, humid_val, normalized_elevation) = if phase == crate::game_state::EditorPhase::Shape {
-                (TerrainType::Grass, 0.5, 0.5, 0.1)
+            let (terrain, temp_val, humid_val, normalized_elevation, feature) = if phase == crate::game_state::EditorPhase::Shape {
+                (TerrainType::Grass, 0.5, 0.5, 0.1, zoning::LandscapeFeature::None)
             } else {
                 let elevation = terrain_gen.get_elevation(terrain_config, world_pos.x, world_pos.z);
                 let norm_elev = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
@@ -518,31 +706,162 @@ fn spawn_map_internal(
                     ((humid_noise.get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05]) as f32) + 1.0) * 0.5;
                 
                 let t = if is_ocean {
-                    TerrainType::Water
+                    TerrainType::Grass
                 } else {
-                    let climate_terrain = get_terrain_from_climate(temp, humid, norm_elev);
-                    if climate_terrain == TerrainType::Water {
-                        TerrainType::Sand
-                    } else {
-                        climate_terrain
-                    }
+                    get_terrain_from_climate(temp, humid, norm_elev)
                 };
-                (t, temp, humid, norm_elev)
+
+                let feat = if force_reset {
+                    zoning::LandscapeFeature::None
+                } else {
+                    map_data.get_tile(q, r).map_or(zoning::LandscapeFeature::None, |t| t.landscape_feature)
+                };
+
+                (t, temp, humid, norm_elev, feat)
+            };
+
+            // Авто-генерация лесов для Фазы 4
+            let (f_type, f_density) = if !is_ocean && feature == zoning::LandscapeFeature::None {
+                if humid_val > 0.6 && temp_val > 0.3 {
+                    let density = (humid_val - 0.4).max(0.0) * 0.8;
+                    if temp_val < 0.5 || normalized_elevation > 0.6 {
+                        (zoning::ForestType::Coniferous, density)
+                    } else {
+                        (zoning::ForestType::Deciduous, density)
+                    }
+                } else {
+                    (zoning::ForestType::None, 0.0)
+                }
+            } else {
+                (zoning::ForestType::None, 0.0)
             };
 
             let tile_data = crate::map::zoning::TileData {
                 terrain,
+                forest_type: f_type,
+                forest_density: f_density,
                 elevation: normalized_elevation,
                 temperature: temp_val,
                 humidity: humid_val,
                 roofed: false,
                 is_ocean,
                 faction_id,
+                landscape_feature: feature,
             };
             new_tiles.insert(coord, tile_data);
         }
     }
     map_data.tiles = new_tiles;
+
+    // 1. Расчет Distance Field (расстояние до океана)
+    let mut distance_field: HashMap<HexCoord, u32> = HashMap::new();
+    let mut queue = VecDeque::new();
+    for (coord, tile) in &map_data.tiles {
+        if tile.is_ocean {
+            distance_field.insert(*coord, 0);
+            queue.push_back(*coord);
+        }
+    }
+
+    while let Some(curr) = queue.pop_front() {
+        let curr_dist = *distance_field.get(&curr).unwrap();
+        for n in curr.neighbors() {
+            if map_data.tiles.contains_key(&n) && !distance_field.contains_key(&n) {
+                distance_field.insert(n, curr_dist + 1);
+                queue.push_back(n);
+            }
+        }
+    }
+
+    // 2. Процедурная расстановка Landscape Features (Mountains, Lakes, Plateaus)
+    let plateau_noise = Fbm::<OpenSimplex>::new(seed.value() + 60);
+
+    for (coord, tile) in map_data.tiles.iter_mut() {
+        if tile.is_ocean { continue; }
+        
+        // Маска фракций: Внутри территорий фракций - только плоская земля
+        if tile.faction_id.is_some() {
+            tile.landscape_feature = zoning::LandscapeFeature::None;
+            continue;
+        }
+
+        let dist = *distance_field.get(coord).unwrap_or(&0);
+        let world_pos = coord.to_world(zoning::HEX_SIZE);
+        let p_noise = ((plateau_noise.get([f64::from(world_pos.x) * 0.1, f64::from(world_pos.z) * 0.1]) as f32) + 1.0) * 0.5;
+
+        if force_reset {
+            // Горы: Глубоко внутри суши, высокий шум
+            if dist > 8 && p_noise > 0.7 {
+                tile.landscape_feature = zoning::LandscapeFeature::Mountain;
+            } 
+            // Плато: Средняя удаленность, средний шум
+            else if dist > 4 && p_noise > 0.5 {
+                tile.landscape_feature = zoning::LandscapeFeature::Plateau;
+            }
+            // Озера: Недалеко от берега или в низинах (по шуму), если нет других фич
+            else if dist > 3 && p_noise < 0.15 {
+                tile.landscape_feature = zoning::LandscapeFeature::Lake;
+            }
+        }
+    }
+
+    // 3. Авто-генерация клиффов
+    if force_reset {
+        map_data.edges.clear();
+        let mut new_cliffs = Vec::new();
+        
+        {
+            let coords: Vec<_> = map_data.tiles.keys().copied().collect();
+            for coord in coords {
+                let tile_a = map_data.get_tile(coord.q, coord.r).unwrap();
+                let feat_a = tile_a.landscape_feature;
+                
+                for n in coord.neighbors() {
+                    if let Some(tile_b) = map_data.get_tile(n.q, n.r) {
+                        let feat_b = tile_b.landscape_feature;
+                        
+                        let mut is_cliff = false;
+                        let mut direction = true;
+
+                        // А) Границы Гор и Плато
+                        if (feat_a != feat_b) && 
+                           (feat_a == zoning::LandscapeFeature::Mountain || feat_a == zoning::LandscapeFeature::Plateau ||
+                            feat_b == zoning::LandscapeFeature::Mountain || feat_b == zoning::LandscapeFeature::Plateau) {
+                            is_cliff = true;
+                            direction = feat_a == zoning::LandscapeFeature::Mountain || feat_a == zoning::LandscapeFeature::Plateau;
+                        }
+                        // Б) Природные разломы на равнине
+                        else if !tile_a.is_ocean && !tile_b.is_ocean && tile_a.faction_id.is_none() && tile_b.faction_id.is_none() {
+                            let d_a = *distance_field.get(&coord).unwrap_or(&0) as i32;
+                            let d_b = *distance_field.get(&n).unwrap_or(&0) as i32;
+                            
+                            // Каждые 12 уровней расстояния создаем "террасу" (гораздо реже)
+                            if d_a != d_b && (d_a % 12 == 0 || d_b % 12 == 0) {
+                                // Шанс появления клиффа с более плавным шумом (0.05 вместо 0.2)
+                                let fault_noise = plateau_noise.get([f64::from(coord.q) * 0.05, f64::from(coord.r) * 0.05]);
+                                if fault_noise > 0.4 { // Более строгий порог для разреженности
+                                    is_cliff = true;
+                                    direction = d_a > d_b;
+                                }
+                            }
+                        }
+
+                        if is_cliff {
+                            let edge = zoning::EdgeCoord::new(coord, n);
+                            new_cliffs.push((edge, zoning::EdgeData {
+                                is_cliff: true,
+                                direction,
+                            }));
+                        }
+                    }
+                }
+            }
+        }
+
+        for (edge, data) in new_cliffs {
+            map_data.edges.insert(edge, data);
+        }
+    }
 
     // Auto-spawn Player Start (Faction 1)
     let has_player_start = map_data.tiles.values().any(|t| t.faction_id == Some(1));
@@ -562,16 +881,13 @@ fn spawn_map_internal(
                 cost = crate::map::navigation::COST_BLOCKER;
             } else {
                 match terrain {
-                    TerrainType::Water => {
-                        cost = crate::map::navigation::COST_BLOCKER;
-                    }
-                    TerrainType::Mud => {
+                    TerrainType::Swamp => {
                         cost = 50;
                     }
-                    TerrainType::Stone => {
+                    TerrainType::Stony => {
                         cost = 80;
                     }
-                    TerrainType::Grass | TerrainType::Sand | TerrainType::CaveFloor => {}
+                    _ => {}
                 }
             }
             nav_map.grid.insert(IVec2::new(q, r), cost);
@@ -582,6 +898,7 @@ fn spawn_map_internal(
         map_data: map_data.clone(),
         phase,
         faction_manager: faction_manager.clone(),
+        config: (*terrain_config).clone(),
     });
 }
 
@@ -590,7 +907,7 @@ fn apply_cave_stamp(map: &mut MapData, x: i32, z: i32) {
     for dx in -1..=1 {
         for dz in -1..=1 {
             if let Some(tile) = map.get_tile_mut(x + dx, z + dz) {
-                tile.terrain = TerrainType::CaveFloor;
+                tile.terrain = TerrainType::Stony;
                 tile.roofed = true;
             }
         }
@@ -770,28 +1087,24 @@ fn auto_spawn_player_territory(map_data: &mut MapData, seed: u32) {
 }
 
 fn get_terrain_from_climate(temp: f32, humid: f32, elev: f32) -> TerrainType {
-    if elev < 0.2 {
-        return TerrainType::Water;
-    }
-    if elev < 0.25 {
-        return TerrainType::Sand;
-    }
     if elev > 0.8 {
-        return TerrainType::Stone;
+        return TerrainType::Stony;
     }
 
     if humid > 0.7 {
         if temp < 0.3 {
-            TerrainType::Mud
+            TerrainType::Swamp
         } else {
-            TerrainType::Grass
+            TerrainType::Mossy
         }
     } else if humid < 0.3 {
         if temp > 0.7 {
-            TerrainType::Sand
+            TerrainType::Dusty
         } else {
-            TerrainType::Grass
+            TerrainType::Steppe
         }
+    } else if temp < 0.3 {
+        TerrainType::Stony
     } else {
         TerrainType::Grass
     }

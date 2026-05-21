@@ -8,7 +8,7 @@ impl Plugin for TerrainGenPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
-#[derive(Resource, Reflect, InspectorOptions)]
+#[derive(Resource, Reflect, InspectorOptions, Clone)]
 #[reflect(Resource, InspectorOptions)]
 pub struct TerrainConfig {
     pub map_width: u32,
@@ -46,6 +46,9 @@ pub struct TerrainConfig {
     #[inspector(min = 0.0, max = 0.2)]
     pub river_depth: f32,
     pub generate_mud_banks: bool,
+
+    // --- VISUAL FILTERS ---
+    pub show_build_area: bool,
 }
 
 impl Default for TerrainConfig {
@@ -69,6 +72,7 @@ impl Default for TerrainConfig {
             river_start_elevation: 0.6,
             river_depth: 0.05,
             generate_mud_banks: true,
+            show_build_area: false,
         }
     }
 }

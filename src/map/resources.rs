@@ -91,7 +91,7 @@ fn spawn_resources(
                         });
                     }
                 }
-                TerrainType::Mud if rng.gen_bool(0.15) => {
+                TerrainType::Swamp if rng.gen_bool(0.15) => {
                     commands.spawn(BerryBushBundle {
                         bush: BerryBush { food_amount: 10.0 },
                         scene: SceneRoot(assets.bush_scene.clone()),
@@ -101,7 +101,7 @@ fn spawn_resources(
                         },
                     });
                 }
-                TerrainType::Stone | TerrainType::Sand if rng.gen_bool(0.12) => {
+                TerrainType::Stony if rng.gen_bool(0.12) => {
                     commands.spawn(RockBundle {
                         rock: Rock,
                         scene: SceneRoot(assets.rock_scene.clone()),
