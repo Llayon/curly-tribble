@@ -9,13 +9,14 @@ pub enum GameState {
     Paused,
 }
 
-#[derive(States, Debug, Clone, Copy, Eq, PartialEq, Hash, Default, Reflect)]
+#[derive(States, Debug, Clone, PartialEq, Eq, Hash, Default, Copy, Reflect, PartialOrd, Ord)]
 pub enum EditorPhase {
     #[default]
     Shape,
     Factions,
     Landscape,
     Sediments,
+    NPCs,
     Height3D,
 }
 
@@ -81,6 +82,15 @@ pub enum LandscapeTool {
     Plateau,
     Cliff,
 }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum NpcTool {
+    #[default]
+    None,
+    SpawnPoi,
+    SpawnEnemyCamp,
+    Move,
+    Delete,
+}
 
 #[derive(Resource, Default, Reflect)]
 #[reflect(Resource)]
@@ -88,11 +98,15 @@ pub struct CurrentTool {
     pub shape: ShapeTool,
     pub faction: FactionTool,
     pub landscape: LandscapeTool,
-    pub sediment: crate::map::zoning::TerrainType,
-    pub forest_type: crate::map::zoning::ForestType,
+    pub sediment: crate::map::TerrainType,
+    pub forest_type: crate::map::ForestType,
     pub forest_density: f32,
     pub active_sediment_tool: bool,
     pub active_forest_tool: bool,
+    pub npc: NpcTool,
+    pub poi_type: crate::map::zoning::PoiType,
+    pub camp_difficulty: f32,
+    pub camp_power: u32,
 }
 
 pub struct GameStatePlugin;
@@ -108,6 +122,7 @@ impl Plugin for GameStatePlugin {
             .register_type::<ShapeTool>()
             .register_type::<FactionTool>()
             .register_type::<LandscapeTool>()
+            .register_type::<NpcTool>()
             .register_type::<CurrentTool>()
             .register_type::<Faction>()
             .register_type::<FactionManager>()

@@ -1,18 +1,7 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    Default,
-    Reflect,
-    Serialize,
-    Deserialize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Reflect, Serialize, Deserialize)]
 pub struct HexCoord {
     pub q: i32,
     pub r: i32,
@@ -74,6 +63,7 @@ impl HexCoord {
     pub fn distance(&self, other: Self) -> i32 {
         ((self.q - other.q).abs()
             + (self.q + self.r - other.q - other.r).abs()
-            + (self.r - other.r).abs()) / 2
+            + (self.r - other.r).abs())
+            / 2
     }
 }

@@ -1,6 +1,6 @@
 // src/map/river_gen.rs
 use crate::map::terrain_gen::TerrainConfig;
-use crate::map::zoning::{MapData, TerrainType};
+use crate::map::{MapData, TerrainType, LandscapeFeature};
 use bevy::prelude::*;
 use rand::prelude::*;
 use std::collections::{BinaryHeap, HashMap};
@@ -77,8 +77,8 @@ pub fn apply_rivers(map_data: &mut MapData, config: &TerrainConfig, seed: u32) {
                 || pos.y <= -half_h
                 || pos.y >= half_h - 1
                 || current_tile.elevation < 0.2
-                || current_tile.landscape_feature == crate::map::zoning::LandscapeFeature::River
-                || current_tile.landscape_feature == crate::map::zoning::LandscapeFeature::Lake
+                || current_tile.landscape_feature == LandscapeFeature::River
+                || current_tile.landscape_feature == LandscapeFeature::Lake
             {
                 target_pos = Some(pos);
                 break;
@@ -128,7 +128,7 @@ pub fn apply_rivers(map_data: &mut MapData, config: &TerrainConfig, seed: u32) {
             let mut prev_elev = 1.0; // Start high for normalized elevation
             for pos in path {
                 if let Some(tile) = map_data.get_tile_mut(pos.x, pos.y) {
-                    tile.landscape_feature = crate::map::zoning::LandscapeFeature::River;
+                    tile.landscape_feature = LandscapeFeature::River;
                     // Carve: Lower elevation and ensure it never goes up (monotonically decreasing to sea)
                     tile.elevation = (tile.elevation - config.river_depth)
                         .min(prev_elev)
@@ -148,7 +148,7 @@ pub fn apply_mud_banks(map_data: &mut MapData) {
     for x in -half_w..half_w {
         for z in -half_h..half_h {
             if let Some(tile) = map_data.get_tile(x, z) {
-                if tile.landscape_feature == crate::map::zoning::LandscapeFeature::River {
+                if tile.landscape_feature == LandscapeFeature::River {
                     for dx in -1..=1 {
                         for dz in -1..=1 {
                             if dx == 0 && dz == 0 {
@@ -181,7 +181,7 @@ pub fn apply_mud_banks(map_data: &mut MapData) {
                     continue;
                 }
                 if let Some(n_tile) = map_data.get_tile(pos.x + dx, pos.y + dz) {
-                    if n_tile.landscape_feature == crate::map::zoning::LandscapeFeature::River {
+                    if n_tile.landscape_feature == LandscapeFeature::River {
                         water_elevs.push(n_tile.elevation);
                     } else if matches!(
                         n_tile.terrain,

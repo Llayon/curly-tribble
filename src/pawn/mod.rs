@@ -144,11 +144,12 @@ pub struct SettlerBundle {
 fn spawn_starting_settler(
     mut commands: Commands,
     assets: Res<GameAssets>,
-    map_data: Res<crate::map::zoning::MapData>,
+    map_data: Res<crate::map::MapData>,
 ) {
     let spawn_q = 0;
     let spawn_r = 0;
-    let mut spawn_pos = crate::map::HexCoord::new(spawn_q, spawn_r).to_world(crate::map::zoning::HEX_SIZE);
+    let mut spawn_pos =
+        crate::map::HexCoord::new(spawn_q, spawn_r).to_world(crate::map::HEX_SIZE);
     let elevation = map_data.get_hex_height(spawn_q, spawn_r);
     spawn_pos.y = elevation + 0.5;
 

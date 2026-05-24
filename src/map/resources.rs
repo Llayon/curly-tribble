@@ -1,6 +1,5 @@
 use crate::economy::GameAssets;
-use crate::map::zoning::TerrainType;
-use crate::map::{MapData, WorldSeed};
+use crate::map::{MapData, WorldSeed, TerrainType, HEX_SIZE};
 use bevy::prelude::*;
 use rand::prelude::*;
 
@@ -65,7 +64,7 @@ fn spawn_resources(
                 None => continue,
             };
 
-            let mut pos = crate::map::HexCoord::new(q, r).to_world(crate::map::zoning::HEX_SIZE);
+            let mut pos = crate::map::HexCoord::new(q, r).to_world(HEX_SIZE);
             pos.y = map_data.get_hex_height(q, r);
 
             match tile.terrain {

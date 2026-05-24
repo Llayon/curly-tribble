@@ -39,15 +39,15 @@ pub struct PathBlockEvent {
 
 #[must_use]
 pub fn world_to_grid(pos: Vec3) -> IVec2 {
-    let hex = crate::map::HexCoord::from_world(pos, crate::map::zoning::HEX_SIZE);
+    let hex = crate::map::HexCoord::from_world(pos, crate::map::HEX_SIZE);
     IVec2::new(hex.q, hex.r)
 }
 
 #[must_use]
 pub fn grid_to_world(cell: IVec2, map: &crate::map::MapData) -> Vec3 {
     let hex = crate::map::HexCoord::new(cell.x, cell.y);
-    let mut world_pos = hex.to_world(crate::map::zoning::HEX_SIZE);
-    
+    let mut world_pos = hex.to_world(crate::map::HEX_SIZE);
+
     let elevation = map.get_tile(cell.x, cell.y).map_or(0.0, |t| t.elevation);
     world_pos.y = (elevation * crate::map::MAX_HEIGHT) + AGENT_HEIGHT;
 

@@ -1,3 +1,4 @@
+use crate::map::HEX_SIZE;
 use bevy::prelude::*;
 use bevy_inspector_egui::prelude::*;
 use noise::{Fbm, NoiseFn, OpenSimplex};
@@ -49,6 +50,9 @@ pub struct TerrainConfig {
 
     // --- VISUAL FILTERS ---
     pub show_build_area: bool,
+    pub show_forests: bool,
+    pub show_factions: bool,
+    pub show_cliffs: bool,
 }
 
 impl Default for TerrainConfig {
@@ -73,6 +77,9 @@ impl Default for TerrainConfig {
             river_depth: 0.05,
             generate_mud_banks: true,
             show_build_area: false,
+            show_forests: true,
+            show_factions: true,
+            show_cliffs: true,
         }
     }
 }
@@ -104,15 +111,17 @@ impl TerrainGenerator {
         let z64 = f64::from(z);
 
         // DISTANCE MASK (MapGen4 Logic)
-        let half_w = config.map_width as f32 * crate::map::zoning::HEX_SIZE * 0.866;
-        let half_h = config.map_height as f32 * crate::map::zoning::HEX_SIZE * 0.75;
+        let half_w = config.map_width as f32 * HEX_SIZE * 0.866;
+        let half_h = config.map_height as f32 * HEX_SIZE * 0.75;
         let nx = (x / half_w).clamp(-1.5, 1.5);
         let nz = (z / half_h).clamp(-1.5, 1.5);
         let distance_sq = nx * nx + nz * nz;
-        
+
         let island_shape = config.island_shape_weight * (0.75 - 2.0 * distance_sq);
-        let ridge_val = self.macro_noise.get([x64 * config.macro_freq, z64 * config.macro_freq]) as f32;
-        
+        let ridge_val = self
+            .macro_noise
+            .get([x64 * config.macro_freq, z64 * config.macro_freq]) as f32;
+
         0.5 * (ridge_val + island_shape)
     }
 
@@ -120,7 +129,7 @@ impl TerrainGenerator {
     #[allow(clippy::cast_possible_truncation)] // Noise output f64 to f32 is intentional for mesh attributes
     pub fn get_elevation(&self, config: &TerrainConfig, x: f32, z: f32) -> f32 {
         let combined_shape = self.get_shape_value(config, x, z);
-        
+
         if combined_shape <= 0.0 {
             return 0.0;
         }
