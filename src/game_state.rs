@@ -17,6 +17,7 @@ pub enum EditorPhase {
     Landscape,
     Sediments,
     NPCs,
+    Plants,
     Height3D,
 }
 
@@ -92,7 +93,7 @@ pub enum NpcTool {
     Delete,
 }
 
-#[derive(Resource, Default, Reflect)]
+#[derive(Resource, Reflect, Clone)]
 #[reflect(Resource)]
 pub struct CurrentTool {
     pub shape: ShapeTool,
@@ -107,6 +108,31 @@ pub struct CurrentTool {
     pub poi_type: crate::map::zoning::PoiType,
     pub camp_difficulty: f32,
     pub camp_power: u32,
+    pub bio_resource: crate::map::DepositType,
+    pub bio_amount: u32,
+    pub bio_brush_size: u32,
+}
+
+impl Default for CurrentTool {
+    fn default() -> Self {
+        Self {
+            shape: ShapeTool::None,
+            faction: FactionTool::None,
+            landscape: LandscapeTool::None,
+            sediment: crate::map::TerrainType::Dirt,
+            forest_type: crate::map::ForestType::None,
+            forest_density: 0.5,
+            active_sediment_tool: false,
+            active_forest_tool: false,
+            npc: NpcTool::None,
+            poi_type: crate::map::zoning::PoiType::TradePost,
+            camp_difficulty: 0.5,
+            camp_power: 100,
+            bio_resource: crate::map::DepositType::Rabbit,
+            bio_amount: 10,
+            bio_brush_size: 1,
+        }
+    }
 }
 
 pub struct GameStatePlugin;
@@ -126,6 +152,9 @@ impl Plugin for GameStatePlugin {
             .register_type::<CurrentTool>()
             .register_type::<Faction>()
             .register_type::<FactionManager>()
+            .register_type::<crate::map::DepositType>()
+            .register_type::<crate::map::TerrainType>()
+            .register_type::<crate::map::ForestType>()
             .add_systems(PostStartup, start_game);
     }
 }
