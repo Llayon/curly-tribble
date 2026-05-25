@@ -1,4 +1,4 @@
-use crate::map::{MapData, HEX_SIZE, ForestType, PointOfInterest, EnemyCamp, PoiType};
+use crate::map::{EnemyCamp, ForestType, MapData, PoiType, PointOfInterest, HEX_SIZE};
 use bevy::prelude::*;
 
 pub fn draw_cliffs_gizmos(

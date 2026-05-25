@@ -1,9 +1,11 @@
 use crate::events::{GameLogMessage, LogSeverity};
 use crate::game_state::{EditorPhase, FactionManager};
-use crate::map::generation::{auto_spawn_npcs, spawn_map_internal};
+use crate::map::generation::{auto_spawn_bio_deposits, auto_spawn_npcs, spawn_map_internal};
 use crate::map::navigation::NavigationMap;
 use crate::map::terrain_gen::{TerrainConfig, TerrainGenerator};
-use crate::map::{MapData, FactionMarker, WorldSeed, MapEntity, GenerateMapEvent, RebuildMeshEvent};
+use crate::map::{
+    FactionMarker, GenerateMapEvent, MapData, MapEntity, RebuildMeshEvent, WorldSeed,
+};
 use bevy::prelude::*;
 use rand::Rng;
 
@@ -57,6 +59,10 @@ pub fn handle_regeneration(
 
         if ev.force_reset || ev.auto_fill_phase == Some(EditorPhase::NPCs) {
             auto_spawn_npcs(&mut commands, &map_data, &faction_manager, seed.value());
+        }
+
+        if ev.force_reset || ev.auto_fill_phase == Some(EditorPhase::Plants) {
+            auto_spawn_bio_deposits(&mut commands, &map_data, seed.value());
         }
 
         crate::map::validation::run_map_validation(&mut map_data);

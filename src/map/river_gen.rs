@@ -1,6 +1,6 @@
 // src/map/river_gen.rs
 use crate::map::terrain_gen::TerrainConfig;
-use crate::map::{MapData, TerrainType, LandscapeFeature};
+use crate::map::{LandscapeFeature, MapData, TerrainType};
 use bevy::prelude::*;
 use rand::prelude::*;
 use std::collections::{BinaryHeap, HashMap};

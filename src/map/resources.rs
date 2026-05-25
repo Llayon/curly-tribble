@@ -1,5 +1,5 @@
 use crate::economy::GameAssets;
-use crate::map::{MapData, WorldSeed, TerrainType, HEX_SIZE};
+use crate::map::{MapData, TerrainType, WorldSeed, HEX_SIZE};
 use bevy::prelude::*;
 use rand::prelude::*;
 

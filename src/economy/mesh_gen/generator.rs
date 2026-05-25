@@ -1,6 +1,6 @@
 use crate::game_state::{EditorPhase, FactionManager};
 use crate::map::terrain_gen::TerrainConfig;
-use crate::map::{LandscapeFeature, MapData, TerrainType, MAX_HEIGHT, HEX_SIZE};
+use crate::map::{LandscapeFeature, MapData, TerrainType, HEX_SIZE, MAX_HEIGHT};
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::Indices;
 use bevy::prelude::*;

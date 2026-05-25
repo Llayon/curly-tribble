@@ -11,8 +11,17 @@
 - [ADR 0004: Procedural Generation](docs/superpowers/adr/0004-procedural-world-generation.md): Rules for Noise, Global Smooth Meshes, Biome Blending, Water Layer, and Premium PBR Lighting (CSM, SSAO, Bloom).
 - [ADR 0005: Hexagonal Grid Transition](docs/superpowers/adr/0005-hexagonal-grid-transition.md): Transition from square grid to axial hexagonal grid.
 - [ADR 0006: Reactive Relocation Pipeline](docs/superpowers/adr/0006-reactive-relocation-pipeline.md): Non-destructive auto-healing for faction placements.
-- **Editor Phases**: State-based rendering logic (`Shape`, `Factions`, `Landscape`, `Sediments`, `Height3D`). Early phases use flat unlit meshes, while `Height3D` uses full elevation and PBR.
-- [SOP: Reactive Faction Relocation](docs/superpowers/patterns/reactive_faction_relocation.md): Multi-phase reactive logic for entity positioning.
+- **Editor Phases**: State-based rendering logic:
+    - `Shape`: 2D Island outline (Land vs Ocean).
+    - `Factions`: Territorial allocation, spacing (1-hex gap), and reactive rescue.
+    - `Landscape`: 3D Topology, elevation blueprinting (Mountains, Lakes, Rivers, Plateaus, and Cliff-edges).
+    - `Sediments`: Surface texturing, biomes (Grass, Dirt, Dusty, Fertile, Mossy, Steppe, Stony, Swamp), fertility, and forestry.
+    - `NPCs`: Settlement placement (Villages, Enemy Camps), POIs, and combat power balancing.
+    - `Plants`: Biological resource clusters (Animals, Plants, Fish) as ECS entities with habitat validation.
+    - `Treasures`: Hidden/Visible treasures, artifacts, and treasure map generation.
+    - `Height3D`: Full elevation preview with PBR lighting and final mesh details.
+- [Plan: Phase 3 Landscape & Phase 4 Sediments](docs/superpowers/plans/2026-05-14-landscape-sediments.md): Implementation guide for geological and biological map layers.
+- [SOP: Reactive Faction Relocation](docs/superpowers/patterns/reactive_faction_relocation.md): Multi-phase reactive logic for entity positioning and territory preservation.
 - [SOP: A River Routing](docs/superpowers/patterns/a_river_routing.md): Pathfinding-based river generation on terraced terrain.
 - [SOP: Zenith Navigator](docs/superpowers/patterns/zenith_navigator.md): Standards for asynchronous, reactive pathfinding.
 - [Design: Advanced Terrain Generation](docs/superpowers/specs/2026-05-11-advanced-terrain-gen-design.md): Sharp ridges, pass masks, and terraced plateaus logic.

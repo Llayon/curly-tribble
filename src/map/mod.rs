@@ -1,18 +1,18 @@
 // src/map/mod.rs
 pub mod atmosphere;
+pub mod camps;
 pub mod construction;
 pub mod data;
+pub mod deposits;
+pub mod factions;
 pub mod hex_math;
 pub mod navigation;
+pub mod poi;
 pub mod resources;
 pub mod river_gen;
 pub mod terrain_gen;
 pub mod visibility;
 pub mod zoning;
-pub mod poi;
-pub mod camps;
-pub mod deposits;
-pub mod factions;
 
 pub mod generation;
 pub mod systems;
@@ -21,17 +21,17 @@ pub mod validation;
 
 use crate::sets::{GameSet, StartupSet};
 use bevy::prelude::*;
+pub use camps::{EnemyCamp, EnemyCampBundle};
 pub use data::{
     EdgeCoord, EdgeData, ForestType, LandscapeFeature, MapData, SedimentTraits, TerrainType,
     TileData, WorldSeed, HEX_SIZE, MAX_HEIGHT,
 };
-pub use hex_math::HexCoord;
-use terrain_gen::{TerrainConfig, TerrainGenerator};
-pub use zoning::Tile;
-pub use poi::{PoiBundle, PoiType, PointOfInterest};
-pub use camps::{EnemyCamp, EnemyCampBundle};
 pub use deposits::{DepositType, ResourceDeposit, ResourceDepositBundle};
 pub use factions::{FactionMarker, FactionMarkerBundle};
+pub use hex_math::HexCoord;
+pub use poi::{PoiBundle, PoiType, PointOfInterest};
+use terrain_gen::{TerrainConfig, TerrainGenerator};
+pub use zoning::Tile;
 
 #[derive(Component, Default, Reflect)]
 #[reflect(Component)]
@@ -89,9 +89,11 @@ impl Plugin for MapPlugin {
                     tools::handle_faction_tools.in_set(GameSet::Logic),
                     tools::handle_landscape_tools.in_set(GameSet::Logic),
                     tools::handle_sediment_tools.in_set(GameSet::Logic),
+                    tools::handle_bio_tools.in_set(GameSet::Logic),
                     tools::handle_npc_tools.in_set(GameSet::Logic),
                     systems::handle_faction_auto_relocation.in_set(GameSet::Logic),
                     validation::validate_faction_placements.in_set(GameSet::Logic),
+                    validation::validate_bio_habitats.in_set(GameSet::Logic),
                     systems::monitor_inspector_triggers
                         .run_if(resource_changed::<TerrainConfig>)
                         .in_set(GameSet::Logic),

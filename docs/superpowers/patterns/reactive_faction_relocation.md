@@ -8,14 +8,16 @@ Factions in the editor are represented by `FactionMarker` entities. These entiti
 - **Relocation System**: Monitors `MapData` changes.
 
 ## Logic Flow
-1. **Trigger**: System detects `MapData` has been modified (either via phase change or tool use).
-2. **Invalidation Check**: For each faction, check `map_data.get_tile(marker.hex_coord)`.
-3. **If `is_ocean`**:
-    - Initialize BFS queue with `marker.hex_coord`.
-    - Traverse hex neighbors layer by layer.
-    - **Stop** at the first hex where `!tile.is_ocean`.
-    - **Update** `marker.hex_coord` and the entity's `Transform`.
-4. **If valid**: Update `Transform` to match potential grid coordinate shifts.
+1. **Trigger**: System detects `MapData` has been modified or faction territory size changes.
+2. **Threshold Check**: For each faction, count current hexes. 
+    - **Player (ID 1)**: Min 15 hexes.
+    - **NPC**: Min 20 hexes.
+3. **If below threshold or `is_ocean`**:
+    - Clear all existing faction hexes to prevent "ghost" fragments.
+    - Initialize BFS relocation logic.
+    - **Stop** at the first valid land cluster that fits the required size.
+    - **Update** `TileData::faction_id`.
+4. **Dynamic Geography**: After relocation, trigger `spawn_map_internal` to update mountains and rivers around the new location.
 
 ## Visual Filter (Factions Phase)
 During `EditorPhase::Factions`, the renderer MUST:

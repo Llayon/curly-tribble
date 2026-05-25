@@ -1,6 +1,6 @@
 use crate::game_state::EditorPhase;
-use crate::map::{LandscapeFeature, MapData, TerrainType, ForestType, FactionMarker, HEX_SIZE};
 use crate::map::GenerateMapEvent;
+use crate::map::{FactionMarker, ForestType, LandscapeFeature, MapData, TerrainType, HEX_SIZE};
 use bevy::prelude::*;
 use std::collections::{HashSet, VecDeque};
 
@@ -62,7 +62,10 @@ pub fn run_map_validation(map_data: &mut MapData) {
         }
 
         if visited.len() < total_land {
-            map_data.validation_errors.push("Остров должен быть единым континентом. Разорванные участки суши не допускаются.".to_string());
+            map_data.validation_errors.push(
+                "Остров должен быть единым континентом. Разорванные участки суши не допускаются."
+                    .to_string(),
+            );
         }
     }
 
@@ -223,6 +226,7 @@ pub fn rebuild_map_on_phase_change(
     map_data: Res<MapData>,
     q_pois: Query<&crate::map::zoning::PointOfInterest>,
     q_camps: Query<&crate::map::zoning::EnemyCamp>,
+    q_deposits: Query<&crate::map::ResourceDeposit>,
 ) {
     debug!(
         "MAP_GEN: Phase changed to {:?}. Checking for auto-fill...",
@@ -235,11 +239,12 @@ pub fn rebuild_map_on_phase_change(
             .tiles
             .values()
             .any(|t| t.landscape_feature != LandscapeFeature::None),
-        EditorPhase::Sediments => !map_data.tiles.values().any(|t| {
-            t.terrain != TerrainType::Grass
-                || t.forest_type != ForestType::None
-        }),
+        EditorPhase::Sediments => !map_data
+            .tiles
+            .values()
+            .any(|t| t.terrain != TerrainType::Grass || t.forest_type != ForestType::None),
         EditorPhase::NPCs => q_pois.is_empty() && q_camps.is_empty(),
+        EditorPhase::Plants => q_deposits.is_empty(),
         _ => false,
     };
 
@@ -251,4 +256,48 @@ pub fn rebuild_map_on_phase_change(
             None
         },
     });
+}
+
+pub fn validate_bio_habitats(
+    map_data: Res<MapData>,
+    mut q_deposits: Query<&mut crate::map::ResourceDeposit>,
+) {
+    if !map_data.is_changed() {
+        return;
+    }
+
+    for mut deposit in &mut q_deposits {
+        let coord = deposit.hex_coord;
+        let Some(tile) = map_data.get_tile(coord.q, coord.r) else {
+            deposit.habitat_valid = false;
+            continue;
+        };
+
+        match deposit.deposit_type {
+            crate::map::DepositType::Deer | crate::map::DepositType::Boar => {
+                let mut has_forest = tile.forest_type != ForestType::None;
+                if !has_forest {
+                    for neighbor in coord.neighbors() {
+                        if let Some(nt) = map_data.get_tile(neighbor.q, neighbor.r) {
+                            if nt.forest_type != ForestType::None {
+                                has_forest = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+                deposit.habitat_valid = has_forest && !tile.is_ocean;
+            }
+            crate::map::DepositType::OceanFish => {
+                deposit.habitat_valid = tile.is_ocean;
+            }
+            crate::map::DepositType::Rabbit
+            | crate::map::DepositType::WildFlax
+            | crate::map::DepositType::Raspberries
+            | crate::map::DepositType::Pumpkin
+            | crate::map::DepositType::WildWheat => {
+                deposit.habitat_valid = tile.terrain.traits().allow_plants && !tile.is_ocean;
+            }
+        }
+    }
 }

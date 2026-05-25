@@ -1,4 +1,5 @@
 // src/economy/mesh_gen/mod.rs
+pub mod billboards;
 pub mod generator;
 pub mod gizmos;
 
@@ -32,6 +33,9 @@ impl Plugin for MeshGenPlugin {
                 }),
                 gizmos::draw_npc_objects_gizmos
                     .run_if(|phase: Res<State<EditorPhase>>| *phase.get() >= EditorPhase::NPCs),
+                billboards::draw_bio_billboards.run_if(|phase: Res<State<EditorPhase>>| {
+                    *phase.get() >= EditorPhase::Plants
+                }),
             ),
         );
     }

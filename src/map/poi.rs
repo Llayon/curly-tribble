@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use crate::map::{HexCoord, MapEntity};
+use bevy::prelude::*;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 pub enum PoiType {

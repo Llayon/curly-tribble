@@ -148,8 +148,7 @@ fn spawn_starting_settler(
 ) {
     let spawn_q = 0;
     let spawn_r = 0;
-    let mut spawn_pos =
-        crate::map::HexCoord::new(spawn_q, spawn_r).to_world(crate::map::HEX_SIZE);
+    let mut spawn_pos = crate::map::HexCoord::new(spawn_q, spawn_r).to_world(crate::map::HEX_SIZE);
     let elevation = map_data.get_hex_height(spawn_q, spawn_r);
     spawn_pos.y = elevation + 0.5;
 

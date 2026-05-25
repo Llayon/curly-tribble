@@ -1,6 +1,6 @@
-use bevy::prelude::*;
-use crate::map::data::{TerrainType, WorldSeed, MapData};
+use crate::map::data::{MapData, TerrainType, WorldSeed};
 use crate::map::MapEntity;
+use bevy::prelude::*;
 
 #[derive(Component)]
 pub struct Tile {
@@ -62,10 +62,10 @@ pub struct MountainRoofBundle {
     pub marker: MapEntity,
 }
 
-pub use super::poi::{PoiBundle, PoiType, PointOfInterest};
 pub use super::camps::{EnemyCamp, EnemyCampBundle};
 pub use super::deposits::{DepositType, ResourceDeposit, ResourceDepositBundle};
 pub use super::factions::{FactionMarker, FactionMarkerBundle};
+pub use super::poi::{PoiBundle, PoiType, PointOfInterest};
 
 #[derive(Component)]
 #[allow(dead_code)]

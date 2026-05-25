@@ -1,6 +1,6 @@
-use bevy::prelude::*;
-use crate::map::HexCoord;
 use crate::game_state::FactionType;
+use crate::map::HexCoord;
+use bevy::prelude::*;
 
 #[derive(Component, Clone, Copy, Debug, Reflect)]
 pub struct FactionMarker {

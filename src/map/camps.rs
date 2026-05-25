@@ -1,5 +1,5 @@
-use bevy::prelude::*;
 use crate::map::{HexCoord, MapEntity};
+use bevy::prelude::*;
 
 #[derive(Component, Debug, Clone, Reflect)]
 #[reflect(Component)]

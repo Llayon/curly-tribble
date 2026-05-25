@@ -68,45 +68,45 @@ pub fn spawn_map_internal(
                 map_data.get_tile(q, r).and_then(|t| t.faction_id)
             };
 
-            let (terrain, temp_val, humid_val, normalized_elevation, feature) =
-                if phase == EditorPhase::Shape {
-                    (TerrainType::Grass, 0.5, 0.5, 0.1, LandscapeFeature::None)
+            let (terrain, temp_val, humid_val, normalized_elevation, feature) = if phase
+                == EditorPhase::Shape
+            {
+                (TerrainType::Grass, 0.5, 0.5, 0.1, LandscapeFeature::None)
+            } else {
+                let elevation = terrain_gen.get_elevation(terrain_config, world_pos.x, world_pos.z);
+                let norm_elev = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
+
+                let temp = ((temp_noise
+                    .get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05])
+                    as f32)
+                    + 1.0)
+                    * 0.5;
+                let humid = ((humid_noise
+                    .get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05])
+                    as f32)
+                    + 1.0)
+                    * 0.5;
+
+                let t = if is_ocean {
+                    TerrainType::Grass
+                } else if force_reset || auto_fill == Some(EditorPhase::Sediments) {
+                    get_terrain_from_climate(temp, humid, norm_elev)
                 } else {
-                    let elevation =
-                        terrain_gen.get_elevation(terrain_config, world_pos.x, world_pos.z);
-                    let norm_elev = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
-
-                    let temp = ((temp_noise
-                        .get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05])
-                        as f32)
-                        + 1.0)
-                        * 0.5;
-                    let humid = ((humid_noise
-                        .get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05])
-                        as f32)
-                        + 1.0)
-                        * 0.5;
-
-                    let t = if is_ocean {
-                        TerrainType::Grass
-                    } else if force_reset || auto_fill == Some(EditorPhase::Sediments) {
-                        get_terrain_from_climate(temp, humid, norm_elev)
-                    } else {
-                        map_data
-                            .get_tile(q, r)
-                            .map_or(TerrainType::Grass, |old| old.terrain)
-                    };
-
-                    let feat = if force_reset {
-                        LandscapeFeature::None
-                    } else {
-                        map_data
-                            .get_tile(q, r)
-                            .map_or(LandscapeFeature::None, |t| t.landscape_feature)
-                    };
-
-                    (t, temp, humid, norm_elev, feat)
+                    map_data
+                        .get_tile(q, r)
+                        .map_or(TerrainType::Grass, |old| old.terrain)
                 };
+
+                let feat = if force_reset {
+                    LandscapeFeature::None
+                } else {
+                    map_data
+                        .get_tile(q, r)
+                        .map_or(LandscapeFeature::None, |t| t.landscape_feature)
+                };
+
+                (t, temp, humid, norm_elev, feat)
+            };
 
             let (f_type, f_density) = if !is_ocean && feature == LandscapeFeature::None {
                 if force_reset || auto_fill == Some(EditorPhase::Sediments) {

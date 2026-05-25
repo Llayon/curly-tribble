@@ -17,7 +17,7 @@
 ### Task 1: Data Model & ECS Setup
 
 **Files:**
-- Modify: `src/map/zoning.rs`
+- Modify: `src/map/zoning.rs` (Refactored to `src/map/deposits.rs`)
 
 - [x] **Step 1: Define `DepositType` and `ResourceDeposit`**
 - [x] **Step 2: Register types in `ZoningPlugin`**
@@ -29,21 +29,21 @@
 
 **Files:**
 - Modify: `src/game_state.rs`
-- Modify: `src/ui/mod.rs`
+- Modify: `src/ui/mod.rs` (Modularized to `src/ui/panels/`)
 
-- [ ] **Step 1: Add Bio Tools to `CurrentTool`**
-- [ ] **Step 2: Implement Phase 6 UI Sidebar**
-- [ ] **Step 3: Add "Plants" to the bottom timeline**
+- [x] **Step 1: Add Bio Tools to `CurrentTool`**
+- [x] **Step 2: Implement Phase 6 UI Sidebar**
+- [x] **Step 3: Add "Plants" to the bottom timeline**
 
 ---
 
 ### Task 3: Interactive Placement System (Click & Brush)
 
 **Files:**
-- Modify: `src/map/tools.rs`
+- Modify: `src/map/tools/bio.rs`
 
-- [ ] **Step 1: Implement `handle_bio_tools`**
-- [ ] **Step 2: Register system in `src/map/mod.rs` Update schedule**
+- [x] **Step 1: Implement `handle_bio_tools`**
+- [x] **Step 2: Register system in `src/map/mod.rs` Update schedule**
 
 ---
 
@@ -53,15 +53,15 @@
 - Create: `src/economy/mesh_gen/billboards.rs`
 - Modify: `src/economy/mesh_gen/mod.rs`
 
-- [ ] **Step 1: Create `draw_bio_billboards` gizmo system**
+- [x] **Step 1: Create `draw_bio_billboards` gizmo system**
 
 ---
 
 ### Task 5: Habitat Validation & Auto-Fill
 
 **Files:**
-- Modify: `src/map/generation.rs`
+- Modify: `src/map/generation/npcs.rs`
 - Modify: `src/map/validation.rs`
 
-- [ ] **Step 1: Implement `auto_spawn_bio_deposits`**
-- [ ] **Step 2: Implement continuous habitat validator**
+- [x] **Step 1: Implement `auto_spawn_bio_deposits`**
+- [x] **Step 2: Implement continuous habitat validator**
