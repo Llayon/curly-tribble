@@ -45,12 +45,12 @@ pub fn create_global_map_meshes(
         };
 
         let mut color = if tile_data.ocean_state == OceanState::Ocean {
-            [0.02, 0.05, 0.3, 1.0]
+            [0.0, 0.2, 0.5, 1.0] // Classic Blue for Ocean
         } else {
             let base_color = match tile_data.landscape_feature {
                 LandscapeFeature::Mountain => [0.3, 0.25, 0.2, 1.0],
-                LandscapeFeature::Lake => [0.0, 0.6, 0.8, 1.0],
-                LandscapeFeature::River => [0.1, 0.3, 0.7, 1.0],
+                LandscapeFeature::Lake => [0.4, 0.6, 1.0, 1.0], // Light Sky Blue for Lake
+                LandscapeFeature::River => [0.0, 0.8, 1.0, 1.0], // Bright Cyan for River
                 LandscapeFeature::Plateau => [0.5, 0.5, 0.5, 1.0],
                 LandscapeFeature::None => {
                     if phase >= EditorPhase::Sediments {
@@ -187,4 +187,6 @@ pub fn create_global_map_meshes(
     roof_mesh.compute_normals();
 
     (terrain_mesh, water_mesh, roof_mesh)
+}
+h, water_mesh, roof_mesh)
 }
