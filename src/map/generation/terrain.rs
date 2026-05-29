@@ -199,6 +199,8 @@ pub fn spawn_map_internal(
             }
         }
         super::cliffs::generate_cliffs(map_data, &distance_field, seed.value());
+        crate::map::river_gen::apply_rivers(map_data, terrain_config, seed.value());
+        crate::map::river_gen::apply_mud_banks(map_data);
     }
 
     if force_reset || !map_data.tiles.values().any(|t| t.faction_id == Some(1)) {
