@@ -2,6 +2,7 @@
 pub mod billboards;
 pub mod generator;
 pub mod gizmos;
+pub mod treasures;
 
 use crate::game_state::EditorPhase;
 use crate::map::zoning::{GlobalTerrainBundle, Roof, WaterBundle};
@@ -20,24 +21,28 @@ pub struct GeneratedMapAssets {
 
 impl Plugin for MeshGenPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<GeneratedMapAssets>().add_systems(
-            Update,
-            (
-                gizmos::draw_hex_grid_gizmos.run_if(not(in_state(EditorPhase::Height3D))),
-                gizmos::draw_factions_gizmos.run_if(in_state(EditorPhase::Factions)),
-                gizmos::draw_cliffs_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
-                    *phase.get() >= EditorPhase::Landscape
-                }),
-                gizmos::draw_forest_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
-                    *phase.get() >= EditorPhase::Sediments
-                }),
-                gizmos::draw_npc_objects_gizmos
-                    .run_if(|phase: Res<State<EditorPhase>>| *phase.get() >= EditorPhase::NPCs),
-                billboards::draw_bio_billboards.run_if(|phase: Res<State<EditorPhase>>| {
-                    *phase.get() >= EditorPhase::Plants
-                }),
-            ),
-        );
+        app.init_resource::<GeneratedMapAssets>()
+            .add_plugins(billboards::BillboardPlugin)
+            .add_plugins(generator::MeshGeneratorPlugin)
+            .add_plugins(gizmos::GizmosPlugin)
+            .add_systems(
+                Update,
+                (
+                    gizmos::draw_hex_grid_gizmos.run_if(not(in_state(EditorPhase::Height3D))),
+                    gizmos::draw_factions_gizmos.run_if(in_state(EditorPhase::Factions)),
+                    gizmos::draw_cliffs_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
+                        *phase.get() >= EditorPhase::Landscape
+                    }),
+                    gizmos::draw_forest_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
+                        *phase.get() >= EditorPhase::Sediments
+                    }),
+                    gizmos::draw_npc_objects_gizmos
+                        .run_if(|phase: Res<State<EditorPhase>>| *phase.get() >= EditorPhase::NPCs),
+                    treasures::draw_treasure_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
+                        *phase.get() >= EditorPhase::Treasures
+                    }),
+                ),
+            );
     }
 }
 

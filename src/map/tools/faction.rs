@@ -1,7 +1,14 @@
 use crate::game_state::{CurrentTool, EditorPhase, FactionManager, FactionTool};
-use crate::map::{HexCoord, MapData, RebuildMeshEvent, HEX_SIZE};
+use crate::map::data::OceanState;
 use crate::map::tools::utils::get_mouse_world_pos;
+use crate::map::{HexCoord, MapData, RebuildMeshEvent, HEX_SIZE};
 use bevy::prelude::*;
+
+pub struct FactionToolPlugin;
+
+impl Plugin for FactionToolPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn handle_faction_tools(
     mouse: Res<ButtonInput<MouseButton>>,
@@ -28,7 +35,7 @@ pub fn handle_faction_tools(
             };
 
             if let Some(tile) = map_data.get_tile(coord.q, coord.r) {
-                if tile.is_ocean {
+                if tile.ocean_state == OceanState::Ocean {
                     return;
                 }
 

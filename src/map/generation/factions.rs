@@ -1,8 +1,15 @@
 use crate::game_state::{FactionManager, FactionType};
+use crate::map::data::OceanState;
 use crate::map::{FactionMarker, FactionMarkerBundle, HexCoord, MapData, HEX_SIZE};
 use bevy::prelude::*;
 use rand::prelude::*;
 use std::collections::{HashMap, HashSet, VecDeque};
+
+pub struct FactionGenerationPlugin;
+
+impl Plugin for FactionGenerationPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn spawn_factions(
     commands: &mut Commands,
@@ -71,10 +78,10 @@ pub fn auto_spawn_player_territory(map_data: &mut MapData, seed: u32) {
     let mut rng = rand::rngs::StdRng::seed_from_u64(u64::from(seed));
     let mut coastal_tiles = Vec::new();
     for (coord, tile) in &map_data.tiles {
-        if !tile.is_ocean {
+        if tile.ocean_state == OceanState::Land {
             for neighbor_coord in coord.neighbors() {
                 if let Some(neighbor) = map_data.tiles.get(&neighbor_coord) {
-                    if neighbor.is_ocean {
+                    if neighbor.ocean_state == OceanState::Ocean {
                         coastal_tiles.push(*coord);
                         break;
                     }
@@ -99,7 +106,7 @@ pub fn auto_spawn_player_territory(map_data: &mut MapData, seed: u32) {
                     break;
                 }
                 if let Some(tile) = map_data.tiles.get(&n) {
-                    if !tile.is_ocean && !territory.contains(&n) {
+                    if tile.ocean_state == OceanState::Land && !territory.contains(&n) {
                         territory.insert(n);
                         queue.push_back(n);
                     }
@@ -120,7 +127,7 @@ pub fn auto_spawn_npc_territory(map_data: &mut MapData, faction_id: u32, seed: u
     let free_land: Vec<_> = map_data
         .tiles
         .iter()
-        .filter(|(_, t)| !t.is_ocean && t.faction_id.is_none())
+        .filter(|(_, t)| t.ocean_state == OceanState::Land && t.faction_id.is_none())
         .map(|(c, _)| *c)
         .collect();
     if let Some(start_coord) = free_land.choose(&mut rng) {
@@ -140,7 +147,8 @@ pub fn auto_spawn_npc_territory(map_data: &mut MapData, faction_id: u32, seed: u
                     break;
                 }
                 if let Some(tile) = map_data.tiles.get(&n) {
-                    let mut can_paint = !tile.is_ocean && tile.faction_id.is_none();
+                    let mut can_paint =
+                        tile.ocean_state == OceanState::Land && tile.faction_id.is_none();
                     if can_paint {
                         for nn in n.neighbors() {
                             if let Some(nt) = map_data.tiles.get(&nn) {

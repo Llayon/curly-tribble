@@ -3,6 +3,12 @@ use crate::map::RebuildMeshEvent;
 use bevy::prelude::*;
 use bevy_egui::egui;
 
+pub struct TopBarPlugin;
+
+impl Plugin for TopBarPlugin {
+    fn build(&self, _app: &mut App) {}
+}
+
 pub fn show_top_bar(
     ctx: &egui::Context,
     terrain_config: &mut crate::map::terrain_gen::TerrainConfig,

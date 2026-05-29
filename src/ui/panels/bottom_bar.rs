@@ -2,12 +2,25 @@ use crate::game_state::EditorPhase;
 use bevy::prelude::*;
 use bevy_egui::egui;
 
+pub struct BottomBarPlugin;
+
+impl Plugin for BottomBarPlugin {
+    fn build(&self, _app: &mut App) {}
+}
+
+#[derive(PartialEq, Clone, Copy)]
+pub enum MapValidationState {
+    Valid,
+    Invalid,
+}
+
 pub fn show_bottom_bar(
     ctx: &egui::Context,
     current_phase: &EditorPhase,
     next_phase: &mut ResMut<NextState<EditorPhase>>,
-    is_valid: bool,
+    validation_state: MapValidationState,
 ) {
+    let is_valid = validation_state == MapValidationState::Valid;
     egui::TopBottomPanel::bottom("phase_timeline").show(ctx, |ui| {
         ui.horizontal_centered(|ui| {
             let phases = [
@@ -17,7 +30,8 @@ pub fn show_bottom_bar(
                 (EditorPhase::Sediments, "4. Sediments"),
                 (EditorPhase::NPCs, "5. NPCs"),
                 (EditorPhase::Plants, "6. Plants"),
-                (EditorPhase::Height3D, "7. Height3D"),
+                (EditorPhase::Treasures, "7. Treasures"),
+                (EditorPhase::Height3D, "8. Height3D"),
             ];
 
             let current_idx = phases

@@ -43,10 +43,15 @@ fn editor_phase_ui(
     current_phase: Res<State<EditorPhase>>,
     mut next_phase: ResMut<NextState<EditorPhase>>,
     mut current_tool: ResMut<CurrentTool>,
+    mut link_state: ResMut<crate::map::LinkToolState>,
     mut faction_manager: ResMut<crate::game_state::FactionManager>,
     map_data: Res<MapData>,
     mut terrain_config: ResMut<crate::map::terrain_gen::TerrainConfig>,
     mut ev_rebuild: MessageWriter<crate::map::RebuildMeshEvent>,
+    q_selected_treasures: Query<
+        (Entity, &mut crate::map::treasures::TreasureDeposit),
+        With<crate::game_state::Selected>,
+    >,
 ) {
     let ctx = match contexts.ctx_mut().ok() {
         Some(ctx) => ctx,
@@ -54,6 +59,11 @@ fn editor_phase_ui(
     };
 
     let is_valid = map_data.validation_errors.is_empty();
+    let validation_state = if is_valid {
+        panels::bottom_bar::MapValidationState::Valid
+    } else {
+        panels::bottom_bar::MapValidationState::Invalid
+    };
 
     // Dispatch to modular panels
     panels::top_bar::show_top_bar(
@@ -62,15 +72,21 @@ fn editor_phase_ui(
         current_phase.get(),
         &mut ev_rebuild,
     );
-    panels::bottom_bar::show_bottom_bar(ctx, current_phase.get(), &mut next_phase, is_valid);
-    panels::tools::show_tools_sidebar(ctx, current_phase.get(), &mut current_tool);
+    panels::bottom_bar::show_bottom_bar(
+        ctx,
+        current_phase.get(),
+        &mut next_phase,
+        validation_state,
+    );
+    panels::tools::show_tools_sidebar(ctx, current_phase.get(), &mut current_tool, &mut link_state);
     panels::inspector::show_inspector_sidebar(
         ctx,
         current_phase.get(),
         &map_data,
         &mut faction_manager,
         &mut current_tool,
-        is_valid,
+        q_selected_treasures,
+        validation_state,
     );
 }
 

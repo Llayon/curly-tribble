@@ -1,5 +1,11 @@
 use bevy::prelude::*;
 
+pub struct UtilsToolPlugin;
+
+impl Plugin for UtilsToolPlugin {
+    fn build(&self, _app: &mut App) {}
+}
+
 pub fn get_mouse_world_pos(
     q_camera: &Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     q_window: &Query<&Window, With<bevy::window::PrimaryWindow>>,
@@ -12,7 +18,9 @@ pub fn get_mouse_world_pos(
     };
 
     let cursor_pos = window.cursor_position()?;
-    let ray = camera.viewport_to_world(camera_transform, cursor_pos).ok()?;
+    let ray = camera
+        .viewport_to_world(camera_transform, cursor_pos)
+        .ok()?;
 
     let distance = ray.origin.y / -ray.direction.y;
     if distance <= 0.0 {

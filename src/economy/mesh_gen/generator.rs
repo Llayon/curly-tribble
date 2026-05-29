@@ -1,10 +1,17 @@
 use crate::game_state::{EditorPhase, FactionManager};
+use crate::map::data::{OceanState, RoofState};
 use crate::map::terrain_gen::TerrainConfig;
 use crate::map::{LandscapeFeature, MapData, TerrainType, HEX_SIZE, MAX_HEIGHT};
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::Indices;
 use bevy::prelude::*;
 use bevy::render::render_resource::PrimitiveTopology;
+
+pub struct MeshGeneratorPlugin;
+
+impl Plugin for MeshGeneratorPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 #[must_use]
 pub fn create_global_map_meshes(
@@ -31,13 +38,13 @@ pub fn create_global_map_meshes(
 
     for (&coord, tile_data) in &map.tiles {
         let center_world = coord.to_world(size);
-        let center_y = if is_flat || tile_data.is_ocean {
+        let center_y = if is_flat || tile_data.ocean_state == OceanState::Ocean {
             0.0
         } else {
             tile_data.elevation * MAX_HEIGHT
         };
 
-        let mut color = if tile_data.is_ocean {
+        let mut color = if tile_data.ocean_state == OceanState::Ocean {
             [0.02, 0.05, 0.3, 1.0]
         } else {
             let base_color = match tile_data.landscape_feature {
@@ -89,8 +96,11 @@ pub fn create_global_map_meshes(
             }
         };
 
-        if phase == EditorPhase::Sediments && config.show_build_area && !tile_data.is_ocean {
-            if !map.is_too_steep(coord.q, coord.r) && tile_data.terrain.traits().allow_buildings {
+        if phase == EditorPhase::Sediments
+            && config.show_build_area
+            && tile_data.ocean_state == OceanState::Land
+        {
+            if !map.is_too_steep(coord.q, coord.r) && tile_data.terrain.allows_buildings() {
                 color = [0.2, 1.0, 0.2, 1.0];
             }
         }
@@ -114,7 +124,7 @@ pub fn create_global_map_meshes(
 
         if (tile_data.landscape_feature == LandscapeFeature::River
             || tile_data.landscape_feature == LandscapeFeature::Lake)
-            && !tile_data.is_ocean
+            && tile_data.ocean_state == OceanState::Land
         {
             water_vertices.push([center_world.x, center_y, center_world.z]);
             for i in 0..6 {
@@ -132,7 +142,7 @@ pub fn create_global_map_meshes(
             water_vertex_count += 7;
         }
 
-        if tile_data.roofed {
+        if tile_data.roof_state == RoofState::Roofed {
             let roof_y = center_y + 2.5;
             roof_vertices.push([center_world.x, roof_y, center_world.z]);
             for i in 0..6 {

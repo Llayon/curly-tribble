@@ -2,6 +2,12 @@ use crate::map::HexCoord;
 use bevy::prelude::*;
 use std::collections::HashMap;
 
+pub struct DataPlugin;
+
+impl Plugin for DataPlugin {
+    fn build(&self, _app: &mut App) {}
+}
+
 pub const MAX_HEIGHT: f32 = 12.0;
 pub const HEX_SIZE: f32 = 1.0;
 
@@ -44,75 +50,48 @@ pub enum ForestType {
     Coniferous,
 }
 
-pub struct SedimentTraits {
-    pub allow_buildings: bool,
-    pub allow_mining: bool,
-    pub allow_forests: bool,
-    pub allow_plants: bool,
-    pub allow_ores: bool,
+impl TerrainType {
+    #[must_use]
+    pub fn allows_buildings(&self) -> bool {
+        !matches!(self, TerrainType::Swamp)
+    }
+
+    #[must_use]
+    pub fn allows_mining(&self) -> bool {
+        true
+    }
+
+    #[must_use]
+    pub fn allows_forests(&self) -> bool {
+        matches!(
+            self,
+            TerrainType::Grass | TerrainType::Fertile | TerrainType::Mossy
+        )
+    }
+
+    #[must_use]
+    pub fn allows_plants(&self) -> bool {
+        !matches!(self, TerrainType::Stony | TerrainType::Swamp)
+    }
+
+    #[must_use]
+    pub fn allows_ores(&self) -> bool {
+        true
+    }
 }
 
-impl TerrainType {
-    pub fn traits(&self) -> SedimentTraits {
-        match self {
-            TerrainType::Grass => SedimentTraits {
-                allow_buildings: true,
-                allow_mining: true,
-                allow_forests: true,
-                allow_plants: true,
-                allow_ores: true,
-            },
-            TerrainType::Dirt => SedimentTraits {
-                allow_buildings: true,
-                allow_mining: true,
-                allow_forests: false,
-                allow_plants: true,
-                allow_ores: true,
-            },
-            TerrainType::Dusty => SedimentTraits {
-                allow_buildings: true,
-                allow_mining: true,
-                allow_forests: false,
-                allow_plants: true,
-                allow_ores: true,
-            },
-            TerrainType::Fertile => SedimentTraits {
-                allow_buildings: true,
-                allow_mining: true,
-                allow_forests: true,
-                allow_plants: true,
-                allow_ores: true,
-            },
-            TerrainType::Mossy => SedimentTraits {
-                allow_buildings: true,
-                allow_mining: true,
-                allow_forests: true,
-                allow_plants: true,
-                allow_ores: true,
-            },
-            TerrainType::Steppe => SedimentTraits {
-                allow_buildings: true,
-                allow_mining: true,
-                allow_forests: false,
-                allow_plants: true,
-                allow_ores: true,
-            },
-            TerrainType::Stony => SedimentTraits {
-                allow_buildings: true,
-                allow_mining: true,
-                allow_forests: false,
-                allow_plants: false,
-                allow_ores: true,
-            },
-            TerrainType::Swamp => SedimentTraits {
-                allow_buildings: false,
-                allow_mining: true,
-                allow_forests: false,
-                allow_plants: false,
-                allow_ores: true,
-            },
-        }
-    }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum OceanState {
+    #[default]
+    Land,
+    Ocean,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum RoofState {
+    #[default]
+    Open,
+    Roofed,
 }
 
 #[derive(Clone, Copy, Debug, Default, Reflect)]
@@ -123,8 +102,8 @@ pub struct TileData {
     pub elevation: f32,
     pub humidity: f32,
     pub temperature: f32,
-    pub roofed: bool,
-    pub is_ocean: bool,
+    pub roof_state: RoofState,
+    pub ocean_state: OceanState,
     pub faction_id: Option<u32>,
     pub landscape_feature: LandscapeFeature,
 }
@@ -146,10 +125,23 @@ impl EdgeCoord {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum EdgeType {
+    #[default]
+    Flat,
+    Cliff,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum EdgeDirection {
+    #[default]
+    Normal,
+    Reversed,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 pub struct EdgeData {
-    pub is_cliff: bool,
-    /// Если true, направление "вниз" от a к b. Если false - от b к a.
-    pub direction: bool,
+    pub edge_type: EdgeType,
+    pub direction: EdgeDirection,
 }
 
 #[derive(Resource, Default, Clone)]
@@ -192,8 +184,9 @@ impl MapData {
     }
 }
 
-#[derive(Resource, Clone, Copy)]
-pub struct WorldSeed(pub u32);
+#[derive(Resource, Clone, Copy, Debug, Reflect)]
+#[reflect(Resource)]
+pub struct WorldSeed(u32);
 
 impl WorldSeed {
     #[must_use]

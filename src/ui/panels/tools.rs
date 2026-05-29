@@ -1,12 +1,21 @@
-use crate::game_state::{CurrentTool, EditorPhase, LandscapeTool, NpcTool, ShapeTool};
-use crate::map::{DepositType, ForestType, TerrainType};
+use crate::game_state::{
+    CurrentTool, EditorPhase, LandscapeTool, NpcTool, ShapeTool, TreasureToolMode,
+};
+use crate::map::{DepositType, ForestType, LinkToolState, TerrainType};
 use bevy::prelude::*;
 use bevy_egui::egui;
+
+pub struct ToolsPlugin;
+
+impl Plugin for ToolsPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn show_tools_sidebar(
     ctx: &egui::Context,
     current_phase: &EditorPhase,
     current_tool: &mut ResMut<CurrentTool>,
+    link_state: &mut ResMut<LinkToolState>,
 ) {
     egui::SidePanel::left("tool_sidebar")
         .default_width(120.0)
@@ -15,6 +24,44 @@ pub fn show_tools_sidebar(
             ui.separator();
 
             match current_phase {
+                EditorPhase::Treasures => {
+                    ui.label("Treasure Tools:");
+                    if ui
+                        .selectable_label(
+                            current_tool.treasure_mode == TreasureToolMode::SpawnVisible,
+                            "Spawn Visible",
+                        )
+                        .clicked()
+                    {
+                        current_tool.treasure_mode = TreasureToolMode::SpawnVisible;
+                    }
+                    if ui
+                        .selectable_label(
+                            current_tool.treasure_mode == TreasureToolMode::SpawnHidden,
+                            "Spawn Hidden",
+                        )
+                        .clicked()
+                    {
+                        current_tool.treasure_mode = TreasureToolMode::SpawnHidden;
+                    }
+                    if ui
+                        .selectable_label(
+                            current_tool.treasure_mode == TreasureToolMode::Link,
+                            "Link Tool",
+                        )
+                        .clicked()
+                    {
+                        current_tool.treasure_mode = TreasureToolMode::Link;
+                    }
+
+                    if !matches!(**link_state, LinkToolState::Idle) {
+                        ui.separator();
+                        ui.colored_label(egui::Color32::YELLOW, "Link Active");
+                        if ui.button("Reset Link Tool").clicked() {
+                            **link_state = LinkToolState::Idle;
+                        }
+                    }
+                }
                 EditorPhase::Shape => {
                     ui.label("Island Shape:");
                     if ui

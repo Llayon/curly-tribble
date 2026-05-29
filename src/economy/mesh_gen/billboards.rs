@@ -4,6 +4,20 @@ use crate::map::terrain_gen::TerrainConfig;
 use crate::map::{MapData, HEX_SIZE};
 use bevy::prelude::*;
 
+use crate::game_state::EditorPhase;
+
+pub struct BillboardPlugin;
+
+impl Plugin for BillboardPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            Update,
+            draw_bio_billboards
+                .run_if(|phase: Res<State<EditorPhase>>| *phase.get() >= EditorPhase::Plants),
+        );
+    }
+}
+
 pub fn draw_bio_billboards(
     mut gizmos: Gizmos,
     query: Query<&ResourceDeposit>,
@@ -20,7 +34,10 @@ pub fn draw_bio_billboards(
         let pos = Vec3::new(world_pos_2d.x, height + 0.5, world_pos_2d.z);
 
         let color = match deposit.deposit_type {
-            DepositType::WildFlax | DepositType::Raspberries | DepositType::Pumpkin | DepositType::WildWheat => {
+            DepositType::WildFlax
+            | DepositType::Raspberries
+            | DepositType::Pumpkin
+            | DepositType::WildWheat => {
                 Color::srgb(0.2, 0.8, 0.2) // Green for plants
             }
             DepositType::Rabbit | DepositType::Deer | DepositType::Boar => {
@@ -38,19 +55,23 @@ pub fn draw_bio_billboards(
 
         // Draw a circle-like icon (billboard-ish)
         // In Bevy 0.18.1 Gizmos::circle takes (position, radius, color)
-        gizmos.circle(
-            pos,
-            0.4,
-            final_color,
-        );
-        
+        gizmos.circle(pos, 0.4, final_color);
+
         // Add a sphere for more "3D" presence
         gizmos.sphere(pos, 0.2, final_color);
-        
+
         if !deposit.habitat_valid {
             // Draw a red "X" or something to indicate error
-            gizmos.line(pos + Vec3::new(-0.3, 0.3, 0.0), pos + Vec3::new(0.3, -0.3, 0.0), Color::WHITE);
-            gizmos.line(pos + Vec3::new(0.3, 0.3, 0.0), pos + Vec3::new(-0.3, -0.3, 0.0), Color::WHITE);
+            gizmos.line(
+                pos + Vec3::new(-0.3, 0.3, 0.0),
+                pos + Vec3::new(0.3, -0.3, 0.0),
+                Color::WHITE,
+            );
+            gizmos.line(
+                pos + Vec3::new(0.3, 0.3, 0.0),
+                pos + Vec3::new(-0.3, -0.3, 0.0),
+                Color::WHITE,
+            );
         }
     }
 }

@@ -1,10 +1,13 @@
 use crate::game_state::{CurrentTool, EditorPhase};
-use crate::map::{
-    HexCoord, MapData, MapEntity, ResourceDeposit,
-    ResourceDepositBundle, HEX_SIZE,
-};
 use crate::map::tools::utils::get_mouse_world_pos;
+use crate::map::{HexCoord, MapData, MapEntity, ResourceDeposit, ResourceDepositBundle, HEX_SIZE};
 use bevy::prelude::*;
+
+pub struct BioToolPlugin;
+
+impl Plugin for BioToolPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn handle_bio_tools(
     mut commands: Commands,

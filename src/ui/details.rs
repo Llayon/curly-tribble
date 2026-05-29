@@ -1,4 +1,5 @@
-use crate::pawn::{Hunger, Morale, Selected, Settler};
+use crate::game_state::Selected;
+use crate::pawn::{Hunger, Morale, Settler};
 use bevy::prelude::*;
 
 #[derive(Component)]

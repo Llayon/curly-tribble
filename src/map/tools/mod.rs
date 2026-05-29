@@ -4,6 +4,7 @@ pub mod landscape;
 pub mod npc;
 pub mod sediment;
 pub mod shape;
+pub mod treasure;
 pub mod utils;
 
 pub use bio::*;
@@ -12,4 +13,5 @@ pub use landscape::*;
 pub use npc::*;
 pub use sediment::*;
 pub use shape::*;
+pub use treasure::*;
 pub use utils::*;

@@ -1,7 +1,14 @@
 use crate::game_state::{CurrentTool, EditorPhase, ShapeTool};
-use crate::map::{HexCoord, MapData, RebuildMeshEvent, HEX_SIZE};
+use crate::map::data::OceanState;
 use crate::map::tools::utils::get_mouse_world_pos;
+use crate::map::{HexCoord, MapData, RebuildMeshEvent, HEX_SIZE};
 use bevy::prelude::*;
+
+pub struct ShapeToolPlugin;
+
+impl Plugin for ShapeToolPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn handle_shape_tools(
     mouse: Res<ButtonInput<MouseButton>>,
@@ -21,8 +28,12 @@ pub fn handle_shape_tools(
             let coord = HexCoord::from_world(world_pos, HEX_SIZE);
             if let Some(tile) = map_data.get_tile_mut(coord.q, coord.r) {
                 let is_ocean = mouse.pressed(MouseButton::Left);
-                if tile.is_ocean != is_ocean {
-                    tile.is_ocean = is_ocean;
+                if (tile.ocean_state == OceanState::Ocean) != is_ocean {
+                    tile.ocean_state = if is_ocean {
+                        OceanState::Ocean
+                    } else {
+                        OceanState::Land
+                    };
                     if is_ocean {
                         tile.faction_id = None;
                     }

@@ -1,7 +1,15 @@
-use crate::game_state::{CurrentTool, EditorPhase, Faction, FactionManager, FactionType, NpcTool};
-use crate::map::{MapData, PoiType};
+use crate::game_state::{
+    CurrentTool, EditorPhase, Faction, FactionManager, FactionType, NpcTool, Selected,
+};
+use crate::map::{ArtifactType, MapData, PoiType, ResourceType, TreasureDeposit, TreasureItem};
 use bevy::prelude::*;
 use bevy_egui::egui;
+
+pub struct InspectorPlugin;
+
+impl Plugin for InspectorPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn show_inspector_sidebar(
     ctx: &egui::Context,
@@ -9,8 +17,10 @@ pub fn show_inspector_sidebar(
     map_data: &MapData,
     faction_manager: &mut ResMut<FactionManager>,
     current_tool: &mut ResMut<CurrentTool>,
-    is_valid: bool,
+    mut q_selected_treasures: Query<(Entity, &mut TreasureDeposit), With<Selected>>,
+    validation_state: super::bottom_bar::MapValidationState,
 ) {
+    let is_valid = validation_state == super::bottom_bar::MapValidationState::Valid;
     egui::SidePanel::right("inspector_sidebar")
         .default_width(250.0)
         .show(ctx, |ui| {
@@ -20,6 +30,43 @@ pub fn show_inspector_sidebar(
                         for err in &map_data.validation_errors {
                             ui.colored_label(egui::Color32::RED, format!("• {}", err));
                         }
+                    });
+                }
+
+                // Selected Treasure Properties
+                if let Ok((_entity, mut deposit)) = q_selected_treasures.single_mut() {
+                    ui.collapsing("💰 Treasure Contents", |ui| {
+                        let mut to_remove = None;
+                        for (idx, item) in deposit.contents.iter().enumerate() {
+                            ui.horizontal(|ui| {
+                                ui.label(format!("{:?}", item));
+                                if ui.button("🗑").clicked() {
+                                    to_remove = Some(idx);
+                                }
+                            });
+                        }
+                        if let Some(idx) = to_remove {
+                            deposit.contents.remove(idx);
+                        }
+
+                        ui.separator();
+                        ui.label("Add Item:");
+                        ui.horizontal(|ui| {
+                            if ui.button("+ Gold").clicked() {
+                                deposit.contents.push(TreasureItem::Gold(100));
+                            }
+                            if ui.button("+ Wood").clicked() {
+                                deposit.contents.push(TreasureItem::Resources {
+                                    resource: ResourceType::Wood,
+                                    amount: 50,
+                                });
+                            }
+                            if ui.button("+ Relic").clicked() {
+                                deposit
+                                    .contents
+                                    .push(TreasureItem::Artifact(ArtifactType::AncientRelic));
+                            }
+                        });
                     });
                 }
 

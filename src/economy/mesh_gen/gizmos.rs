@@ -1,4 +1,6 @@
-use crate::map::{EnemyCamp, ForestType, MapData, PoiType, PointOfInterest, HEX_SIZE};
+use crate::map::{
+    EdgeDirection, EdgeType, EnemyCamp, ForestType, MapData, PoiType, PointOfInterest, HEX_SIZE,
+};
 use bevy::prelude::*;
 
 pub fn draw_cliffs_gizmos(
@@ -13,7 +15,7 @@ pub fn draw_cliffs_gizmos(
     let y = 0.1;
 
     for (edge, data) in &map_data.edges {
-        if data.is_cliff {
+        if data.edge_type == EdgeType::Cliff {
             let center_a = edge.a.to_world(size);
             let center_b = edge.b.to_world(size);
             let between = center_b - center_a;
@@ -28,7 +30,11 @@ pub fn draw_cliffs_gizmos(
             let start = midpoint - perp * edge_half_len;
             let end = midpoint + perp * edge_half_len;
             gizmos.line(start + Vec3::Y * y, end + Vec3::Y * y, Color::WHITE);
-            let arrow_dir = if data.direction { dir } else { -dir };
+            let arrow_dir = if data.direction == EdgeDirection::Normal {
+                dir
+            } else {
+                -dir
+            };
             let arrow_base = midpoint + arrow_dir * 0.15;
             let arrow_tip = midpoint + arrow_dir * 0.35;
             gizmos.line(
@@ -56,6 +62,12 @@ pub fn draw_factions_gizmos(
     _map_data: Res<MapData>,
     _faction_manager: Res<crate::game_state::FactionManager>,
 ) {
+}
+
+pub struct GizmosPlugin;
+
+impl Plugin for GizmosPlugin {
+    fn build(&self, _app: &mut App) {}
 }
 
 pub fn draw_hex_grid_gizmos(mut gizmos: Gizmos, map: Res<MapData>) {

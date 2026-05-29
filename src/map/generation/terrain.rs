@@ -1,13 +1,20 @@
 use crate::game_state::EditorPhase;
+use crate::map::data::{OceanState, RoofState};
 use crate::map::navigation::NavigationMap;
 use crate::map::terrain_gen::{TerrainConfig, TerrainGenerator};
 use crate::map::{
-    EdgeCoord, EdgeData, ForestType, HexCoord, LandscapeFeature, MapData, TerrainType, TileData,
-    WorldSeed, HEX_SIZE, MAX_HEIGHT,
+    ForestType, HexCoord, LandscapeFeature, MapData, TerrainType, TileData, WorldSeed, HEX_SIZE,
+    MAX_HEIGHT,
 };
 use bevy::prelude::*;
 use noise::{Fbm, NoiseFn, OpenSimplex};
 use std::collections::{HashMap, VecDeque};
+
+pub struct TerrainGenerationPlugin;
+
+impl Plugin for TerrainGenerationPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 #[allow(clippy::cast_possible_truncation)]
 pub fn spawn_map_internal(
@@ -39,7 +46,6 @@ pub fn spawn_map_internal(
         for r in -half_h..half_h {
             let coord = HexCoord::new(q, r);
             let world_pos = coord.to_world(HEX_SIZE);
-
             let is_border =
                 q <= -half_w + 1 || q >= half_w - 2 || r <= -half_h + 1 || r >= half_h - 2;
 
@@ -54,7 +60,7 @@ pub fn spawn_map_internal(
                             terrain_gen.get_shape_value(terrain_config, world_pos.x, world_pos.z);
                         is_border || shape_val <= 0.0
                     },
-                    |t| t.is_ocean,
+                    |t| t.ocean_state == OceanState::Ocean,
                 )
             };
 
@@ -75,7 +81,6 @@ pub fn spawn_map_internal(
             } else {
                 let elevation = terrain_gen.get_elevation(terrain_config, world_pos.x, world_pos.z);
                 let norm_elev = (elevation / MAX_HEIGHT).clamp(0.0, 1.0);
-
                 let temp = ((temp_noise
                     .get([f64::from(world_pos.x) * 0.05, f64::from(world_pos.z) * 0.05])
                     as f32)
@@ -90,7 +95,7 @@ pub fn spawn_map_internal(
                 let t = if is_ocean {
                     TerrainType::Grass
                 } else if force_reset || auto_fill == Some(EditorPhase::Sediments) {
-                    get_terrain_from_climate(temp, humid, norm_elev)
+                    super::climate::get_terrain_from_climate(temp, humid, norm_elev)
                 } else {
                     map_data
                         .get_tile(q, r)
@@ -104,7 +109,6 @@ pub fn spawn_map_internal(
                         .get_tile(q, r)
                         .map_or(LandscapeFeature::None, |t| t.landscape_feature)
                 };
-
                 (t, temp, humid, norm_elev, feat)
             };
 
@@ -131,32 +135,37 @@ pub fn spawn_map_internal(
                 (ForestType::None, 0.0)
             };
 
-            let tile_data = TileData {
-                terrain,
-                forest_type: f_type,
-                forest_density: f_density,
-                elevation: normalized_elevation,
-                temperature: temp_val,
-                humidity: humid_val,
-                roofed: false,
-                is_ocean,
-                faction_id,
-                landscape_feature: feature,
-            };
-            new_tiles.insert(coord, tile_data);
+            new_tiles.insert(
+                coord,
+                TileData {
+                    terrain,
+                    forest_type: f_type,
+                    forest_density: f_density,
+                    elevation: normalized_elevation,
+                    temperature: temp_val,
+                    humidity: humid_val,
+                    roof_state: RoofState::Open,
+                    ocean_state: if is_ocean {
+                        OceanState::Ocean
+                    } else {
+                        OceanState::Land
+                    },
+                    faction_id,
+                    landscape_feature: feature,
+                },
+            );
         }
     }
     map_data.tiles = new_tiles;
 
-    let mut distance_field: HashMap<HexCoord, u32> = HashMap::new();
+    let mut distance_field = HashMap::new();
     let mut queue = VecDeque::new();
     for (coord, tile) in &map_data.tiles {
-        if tile.is_ocean {
+        if tile.ocean_state == OceanState::Ocean {
             distance_field.insert(*coord, 0);
             queue.push_back(*coord);
         }
     }
-
     while let Some(curr) = queue.pop_front() {
         if let Some(&curr_dist) = distance_field.get(&curr) {
             for n in curr.neighbors() {
@@ -168,14 +177,12 @@ pub fn spawn_map_internal(
         }
     }
 
-    let plateau_noise = Fbm::<OpenSimplex>::new(seed.value() + 60);
-
     if force_reset || auto_fill == Some(EditorPhase::Landscape) {
+        let plateau_noise = Fbm::<OpenSimplex>::new(seed.value() + 60);
         for (coord, tile) in map_data.tiles.iter_mut() {
-            if tile.is_ocean || tile.faction_id.is_some() {
+            if tile.ocean_state == OceanState::Ocean || tile.faction_id.is_some() {
                 continue;
             }
-
             let dist = *distance_field.get(coord).unwrap_or(&0);
             let world_pos = coord.to_world(HEX_SIZE);
             let p_noise = ((plateau_noise
@@ -183,7 +190,6 @@ pub fn spawn_map_internal(
                 as f32)
                 + 1.0)
                 * 0.5;
-
             if dist > 8 && p_noise > 0.7 {
                 tile.landscape_feature = LandscapeFeature::Mountain;
             } else if dist > 4 && p_noise > 0.5 {
@@ -192,100 +198,25 @@ pub fn spawn_map_internal(
                 tile.landscape_feature = LandscapeFeature::Lake;
             }
         }
+        super::cliffs::generate_cliffs(map_data, &distance_field, seed.value());
     }
 
-    if force_reset || auto_fill == Some(EditorPhase::Landscape) {
-        map_data.edges.clear();
-        let mut new_cliffs = Vec::new();
-
-        {
-            let coords: Vec<_> = map_data.tiles.keys().copied().collect();
-            for coord in coords {
-                if let Some(tile_a) = map_data.get_tile(coord.q, coord.r) {
-                    let feat_a = tile_a.landscape_feature;
-                    for n in coord.neighbors() {
-                        if let Some(tile_b) = map_data.get_tile(n.q, n.r) {
-                            let feat_b = tile_b.landscape_feature;
-                            let mut is_cliff = false;
-                            let mut direction = true;
-
-                            if (feat_a != feat_b)
-                                && (feat_a == LandscapeFeature::Mountain
-                                    || feat_a == LandscapeFeature::Plateau
-                                    || feat_b == LandscapeFeature::Mountain
-                                    || feat_b == LandscapeFeature::Plateau)
-                            {
-                                is_cliff = true;
-                                direction = feat_a == LandscapeFeature::Mountain
-                                    || feat_a == LandscapeFeature::Plateau;
-                            } else if !tile_a.is_ocean
-                                && !tile_b.is_ocean
-                                && tile_a.faction_id.is_none()
-                                && tile_b.faction_id.is_none()
-                            {
-                                let d_a = *distance_field.get(&coord).unwrap_or(&0) as i32;
-                                let d_b = *distance_field.get(&n).unwrap_or(&0) as i32;
-                                if d_a != d_b && (d_a % 12 == 0 || d_b % 12 == 0) {
-                                    let fault_noise = plateau_noise.get([
-                                        f64::from(coord.q) * 0.05,
-                                        f64::from(coord.r) * 0.05,
-                                    ]);
-                                    if fault_noise > 0.4 {
-                                        is_cliff = true;
-                                        direction = d_a > d_b;
-                                    }
-                                }
-                            }
-
-                            if is_cliff {
-                                let edge = EdgeCoord::new(coord, n);
-                                new_cliffs.push((
-                                    edge,
-                                    EdgeData {
-                                        is_cliff: true,
-                                        direction,
-                                    },
-                                ));
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        for (edge, data) in new_cliffs {
-            map_data.edges.insert(edge, data);
-        }
-    }
-
-    let has_player_start = map_data.tiles.values().any(|t| t.faction_id == Some(1));
-    if force_reset || !has_player_start {
+    if force_reset || !map_data.tiles.values().any(|t| t.faction_id == Some(1)) {
         super::factions::auto_spawn_player_territory(map_data, seed.value());
     }
 
-    for q in -half_w..half_w {
-        for r in -half_h..half_h {
-            let tile_data = map_data.get_tile(q, r).copied().unwrap_or_default();
-            let terrain = tile_data.terrain;
-
-            let mut cost = crate::map::navigation::COST_BASE;
-            if tile_data.is_ocean {
-                cost = crate::map::navigation::COST_BLOCKER;
-            } else if map_data.is_too_steep(q, r) {
-                cost = crate::map::navigation::COST_BLOCKER;
-            } else {
-                match terrain {
-                    TerrainType::Swamp => {
-                        cost = 50;
-                    }
-                    TerrainType::Stony => {
-                        cost = 80;
-                    }
-                    _ => {}
-                }
+    for (coord, tile_data) in &map_data.tiles {
+        let mut cost = crate::map::navigation::COST_BASE;
+        if tile_data.ocean_state == OceanState::Ocean || map_data.is_too_steep(coord.q, coord.r) {
+            cost = crate::map::navigation::COST_BLOCKER;
+        } else {
+            match tile_data.terrain {
+                TerrainType::Swamp => cost = 50,
+                TerrainType::Stony => cost = 80,
+                _ => {}
             }
-            nav_map.grid.insert(IVec2::new(q, r), cost);
         }
+        nav_map.grid.insert(IVec2::new(coord.q, coord.r), cost);
     }
 
     commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
@@ -294,27 +225,4 @@ pub fn spawn_map_internal(
         faction_manager: faction_manager.clone(),
         config: (*terrain_config).clone(),
     });
-}
-
-pub fn get_terrain_from_climate(temp: f32, humid: f32, elev: f32) -> TerrainType {
-    if elev > 0.8 {
-        return TerrainType::Stony;
-    }
-    if humid > 0.7 {
-        if temp < 0.3 {
-            TerrainType::Swamp
-        } else {
-            TerrainType::Mossy
-        }
-    } else if humid < 0.3 {
-        if temp > 0.7 {
-            TerrainType::Dusty
-        } else {
-            TerrainType::Steppe
-        }
-    } else if temp < 0.3 {
-        TerrainType::Stony
-    } else {
-        TerrainType::Grass
-    }
 }

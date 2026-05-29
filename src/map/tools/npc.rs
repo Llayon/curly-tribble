@@ -1,9 +1,16 @@
 use crate::game_state::{CurrentTool, EditorPhase, FactionManager, NpcTool};
+use crate::map::data::OceanState;
+use crate::map::tools::utils::get_mouse_world_pos;
 use crate::map::{
     EnemyCamp, EnemyCampBundle, HexCoord, MapData, MapEntity, PoiBundle, PointOfInterest, HEX_SIZE,
 };
-use crate::map::tools::utils::get_mouse_world_pos;
 use bevy::prelude::*;
+
+pub struct NpcToolPlugin;
+
+impl Plugin for NpcToolPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn handle_npc_tools(
     mut commands: Commands,
@@ -26,7 +33,7 @@ pub fn handle_npc_tools(
             let coord = HexCoord::from_world(world_pos, HEX_SIZE);
 
             if let Some(tile) = map_data.get_tile(coord.q, coord.r) {
-                if tile.is_ocean {
+                if tile.ocean_state == OceanState::Ocean {
                     return;
                 }
 
@@ -58,9 +65,7 @@ pub fn handle_npc_tools(
                                     "{:?} at {:?}",
                                     current_tool.poi_type, coord
                                 )),
-                                transform: Transform::from_translation(
-                                    coord.to_world(HEX_SIZE),
-                                ),
+                                transform: Transform::from_translation(coord.to_world(HEX_SIZE)),
                                 visibility: Visibility::Visible,
                                 inherited_visibility: InheritedVisibility::default(),
                                 marker: MapEntity,
@@ -89,9 +94,7 @@ pub fn handle_npc_tools(
                                     camp_count: 1,
                                 },
                                 name: Name::new(format!("Enemy Camp at {:?}", coord)),
-                                transform: Transform::from_translation(
-                                    coord.to_world(HEX_SIZE),
-                                ),
+                                transform: Transform::from_translation(coord.to_world(HEX_SIZE)),
                                 visibility: Visibility::Visible,
                                 inherited_visibility: InheritedVisibility::default(),
                                 marker: MapEntity,

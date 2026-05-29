@@ -7,10 +7,12 @@ pub mod deposits;
 pub mod factions;
 pub mod hex_math;
 pub mod navigation;
+pub mod phase_transitions;
 pub mod poi;
 pub mod resources;
 pub mod river_gen;
 pub mod terrain_gen;
+pub mod treasures;
 pub mod visibility;
 pub mod zoning;
 
@@ -18,19 +20,24 @@ pub mod generation;
 pub mod systems;
 pub mod tools;
 pub mod validation;
+pub mod validation_deposits;
 
 use crate::sets::{GameSet, StartupSet};
 use bevy::prelude::*;
 pub use camps::{EnemyCamp, EnemyCampBundle};
 pub use data::{
-    EdgeCoord, EdgeData, ForestType, LandscapeFeature, MapData, SedimentTraits, TerrainType,
-    TileData, WorldSeed, HEX_SIZE, MAX_HEIGHT,
+    EdgeCoord, EdgeData, EdgeDirection, EdgeType, ForestType, LandscapeFeature, MapData,
+    TerrainType, TileData, WorldSeed, HEX_SIZE, MAX_HEIGHT,
 };
 pub use deposits::{DepositType, ResourceDeposit, ResourceDepositBundle};
 pub use factions::{FactionMarker, FactionMarkerBundle};
 pub use hex_math::HexCoord;
 pub use poi::{PoiBundle, PoiType, PointOfInterest};
 use terrain_gen::{TerrainConfig, TerrainGenerator};
+pub use treasures::{
+    ArtifactType, HiddenTreasure, LinkToolState, MapToTarget, ResourceType, Targeting,
+    TreasureBundle, TreasureDeposit, TreasureItem, VisibleTreasure,
+};
 pub use zoning::Tile;
 
 #[derive(Component, Default, Reflect)]
@@ -53,8 +60,21 @@ impl Plugin for MapPlugin {
         let config = TerrainConfig::default();
         app.insert_resource(TerrainGenerator::new(config.seed))
             .insert_resource(config)
+            .init_resource::<MapData>()
+            .init_resource::<WorldSeed>()
+            .init_resource::<navigation::NavigationMap>()
+            .init_resource::<LinkToolState>()
             .register_type::<TerrainConfig>()
             .register_type::<MapEntity>()
+            .register_type::<treasures::ResourceType>()
+            .register_type::<treasures::ArtifactType>()
+            .register_type::<treasures::TreasureItem>()
+            .register_type::<treasures::TreasureDeposit>()
+            .register_type::<treasures::VisibleTreasure>()
+            .register_type::<treasures::HiddenTreasure>()
+            .register_type::<treasures::Targeting>()
+            .register_type::<treasures::MapToTarget>()
+            .register_type::<LinkToolState>()
             .add_plugins(bevy_inspector_egui::quick::ResourceInspectorPlugin::<
                 TerrainConfig,
             >::default())
@@ -91,13 +111,15 @@ impl Plugin for MapPlugin {
                     tools::handle_sediment_tools.in_set(GameSet::Logic),
                     tools::handle_bio_tools.in_set(GameSet::Logic),
                     tools::handle_npc_tools.in_set(GameSet::Logic),
+                    tools::handle_treasure_tools.in_set(GameSet::Logic),
                     systems::handle_faction_auto_relocation.in_set(GameSet::Logic),
                     validation::validate_faction_placements.in_set(GameSet::Logic),
-                    validation::validate_bio_habitats.in_set(GameSet::Logic),
+                    validation_deposits::validate_bio_habitats.in_set(GameSet::Logic),
+                    validation_deposits::validate_treasures.in_set(GameSet::Logic),
                     systems::monitor_inspector_triggers
                         .run_if(resource_changed::<TerrainConfig>)
                         .in_set(GameSet::Logic),
-                    validation::rebuild_map_on_phase_change
+                    phase_transitions::rebuild_map_on_phase_change
                         .run_if(state_changed::<crate::game_state::EditorPhase>)
                         .in_set(GameSet::Logic),
                 ),

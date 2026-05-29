@@ -1,10 +1,11 @@
 use crate::game_state::GameState;
 use crate::sets::{GameSet, StartupSet};
-use bevy::anti_alias::taa::TemporalAntiAliasPlugin;
+use bevy::anti_alias::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing};
 use bevy::core_pipeline::core_3d::graph::Core3d;
 use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
 use bevy::core_pipeline::tonemapping::Tonemapping;
-use bevy::post_process::bloom::BloomPlugin;
+use bevy::pbr::ScreenSpaceAmbientOcclusion;
+use bevy::post_process::bloom::{Bloom, BloomPlugin};
 use bevy::prelude::*;
 use bevy::render::camera::CameraRenderGraph;
 use bevy::render::view::Hdr;
@@ -63,11 +64,14 @@ pub struct MainCameraBundle {
     pub focus: CameraFocus,
     pub config: CameraConfig,
     pub tonemapping: Tonemapping,
+    pub bloom: Bloom,
     pub hdr: Hdr,
     pub msaa: Msaa,
     pub depth_prepass: DepthPrepass,
     pub normal_prepass: NormalPrepass,
     pub motion_vector_prepass: MotionVectorPrepass,
+    pub taa: TemporalAntiAliasing,
+    pub ssao: ScreenSpaceAmbientOcclusion,
     pub name: Name,
 }
 
@@ -80,11 +84,14 @@ fn setup_camera(mut commands: Commands) {
         focus: CameraFocus(Vec3::ZERO),
         config: CameraConfig::default(),
         tonemapping: Tonemapping::TonyMcMapface,
+        bloom: Bloom::default(),
         hdr: Hdr,
         msaa: Msaa::Off,
         depth_prepass: DepthPrepass,
         normal_prepass: NormalPrepass,
         motion_vector_prepass: MotionVectorPrepass,
+        taa: TemporalAntiAliasing::default(),
+        ssao: ScreenSpaceAmbientOcclusion::default(),
         name: Name::new("Main Camera"),
     });
 }

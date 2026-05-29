@@ -10,6 +10,14 @@ const WINDOW_HEIGHT: u32 = 720;
 fn main() {
     // 4. Panic Hook - Better error reporting for Windows/CLI
     std::panic::set_hook(Box::new(|info| {
+        let msg = match info.payload().downcast_ref::<&'static str>() {
+            Some(s) => *s,
+            None => match info.payload().downcast_ref::<String>() {
+                Some(s) => &s[..],
+                None => "Box<dyn Any>",
+            },
+        };
+        let _ = std::fs::write("panic_log.txt", format!("Panic occurred: {}\nLocation: {:?}", msg, info.location()));
         error!("Panic occurred: {:?}", info);
     }));
 

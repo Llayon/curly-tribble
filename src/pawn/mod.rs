@@ -8,6 +8,7 @@ pub mod brain;
 pub mod needs;
 pub mod relations;
 
+use crate::game_state::Selected;
 use behaviors::{BehaviorExt, Idle};
 use relations::RelationsPlugin;
 
@@ -32,9 +33,6 @@ pub struct LanternBundle {
     pub light: PointLight,
     pub source: crate::map::atmosphere::LightSource,
 }
-
-#[derive(Component, Default)]
-pub struct Selected;
 
 pub struct PawnPlugin;
 

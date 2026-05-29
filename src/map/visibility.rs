@@ -1,3 +1,4 @@
+use crate::map::data::RoofState;
 use crate::map::zoning::Roof;
 use crate::map::MapData;
 use crate::pawn::Pawn;
@@ -23,7 +24,7 @@ pub fn update_cave_visibility(
     for transform in &pawns {
         let grid_pos = crate::map::navigation::types::world_to_grid(transform.translation);
         if let Some(tile) = map.get_tile(grid_pos.x, grid_pos.y) {
-            if tile.roofed {
+            if tile.roof_state == RoofState::Roofed {
                 any_pawn_in_cave = true;
                 break;
             }

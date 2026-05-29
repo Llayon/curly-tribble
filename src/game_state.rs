@@ -18,6 +18,7 @@ pub enum EditorPhase {
     Sediments,
     NPCs,
     Plants,
+    Treasures,
     Height3D,
 }
 
@@ -93,6 +94,18 @@ pub enum NpcTool {
     Delete,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum TreasureToolMode {
+    #[default]
+    SpawnVisible,
+    SpawnHidden,
+    Link,
+}
+
+#[derive(Component, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+#[reflect(Component)]
+pub struct Selected;
+
 #[derive(Resource, Reflect, Clone)]
 #[reflect(Resource)]
 pub struct CurrentTool {
@@ -105,12 +118,13 @@ pub struct CurrentTool {
     pub active_sediment_tool: bool,
     pub active_forest_tool: bool,
     pub npc: NpcTool,
-    pub poi_type: crate::map::zoning::PoiType,
+    pub poi_type: crate::map::PoiType,
     pub camp_difficulty: f32,
     pub camp_power: u32,
     pub bio_resource: crate::map::DepositType,
     pub bio_amount: u32,
     pub bio_brush_size: u32,
+    pub treasure_mode: TreasureToolMode,
 }
 
 impl Default for CurrentTool {
@@ -125,12 +139,13 @@ impl Default for CurrentTool {
             active_sediment_tool: false,
             active_forest_tool: false,
             npc: NpcTool::None,
-            poi_type: crate::map::zoning::PoiType::TradePost,
+            poi_type: crate::map::PoiType::TradePost,
             camp_difficulty: 0.5,
             camp_power: 100,
             bio_resource: crate::map::DepositType::Rabbit,
             bio_amount: 10,
             bio_brush_size: 1,
+            treasure_mode: TreasureToolMode::default(),
         }
     }
 }
@@ -149,6 +164,8 @@ impl Plugin for GameStatePlugin {
             .register_type::<FactionTool>()
             .register_type::<LandscapeTool>()
             .register_type::<NpcTool>()
+            .register_type::<TreasureToolMode>()
+            .register_type::<Selected>()
             .register_type::<CurrentTool>()
             .register_type::<Faction>()
             .register_type::<FactionManager>()

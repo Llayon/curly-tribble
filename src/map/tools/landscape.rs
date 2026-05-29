@@ -1,7 +1,16 @@
 use crate::game_state::{CurrentTool, EditorPhase, LandscapeTool};
-use crate::map::{EdgeCoord, HexCoord, LandscapeFeature, MapData, RebuildMeshEvent, HEX_SIZE};
 use crate::map::tools::utils::get_mouse_world_pos;
+use crate::map::{
+    EdgeCoord, EdgeDirection, EdgeType, HexCoord, LandscapeFeature, MapData, RebuildMeshEvent,
+    HEX_SIZE,
+};
 use bevy::prelude::*;
+
+pub struct LandscapeToolPlugin;
+
+impl Plugin for LandscapeToolPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn handle_landscape_tools(
     mouse: Res<ButtonInput<MouseButton>>,
@@ -65,11 +74,15 @@ pub fn handle_landscape_tools(
                         if mouse.just_pressed(MouseButton::Left) {
                             let data = map_data.edges.get(&edge).copied().unwrap_or_default();
                             let mut new_data = data;
-                            if !data.is_cliff {
-                                new_data.is_cliff = true;
-                                new_data.direction = true;
+                            if data.edge_type != EdgeType::Cliff {
+                                new_data.edge_type = EdgeType::Cliff;
+                                new_data.direction = EdgeDirection::Normal;
                             } else {
-                                new_data.direction = !data.direction;
+                                new_data.direction = if data.direction == EdgeDirection::Normal {
+                                    EdgeDirection::Reversed
+                                } else {
+                                    EdgeDirection::Normal
+                                };
                             }
                             map_data.edges.insert(edge, new_data);
                             ev_rebuild.write(RebuildMeshEvent);

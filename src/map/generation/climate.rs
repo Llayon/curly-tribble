@@ -1,4 +1,11 @@
-use crate::map::data::TerrainType;
+use crate::map::TerrainType;
+use bevy::prelude::*;
+
+pub struct ClimateGenerationPlugin;
+
+impl Plugin for ClimateGenerationPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn get_terrain_from_climate(temp: f32, humid: f32, elev: f32) -> TerrainType {
     if elev > 0.8 {

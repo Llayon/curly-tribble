@@ -1,7 +1,13 @@
 use crate::game_state::{CurrentTool, EditorPhase};
-use crate::map::{ForestType, HexCoord, MapData, RebuildMeshEvent, TerrainType, HEX_SIZE};
 use crate::map::tools::utils::get_mouse_world_pos;
+use crate::map::{ForestType, HexCoord, MapData, RebuildMeshEvent, TerrainType, HEX_SIZE};
 use bevy::prelude::*;
+
+pub struct SedimentToolPlugin;
+
+impl Plugin for SedimentToolPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn handle_sediment_tools(
     mouse: Res<ButtonInput<MouseButton>>,

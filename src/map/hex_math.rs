@@ -1,6 +1,12 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
+pub struct HexMathPlugin;
+
+impl Plugin for HexMathPlugin {
+    fn build(&self, _app: &mut App) {}
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Reflect, Serialize, Deserialize)]
 pub struct HexCoord {
     pub q: i32,

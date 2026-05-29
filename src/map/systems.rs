@@ -1,6 +1,8 @@
 use crate::events::{GameLogMessage, LogSeverity};
 use crate::game_state::{EditorPhase, FactionManager};
-use crate::map::generation::{auto_spawn_bio_deposits, auto_spawn_npcs, spawn_map_internal};
+use crate::map::generation::{
+    auto_spawn_bio_deposits, auto_spawn_npcs, auto_spawn_treasures, spawn_map_internal,
+};
 use crate::map::navigation::NavigationMap;
 use crate::map::terrain_gen::{TerrainConfig, TerrainGenerator};
 use crate::map::{
@@ -8,6 +10,12 @@ use crate::map::{
 };
 use bevy::prelude::*;
 use rand::Rng;
+
+pub struct MapSystemsPlugin;
+
+impl Plugin for MapSystemsPlugin {
+    fn build(&self, _app: &mut App) {}
+}
 
 pub fn handle_regeneration(
     mut commands: Commands,
@@ -63,6 +71,10 @@ pub fn handle_regeneration(
 
         if ev.force_reset || ev.auto_fill_phase == Some(EditorPhase::Plants) {
             auto_spawn_bio_deposits(&mut commands, &map_data, seed.value());
+        }
+
+        if ev.force_reset || ev.auto_fill_phase == Some(EditorPhase::Treasures) {
+            auto_spawn_treasures(&mut commands, &map_data, seed.value());
         }
 
         crate::map::validation::run_map_validation(&mut map_data);
