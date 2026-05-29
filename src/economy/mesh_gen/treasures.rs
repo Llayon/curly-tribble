@@ -53,7 +53,7 @@ pub fn draw_treasure_gizmos(
         gizmos.line(
             source_transform.translation() + Vec3::Y * 0.5,
             target_transform.translation() + Vec3::Y * 0.5,
-            Color::WHITE,
+            Color::srgb(0.0, 1.0, 0.0), // Green lines as per spec
         );
     }
 }

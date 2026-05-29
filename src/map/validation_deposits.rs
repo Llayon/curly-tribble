@@ -40,6 +40,13 @@ pub fn validate_treasures(
                 "Multiple treasures found on the same hex at {coord:?}."
             ));
         }
+        // 3. Ensure treasure is not empty
+        if deposit.contents.is_empty() {
+            errors.push(format!(
+                "Treasure at {coord:?} is empty. It must have at least 1 defined content."
+            ));
+        }
+
         occupied.insert(coord);
     }
 
