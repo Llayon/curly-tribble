@@ -48,10 +48,10 @@ pub fn generate_cliffs(map_data: &mut MapData, distance_field: &HashMap<HexCoord
                     {
                         let d_a = *distance_field.get(&coord).unwrap_or(&0) as i32;
                         let d_b = *distance_field.get(&n).unwrap_or(&0) as i32;
-                        if d_a != d_b && (d_a % 12 == 0 || d_b % 12 == 0) {
+                        if d_a != d_b && (d_a % 8 == 0 || d_b % 8 == 0) {
                             let fault_noise = plateau_noise
                                 .get([f64::from(coord.q) * 0.05, f64::from(coord.r) * 0.05]);
-                            if fault_noise > 0.4 {
+                            if fault_noise > 0.3 {
                                 is_cliff = true;
                                 direction = if d_a > d_b {
                                     EdgeDirection::Normal
