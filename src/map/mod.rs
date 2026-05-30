@@ -1,4 +1,5 @@
 // src/map/mod.rs
+pub mod artifacts;
 pub mod atmosphere;
 pub mod camps;
 pub mod construction;
@@ -23,6 +24,7 @@ pub mod validation;
 pub mod validation_deposits;
 
 use crate::sets::{GameSet, StartupSet};
+pub use artifacts::{Artifact, ArtifactBundle, ArtifactLocation, TradeConfig};
 use bevy::prelude::*;
 pub use camps::{EnemyCamp, EnemyCampBundle};
 pub use data::{
@@ -35,8 +37,8 @@ pub use hex_math::HexCoord;
 pub use poi::{PoiBundle, PoiType, PointOfInterest};
 use terrain_gen::{TerrainConfig, TerrainGenerator};
 pub use treasures::{
-    ArtifactType, HiddenTreasure, LinkToolState, MapToTarget, ResourceType, Targeting,
-    TreasureBundle, TreasureDeposit, TreasureItem, VisibleTreasure,
+    ArtifactType, ContainsArtifact, HiddenTreasure, LinkToolState, MapToTarget, ResourceType,
+    TargetEntity, Targeting, TreasureBundle, TreasureDeposit, TreasureItem, VisibleTreasure,
 };
 pub use zoning::Tile;
 
@@ -74,6 +76,10 @@ impl Plugin for MapPlugin {
             .register_type::<treasures::HiddenTreasure>()
             .register_type::<treasures::Targeting>()
             .register_type::<treasures::MapToTarget>()
+            .register_type::<treasures::ContainsArtifact>()
+            .register_type::<artifacts::Artifact>()
+            .register_type::<artifacts::ArtifactLocation>()
+            .register_type::<artifacts::TradeConfig>()
             .register_type::<LinkToolState>()
             .add_plugins(bevy_inspector_egui::quick::ResourceInspectorPlugin::<
                 TerrainConfig,
@@ -112,6 +118,7 @@ impl Plugin for MapPlugin {
                     tools::handle_bio_tools.in_set(GameSet::Logic),
                     tools::handle_npc_tools.in_set(GameSet::Logic),
                     tools::handle_treasure_tools.in_set(GameSet::Logic),
+                    tools::handle_artifact_tools.in_set(GameSet::Logic),
                     systems::handle_faction_auto_relocation.in_set(GameSet::Logic),
                     validation::validate_faction_placements.in_set(GameSet::Logic),
                     validation_deposits::validate_bio_habitats.in_set(GameSet::Logic),

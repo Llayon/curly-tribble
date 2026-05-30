@@ -21,11 +21,18 @@ pub enum ArtifactType {
 pub enum TreasureItem {
     Gold(u32),
     Resources { resource: ResourceType, amount: u32 },
-    Artifact(ArtifactType),
+    ArtifactDef(ArtifactType),
+    ArtifactRef(TargetEntity),
     // RAW ENTITY REMOVED: Use MapToTarget child with Targeting relation instead.
     TreasureMap,
 }
 pub type TargetEntity = Entity;
+
+#[derive(Component, Debug, Clone, Copy, Reflect)]
+#[reflect(Component)]
+pub struct ContainsArtifact {
+    pub artifact: TargetEntity,
+}
 
 /// Relationship: This entity points to a Target Treasure.
 /// Complies with Guard #18 (Semantic Graph).

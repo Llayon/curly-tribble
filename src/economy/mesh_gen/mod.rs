@@ -22,9 +22,12 @@ pub struct GeneratedMapAssets {
 impl Plugin for MeshGenPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<GeneratedMapAssets>()
-            .add_plugins(billboards::BillboardPlugin)
-            .add_plugins(generator::MeshGeneratorPlugin)
-            .add_plugins(gizmos::GizmosPlugin)
+            .add_plugins((
+                billboards::BillboardPlugin,
+                generator::MeshGeneratorPlugin,
+                gizmos::GizmosPlugin,
+                treasures::TreasureMeshPlugin,
+            ))
             .add_systems(
                 Update,
                 (
@@ -38,9 +41,6 @@ impl Plugin for MeshGenPlugin {
                     }),
                     gizmos::draw_npc_objects_gizmos
                         .run_if(|phase: Res<State<EditorPhase>>| *phase.get() >= EditorPhase::NPCs),
-                    treasures::draw_treasure_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
-                        *phase.get() >= EditorPhase::Treasures
-                    }),
                 ),
             );
     }

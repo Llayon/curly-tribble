@@ -28,7 +28,7 @@ pub fn handle_treasure_tools(
     q_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     q_window: Query<&Window, With<bevy::window::PrimaryWindow>>,
     q_deposits: Query<(Entity, &GlobalTransform), With<TreasureDeposit>>,
-    mut q_deposit_mut: Query<&mut TreasureDeposit>,
+    mut q_deposit_mut: Query<&mut TreasureDeposit, With<TreasureDeposit>>,
     mut gizmos: Gizmos,
 ) {
     if *phase.get() != EditorPhase::Treasures {

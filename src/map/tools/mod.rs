@@ -1,3 +1,4 @@
+pub mod artifact;
 pub mod bio;
 pub mod faction;
 pub mod landscape;
@@ -7,6 +8,7 @@ pub mod shape;
 pub mod treasure;
 pub mod utils;
 
+pub use artifact::*;
 pub use bio::*;
 pub use faction::*;
 pub use landscape::*;

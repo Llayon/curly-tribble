@@ -6,7 +6,54 @@ use bevy::prelude::*;
 pub struct PhaseTransitionsPlugin;
 
 impl Plugin for PhaseTransitionsPlugin {
-    fn build(&self, _app: &mut App) {}
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            OnEnter(EditorPhase::Artifacts),
+            extract_artifacts_on_phase_change,
+        );
+    }
+}
+
+pub fn extract_artifacts_on_phase_change(
+    mut commands: Commands,
+    mut q_treasures: Query<
+        (Entity, &mut crate::map::TreasureDeposit),
+        With<crate::map::TreasureDeposit>,
+    >,
+) {
+    for (entity, mut deposit) in &mut q_treasures {
+        let mut new_contents = Vec::new();
+        for item in deposit.contents.drain(..) {
+            if let crate::map::TreasureItem::ArtifactDef(a_type) = item {
+                let artifact_entity = commands
+                    .spawn(crate::map::artifacts::ArtifactBundle {
+                        artifact: crate::map::artifacts::Artifact {
+                            artifact_type: a_type,
+                            location: crate::map::artifacts::ArtifactLocation::InTreasure(entity),
+                        },
+                        name: Name::new(format!("{a_type:?} (Artifact)")),
+                        marker: crate::map::MapEntity,
+                        transform: Transform::default(),
+                        global_transform: GlobalTransform::default(),
+                        visibility: Visibility::default(),
+                        inherited_visibility: InheritedVisibility::default(),
+                        view_visibility: ViewVisibility::default(),
+                    })
+                    .id();
+
+                commands.entity(entity).with_children(|parent| {
+                    parent.spawn(crate::map::treasures::ContainsArtifact {
+                        artifact: artifact_entity,
+                    });
+                });
+
+                new_contents.push(crate::map::TreasureItem::ArtifactRef(artifact_entity));
+            } else {
+                new_contents.push(item);
+            }
+        }
+        deposit.contents = new_contents;
+    }
 }
 
 pub fn rebuild_map_on_phase_change(

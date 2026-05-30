@@ -188,5 +188,3 @@ pub fn create_global_map_meshes(
 
     (terrain_mesh, water_mesh, roof_mesh)
 }
-h, water_mesh, roof_mesh)
-}

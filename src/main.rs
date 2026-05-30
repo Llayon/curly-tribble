@@ -17,7 +17,10 @@ fn main() {
                 None => "Box<dyn Any>",
             },
         };
-        let _ = std::fs::write("panic_log.txt", format!("Panic occurred: {}\nLocation: {:?}", msg, info.location()));
+        let _ = std::fs::write(
+            "panic_log.txt",
+            format!("Panic occurred: {}\nLocation: {:?}", msg, info.location()),
+        );
         error!("Panic occurred: {:?}", info);
     }));
 

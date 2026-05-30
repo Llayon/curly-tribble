@@ -49,7 +49,12 @@ pub fn auto_spawn_treasures(commands: &mut Commands, map_data: &MapData, seed: u
     for i in 0..num_visible {
         if let Some(&coord) = sorted_land.get(i) {
             let contents = if rng.gen_bool(0.7) {
-                vec![TreasureItem::Gold(rng.gen_range(50..150))]
+                vec![
+                    TreasureItem::Gold(rng.gen_range(50..150)),
+                    crate::map::treasures::TreasureItem::ArtifactDef(
+                        crate::map::treasures::ArtifactType::AncientRelic,
+                    ),
+                ]
             } else {
                 vec![TreasureItem::Resources {
                     resource: ResourceType::Wood,

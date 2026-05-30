@@ -1,7 +1,5 @@
-use crate::game_state::EditorPhase;
 use crate::map::data::OceanState;
-use crate::map::GenerateMapEvent;
-use crate::map::{FactionMarker, ForestType, LandscapeFeature, MapData, TerrainType, HEX_SIZE};
+use crate::map::{FactionMarker, MapData, HEX_SIZE};
 use bevy::prelude::*;
 use std::collections::{HashSet, VecDeque};
 

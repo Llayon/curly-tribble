@@ -49,8 +49,19 @@ fn editor_phase_ui(
     mut terrain_config: ResMut<crate::map::terrain_gen::TerrainConfig>,
     mut ev_rebuild: MessageWriter<crate::map::RebuildMeshEvent>,
     q_selected_treasures: Query<
-        (Entity, &mut crate::map::treasures::TreasureDeposit),
-        With<crate::game_state::Selected>,
+        (
+            crate::map::TargetEntity,
+            &mut crate::map::treasures::TreasureDeposit,
+        ),
+        (
+            With<crate::game_state::Selected>,
+            With<crate::map::treasures::TreasureDeposit>,
+        ),
+    >,
+    mut artifact_state: ResMut<crate::game_state::ArtifactToolState>,
+    mut q_artifacts: Query<
+        (crate::map::TargetEntity, &mut crate::map::Artifact),
+        With<crate::map::Artifact>,
     >,
 ) {
     let ctx = match contexts.ctx_mut().ok() {
@@ -87,6 +98,8 @@ fn editor_phase_ui(
         &mut current_tool,
         q_selected_treasures,
         validation_state,
+        &mut artifact_state,
+        &mut q_artifacts,
     );
 }
 

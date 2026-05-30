@@ -1,9 +1,13 @@
 use crate::game_state::{
-    CurrentTool, EditorPhase, Faction, FactionManager, FactionType, NpcTool, Selected,
+    ArtifactToolState, CurrentTool, EditorPhase, Faction, FactionManager, FactionType, NpcTool,
+    Selected,
 };
-use crate::map::{ArtifactType, MapData, PoiType, ResourceType, TreasureDeposit, TreasureItem};
+use crate::map::{MapData, PoiType, TreasureDeposit};
 use bevy::prelude::*;
 use bevy_egui::egui;
+
+pub mod artifacts;
+pub mod treasures;
 
 pub struct InspectorPlugin;
 
@@ -17,8 +21,16 @@ pub fn show_inspector_sidebar(
     map_data: &MapData,
     faction_manager: &mut ResMut<FactionManager>,
     current_tool: &mut ResMut<CurrentTool>,
-    mut q_selected_treasures: Query<(Entity, &mut TreasureDeposit), With<Selected>>,
+    mut q_selected_treasures: Query<
+        (crate::map::TargetEntity, &mut TreasureDeposit),
+        (With<Selected>, With<TreasureDeposit>),
+    >,
     validation_state: super::bottom_bar::MapValidationState,
+    artifact_state: &mut ResMut<ArtifactToolState>,
+    q_artifacts: &mut Query<
+        (crate::map::TargetEntity, &mut crate::map::Artifact),
+        With<crate::map::Artifact>,
+    >,
 ) {
     let is_valid = validation_state == super::bottom_bar::MapValidationState::Valid;
     egui::SidePanel::right("inspector_sidebar")
@@ -35,39 +47,7 @@ pub fn show_inspector_sidebar(
 
                 // Selected Treasure Properties
                 if let Ok((_entity, mut deposit)) = q_selected_treasures.single_mut() {
-                    ui.collapsing("💰 Treasure Contents", |ui| {
-                        let mut to_remove = None;
-                        for (idx, item) in deposit.contents.iter().enumerate() {
-                            ui.horizontal(|ui| {
-                                ui.label(format!("{:?}", item));
-                                if ui.button("🗑").clicked() {
-                                    to_remove = Some(idx);
-                                }
-                            });
-                        }
-                        if let Some(idx) = to_remove {
-                            deposit.contents.remove(idx);
-                        }
-
-                        ui.separator();
-                        ui.label("Add Item:");
-                        ui.horizontal(|ui| {
-                            if ui.button("+ Gold").clicked() {
-                                deposit.contents.push(TreasureItem::Gold(100));
-                            }
-                            if ui.button("+ Wood").clicked() {
-                                deposit.contents.push(TreasureItem::Resources {
-                                    resource: ResourceType::Wood,
-                                    amount: 50,
-                                });
-                            }
-                            if ui.button("+ Relic").clicked() {
-                                deposit
-                                    .contents
-                                    .push(TreasureItem::Artifact(ArtifactType::AncientRelic));
-                            }
-                        });
-                    });
+                    treasures::show_treasure_properties(ui, &mut deposit);
                 }
 
                 // Faction Hierarchy
@@ -114,6 +94,34 @@ pub fn show_inspector_sidebar(
                                 color: Color::srgb(rand::random(), rand::random(), rand::random()),
                                 economy_focus: "None".to_string(),
                             });
+                        }
+                    });
+                }
+
+                // Artifact Hierarchy (only in Artifacts phase)
+                if *current_phase == EditorPhase::Artifacts {
+                    let mut q_arts_immut = Vec::new();
+                    for (ent, art) in q_artifacts.iter() {
+                        q_arts_immut.push((ent, art));
+                    }
+                    // Wait, I can't easily pass a Query to a function if I already have it as mut.
+                    // I'll just keep the hierarchy here for now to avoid borrow checker hell.
+                    ui.collapsing("🏺 Artifacts", |ui| {
+                        let mut to_select = None;
+                        for (entity, artifact) in q_artifacts.iter() {
+                            let is_selected = artifact_state.selected_artifact == Some(entity);
+                            if ui
+                                .selectable_label(
+                                    is_selected,
+                                    format!("{:?}", artifact.artifact_type),
+                                )
+                                .clicked()
+                            {
+                                to_select = Some(entity);
+                            }
+                        }
+                        if let Some(ent) = to_select {
+                            artifact_state.selected_artifact = Some(ent);
                         }
                     });
                 }
@@ -214,6 +222,13 @@ pub fn show_inspector_sidebar(
                                     "Treasure",
                                 );
                             });
+                    } else if let Some(art_ent) = artifact_state.selected_artifact {
+                        artifacts::show_artifact_properties(
+                            ui,
+                            art_ent,
+                            artifact_state,
+                            q_artifacts,
+                        );
                     } else {
                         ui.label("No selection.");
                     }

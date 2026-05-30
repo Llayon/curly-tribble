@@ -31,7 +31,8 @@ pub fn show_bottom_bar(
                 (EditorPhase::NPCs, "5. NPCs"),
                 (EditorPhase::Plants, "6. Plants"),
                 (EditorPhase::Treasures, "7. Treasures"),
-                (EditorPhase::Height3D, "8. Height3D"),
+                (EditorPhase::Artifacts, "8. Artifacts"),
+                (EditorPhase::Height3D, "9. Height3D"),
             ];
 
             let current_idx = phases

@@ -19,6 +19,7 @@ pub enum EditorPhase {
     NPCs,
     Plants,
     Treasures,
+    Artifacts,
     Height3D,
 }
 
@@ -106,6 +107,13 @@ pub enum TreasureToolMode {
 #[reflect(Component)]
 pub struct Selected;
 
+#[derive(Resource, Reflect, Clone, Default)]
+#[reflect(Resource)]
+pub struct ArtifactToolState {
+    pub selected_artifact: Option<crate::map::TargetEntity>,
+    pub placing_on_ground: bool,
+}
+
 #[derive(Resource, Reflect, Clone)]
 #[reflect(Resource)]
 pub struct CurrentTool {
@@ -172,6 +180,8 @@ impl Plugin for GameStatePlugin {
             .register_type::<crate::map::DepositType>()
             .register_type::<crate::map::TerrainType>()
             .register_type::<crate::map::ForestType>()
+            .init_resource::<ArtifactToolState>()
+            .register_type::<ArtifactToolState>()
             .add_systems(PostStartup, start_game);
     }
 }
