@@ -76,7 +76,7 @@ pub fn apply_rivers(map_data: &mut MapData, config: &TerrainConfig, seed: u32) {
                 || pos.x >= half_w - 1
                 || pos.y <= -half_h
                 || pos.y >= half_h - 1
-                || current_tile.elevation < 0.2
+                || current_tile.elevation < 0.05
                 || current_tile.landscape_feature == LandscapeFeature::River
                 || current_tile.landscape_feature == LandscapeFeature::Lake
             {

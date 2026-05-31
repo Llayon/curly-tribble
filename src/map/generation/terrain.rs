@@ -190,11 +190,11 @@ pub fn spawn_map_internal(
                 as f32)
                 + 1.0)
                 * 0.5;
-            if dist > 6 && p_noise > 0.6 {
+            if dist > 5 && p_noise > 0.6 {
                 tile.landscape_feature = LandscapeFeature::Mountain;
             } else if dist > 4 && p_noise > 0.45 {
                 tile.landscape_feature = LandscapeFeature::Plateau;
-            } else if dist > 3 && p_noise < 0.22 {
+            } else if dist > 3 && p_noise < 0.35 {
                 tile.landscape_feature = LandscapeFeature::Lake;
             }
         }

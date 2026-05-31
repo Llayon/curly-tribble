@@ -1,0 +1,2 @@
+Panic occurred: error[B0001]: Query<&mut TreasureDeposit, With<TreasureDeposit>> in system savage_fantasy::map::tools::treasure::handle_treasure_tools accesses component(s) TreasureDeposit in a way that conflicts with a previous system parameter. Consider using `Without<T>` to create disjoint Queries or merging conflicting Queries into a `ParamSet`. See: https://bevy.org/learn/errors/b0001
+Location: Some(Location { file: "C:\\Users\\Max\\.cargo\\registry\\src\\index.crates.io-1949cf8c6b5b557f\\bevy_ecs-0.18.1\\src\\system\\system_param.rs", line: 387, column: 5 })
