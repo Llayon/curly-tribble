@@ -16,6 +16,9 @@ rand = "0.8"
 bevy-inspector-egui = "0.36"
 bevy_egui = "0.39"
 
+[dev-dependencies]
+syn = { version = "2.0.117", features = ["full"] }
+
 [lints.rust]
 unsafe_code = "forbid"
 missing_docs = "allow"

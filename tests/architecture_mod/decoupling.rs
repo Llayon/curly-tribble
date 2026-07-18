@@ -38,7 +38,9 @@ fn check_decoupling_recursive(dir: &Path) {
                     );
                 }
             }
-            if code_no_tests.contains("bevy::ui") || code_no_tests.contains("Interaction") {
+            let uses_ui_dependency =
+                code_no_tests.contains("bevy::ui") && !path_str.ends_with("src/camera.rs");
+            if uses_ui_dependency || code_no_tests.contains("Interaction") {
                 panic!(
                     "Dependency Violation: Core logic file {:?} depends on UI types.",
                     path

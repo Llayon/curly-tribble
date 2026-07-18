@@ -44,13 +44,9 @@ pub fn spawn_map_internal(
 
     let distance_field = distance_to_ocean(map_data);
 
-    apply_landscape_generation(
-        map_data,
-        terrain_config,
-        *seed,
-        &distance_field,
-        reset || auto_fill == Some(EditorPhase::Landscape),
-    );
+    if reset || auto_fill == Some(EditorPhase::Landscape) {
+        apply_landscape_generation(map_data, terrain_config, *seed, &distance_field);
+    }
 
     if reset || !map_data.tiles.values().any(|t| t.faction_id == Some(1)) {
         super::factions::auto_spawn_player_territory(map_data, seed.value());
@@ -205,12 +201,7 @@ fn apply_landscape_generation(
     terrain_config: &TerrainConfig,
     seed: WorldSeed,
     distance_field: &HashMap<HexCoord, u32>,
-    should_generate: bool,
 ) {
-    if !should_generate {
-        return;
-    }
-
     let plateau_noise = Fbm::<OpenSimplex>::new(seed.value() + 60);
     for (coord, tile) in &mut map_data.tiles {
         if tile.ocean_state == OceanState::Ocean || tile.faction_id.is_some() {
