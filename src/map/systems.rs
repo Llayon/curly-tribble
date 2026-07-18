@@ -4,9 +4,10 @@ use crate::map::generation::{
     auto_spawn_bio_deposits, auto_spawn_npcs, auto_spawn_treasures, spawn_map_internal,
 };
 use crate::map::navigation::NavigationMap;
-use crate::map::terrain_gen::{TerrainConfig, TerrainGenerator};
+use crate::map::terrain_gen::{GenerationRequest, TerrainConfig, TerrainGenerator};
 use crate::map::{
-    FactionMarker, GenerateMapEvent, MapData, MapEntity, RebuildMeshEvent, WorldSeed,
+    FactionMarker, GenerateMapEvent, GenerationMode, MapData, MapEntity, MapVisualEntity,
+    RebuildMeshEvent, WorldSeed,
 };
 use bevy::prelude::*;
 use rand::Rng;
@@ -32,9 +33,13 @@ pub fn handle_regeneration(
     phase: Res<State<EditorPhase>>,
 ) {
     for ev in ev_gen.read() {
-        debug!("MAP_GEN: Received GenerateMapEvent (ForceReset: {}, AutoFill: {:?}). Starting cleanup...", ev.force_reset, ev.auto_fill_phase);
+        let reset = ev.mode == GenerationMode::Reset;
+        debug!(
+            "MAP_GEN: Received GenerateMapEvent ({:?}, AutoFill: {:?}). Starting cleanup...",
+            ev.mode, ev.auto_fill_phase
+        );
 
-        if ev.force_reset {
+        if reset {
             for entity in &q_map_entities {
                 commands.entity(entity).despawn();
             }
@@ -57,23 +62,23 @@ pub fn handle_regeneration(
             &mut nav_map,
             &faction_manager,
             *phase.get(),
-            ev.force_reset,
+            ev.mode,
             ev.auto_fill_phase,
         );
 
-        if ev.force_reset || ev.auto_fill_phase == Some(EditorPhase::Factions) {
+        if reset || ev.auto_fill_phase == Some(EditorPhase::Factions) {
             super::generation::spawn_factions(&mut commands, &map_data, &faction_manager);
         }
 
-        if ev.force_reset || ev.auto_fill_phase == Some(EditorPhase::NPCs) {
+        if reset || ev.auto_fill_phase == Some(EditorPhase::NPCs) {
             auto_spawn_npcs(&mut commands, &map_data, &faction_manager, seed.value());
         }
 
-        if ev.force_reset || ev.auto_fill_phase == Some(EditorPhase::Plants) {
+        if reset || ev.auto_fill_phase == Some(EditorPhase::Plants) {
             auto_spawn_bio_deposits(&mut commands, &map_data, seed.value());
         }
 
-        if ev.force_reset || ev.auto_fill_phase == Some(EditorPhase::Treasures) {
+        if reset || ev.auto_fill_phase == Some(EditorPhase::Treasures) {
             auto_spawn_treasures(&mut commands, &map_data, seed.value());
         }
 
@@ -92,42 +97,39 @@ pub fn handle_regeneration(
 pub fn handle_rebuild_mesh(
     mut commands: Commands,
     mut ev_rebuild: MessageReader<RebuildMeshEvent>,
-    q_map_entities: Query<Entity, With<MapEntity>>,
+    q_map_entities: Query<Entity, With<MapVisualEntity>>,
     map_data: Res<MapData>,
     faction_manager: Res<FactionManager>,
     config: Res<TerrainConfig>,
     phase: Res<State<EditorPhase>>,
 ) {
-    for _ in ev_rebuild.read() {
-        for entity in &q_map_entities {
-            commands.entity(entity).despawn();
-        }
-        commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
-            map_data: map_data.clone(),
-            phase: *phase.get(),
-            faction_manager: faction_manager.clone(),
-            config: (*config).clone(),
-        });
+    if ev_rebuild.read().next().is_none() {
+        return;
     }
+
+    for entity in &q_map_entities {
+        commands.entity(entity).despawn();
+    }
+    commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
+        map_data: map_data.clone(),
+        phase: *phase.get(),
+        faction_manager: faction_manager.clone(),
+        config: (*config).clone(),
+    });
 }
 
 pub fn monitor_inspector_triggers(
     mut config: ResMut<TerrainConfig>,
     mut ev_gen: MessageWriter<GenerateMapEvent>,
 ) {
-    let mut triggered = false;
-    if config.randomize_seed {
+    let request = std::mem::take(&mut config.generation_request);
+    if request == GenerationRequest::RandomizeSeed {
         config.seed = rand::thread_rng().gen_range(0..999_999);
-        config.randomize_seed = false;
-        triggered = true;
     }
-    if config.regenerate_world {
-        config.regenerate_world = false;
-        triggered = true;
-    }
-    if triggered {
+
+    if request != GenerationRequest::None {
         ev_gen.write(GenerateMapEvent {
-            force_reset: true,
+            mode: GenerationMode::Reset,
             auto_fill_phase: None,
         });
     }
@@ -185,10 +187,43 @@ pub fn handle_faction_auto_relocation(
             &mut nav_map,
             &faction_manager,
             *phase.get(),
-            false,
+            GenerationMode::Preserve,
             None,
         );
         crate::map::validation::run_map_validation(&mut map_data);
         ev_rebuild.write(RebuildMeshEvent);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::economy::GameAssets;
+    use crate::map::MapVisualEntity;
+
+    fn request_rebuild(mut events: MessageWriter<RebuildMeshEvent>) {
+        events.write(RebuildMeshEvent);
+    }
+
+    #[test]
+    fn rebuild_replaces_only_visual_map_entities() {
+        let mut app = App::new();
+        app.insert_resource(MapData::default())
+            .insert_resource(FactionManager::default())
+            .insert_resource(TerrainConfig::default())
+            .insert_resource(State::new(EditorPhase::Shape))
+            .insert_resource(GameAssets::default())
+            .insert_resource(Assets::<Mesh>::default())
+            .insert_resource(Assets::<StandardMaterial>::default())
+            .add_message::<RebuildMeshEvent>()
+            .add_systems(Update, (request_rebuild, handle_rebuild_mesh).chain());
+
+        let visual_entity = app.world_mut().spawn((MapEntity, MapVisualEntity)).id();
+        let content_entity = app.world_mut().spawn(MapEntity).id();
+
+        app.update();
+
+        assert!(app.world().get_entity(visual_entity).is_err());
+        assert!(app.world().get_entity(content_entity).is_ok());
     }
 }

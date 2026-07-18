@@ -20,7 +20,7 @@ pub enum ArtifactType {
 #[derive(Debug, Clone, PartialEq, Eq, Reflect)]
 pub enum TreasureItem {
     Gold(u32),
-    Resources { resource: ResourceType, amount: u32 },
+    Resources(ResourceType, u32),
     ArtifactDef(ArtifactType),
     ArtifactRef(TargetEntity),
     // RAW ENTITY REMOVED: Use MapToTarget child with Targeting relation instead.
@@ -30,17 +30,24 @@ pub type TargetEntity = Entity;
 
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 #[reflect(Component)]
-pub struct ContainsArtifact {
-    pub artifact: TargetEntity,
-}
+#[relationship(relationship_target = ContainedByTreasure)]
+pub struct ContainsArtifact(pub Entity);
 
-/// Relationship: This entity points to a Target Treasure.
-/// Complies with Guard #18 (Semantic Graph).
+#[derive(Component, Debug, Clone, Reflect, Default)]
+#[reflect(Component)]
+#[relationship_target(relationship = ContainsArtifact)]
+pub struct ContainedByTreasure(Vec<Entity>);
+
 #[derive(Component, Debug, Clone, Copy, Reflect)]
 #[reflect(Component)]
-pub struct Targeting {
-    pub target: TargetEntity,
-}
+#[relationship(relationship_target = TargetedByTreasureMap)]
+pub struct Targeting(pub Entity);
+
+/// Reverse index maintained by Bevy for every treasure map that targets this treasure.
+#[derive(Component, Debug, Clone, Reflect, Default)]
+#[reflect(Component)]
+#[relationship_target(relationship = Targeting)]
+pub struct TargetedByTreasureMap(Vec<Entity>);
 
 /// Component for a child entity that represents a physical map item.
 #[derive(Component, Debug, Clone, Reflect, Default)]

@@ -13,7 +13,7 @@ pub fn show_treasure_properties(ui: &mut egui::Ui, deposit: &mut TreasureDeposit
         let mut to_remove = None;
         for (idx, item) in deposit.contents.iter().enumerate() {
             ui.horizontal(|ui| {
-                ui.label(format!("{:?}", item));
+                ui.label(format!("{item:?}"));
                 if ui.button("🗑").clicked() {
                     to_remove = Some(idx);
                 }
@@ -30,10 +30,9 @@ pub fn show_treasure_properties(ui: &mut egui::Ui, deposit: &mut TreasureDeposit
                 deposit.contents.push(TreasureItem::Gold(100));
             }
             if ui.button("+ Wood").clicked() {
-                deposit.contents.push(TreasureItem::Resources {
-                    resource: ResourceType::Wood,
-                    amount: 50,
-                });
+                deposit
+                    .contents
+                    .push(TreasureItem::Resources(ResourceType::Wood, 50));
             }
             if ui.button("+ Relic").clicked() {
                 deposit

@@ -19,34 +19,37 @@ pub fn show_top_bar(
         ui.horizontal(|ui| {
             ui.label("VIEW:");
             if ui
-                .selectable_label(terrain_config.show_forests, "🌲 Forests")
+                .selectable_label(terrain_config.forest_layer.is_visible(), "🌲 Forests")
                 .clicked()
             {
-                terrain_config.show_forests = !terrain_config.show_forests;
+                terrain_config.forest_layer.toggle();
                 ev_rebuild.write(RebuildMeshEvent);
             }
             if ui
-                .selectable_label(terrain_config.show_factions, "🚩 Factions")
+                .selectable_label(terrain_config.faction_layer.is_visible(), "🚩 Factions")
                 .clicked()
             {
-                terrain_config.show_factions = !terrain_config.show_factions;
+                terrain_config.faction_layer.toggle();
                 ev_rebuild.write(RebuildMeshEvent);
             }
             if ui
-                .selectable_label(terrain_config.show_cliffs, "📐 Cliffs")
+                .selectable_label(terrain_config.cliff_layer.is_visible(), "📐 Cliffs")
                 .clicked()
             {
-                terrain_config.show_cliffs = !terrain_config.show_cliffs;
+                terrain_config.cliff_layer.toggle();
             }
             if ui
-                .selectable_label(terrain_config.show_build_area, "🧱 Build Area")
+                .selectable_label(
+                    terrain_config.build_area_layer.is_visible(),
+                    "🧱 Build Area",
+                )
                 .clicked()
             {
-                terrain_config.show_build_area = !terrain_config.show_build_area;
+                terrain_config.build_area_layer.toggle();
                 ev_rebuild.write(RebuildMeshEvent);
             }
             ui.separator();
-            ui.label(format!("Phase: {:?}", current_phase));
+            ui.label(format!("Phase: {current_phase:?}"));
         });
     });
 }

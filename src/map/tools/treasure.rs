@@ -77,14 +77,7 @@ pub fn handle_treasure_tools(
             }
         }
         TreasureToolMode::Link => {
-            // Find deposit under mouse
-            let mut hovered_deposit = None;
-            for (entity, transform) in q_deposits.iter() {
-                if transform.translation().distance(world_pos) < HEX_SIZE * 0.8 {
-                    hovered_deposit = Some(entity);
-                    break;
-                }
-            }
+            let hovered_deposit = hovered_treasure(world_pos, &q_deposits);
 
             match *link_state {
                 LinkToolState::Idle => {
@@ -118,9 +111,7 @@ pub fn handle_treasure_tools(
                                         parent.spawn(MapToTargetBundle {
                                             name: Name::new("Map to Treasure"),
                                             marker: MapToTarget,
-                                            targeting: Targeting {
-                                                target: target_entity,
-                                            },
+                                            targeting: Targeting(target_entity),
                                         });
                                     });
                                 }
@@ -143,14 +134,38 @@ pub fn handle_treasure_tools(
         }
     }
 
-    // Delete treasures (Right Click in Spawn modes)
-    if mouse_input.just_pressed(MouseButton::Right) && tool.treasure_mode != TreasureToolMode::Link
-    {
-        for (entity, transform) in q_deposits.iter() {
-            if transform.translation().distance(world_pos) < HEX_SIZE * 0.8 {
-                commands.entity(entity).despawn();
-                break;
-            }
+    delete_hovered_treasure(
+        &mut commands,
+        &mouse_input,
+        tool.treasure_mode,
+        world_pos,
+        &q_deposits,
+    );
+}
+
+fn hovered_treasure(
+    world_pos: Vec3,
+    deposits: &Query<(Entity, &GlobalTransform), With<TreasureDeposit>>,
+) -> Option<Entity> {
+    deposits.iter().find_map(|(entity, transform)| {
+        (transform.translation().distance(world_pos) < HEX_SIZE * 0.8).then_some(entity)
+    })
+}
+
+fn delete_hovered_treasure(
+    commands: &mut Commands,
+    mouse_input: &ButtonInput<MouseButton>,
+    mode: TreasureToolMode,
+    world_pos: Vec3,
+    deposits: &Query<(Entity, &GlobalTransform), With<TreasureDeposit>>,
+) {
+    if !mouse_input.just_pressed(MouseButton::Right) || mode == TreasureToolMode::Link {
+        return;
+    }
+    for (entity, transform) in deposits.iter() {
+        if transform.translation().distance(world_pos) < HEX_SIZE * 0.8 {
+            commands.entity(entity).despawn();
+            return;
         }
     }
 }

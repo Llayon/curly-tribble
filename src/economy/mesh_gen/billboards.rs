@@ -24,7 +24,7 @@ pub fn draw_bio_billboards(
     map_data: Res<MapData>,
     config: Res<TerrainConfig>,
 ) {
-    if !config.show_forests {
+    if !config.forest_layer.is_visible() {
         return;
     }
 

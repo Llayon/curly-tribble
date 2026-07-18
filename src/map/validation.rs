@@ -48,118 +48,17 @@ pub fn run_map_validation(map_data: &mut MapData) {
         return;
     }
 
-    // 1. Проверка на разорванность (Единый континент)
-    if let Some(start) = first_land {
-        let mut visited = HashSet::new();
-        let mut queue = VecDeque::new();
-        queue.push_back(start);
-        visited.insert(start);
-
-        while let Some(curr) = queue.pop_front() {
-            for n in curr.neighbors() {
-                if let Some(t) = map_data.tiles.get(&n) {
-                    if t.ocean_state == OceanState::Land && !visited.contains(&n) {
-                        visited.insert(n);
-                        queue.push_back(n);
-                    }
-                }
-            }
-        }
-
-        if visited.len() < total_land {
-            map_data.validation_errors.push(
-                "Остров должен быть единым континентом. Разорванные участки суши не допускаются."
-                    .to_string(),
-            );
-        }
+    if !region_is_connected(map_data, first_land, total_land, OceanState::Land) {
+        map_data.validation_errors.push(
+            "Остров должен быть единым континентом. Разорванные участки суши не допускаются."
+                .to_string(),
+        );
+    }
+    if !region_is_connected(map_data, first_border_ocean, total_ocean, OceanState::Ocean) {
+        map_data.validation_errors.push("Внутри континента найдены изолированные озера. Океан должен соединяться с краем карты.".to_string());
     }
 
-    // 2. Проверка на изолированные озера из океана
-    if let Some(start) = first_border_ocean {
-        let mut visited = HashSet::new();
-        let mut queue = VecDeque::new();
-        queue.push_back(start);
-        visited.insert(start);
-
-        while let Some(curr) = queue.pop_front() {
-            for n in curr.neighbors() {
-                if let Some(t) = map_data.tiles.get(&n) {
-                    if t.ocean_state == OceanState::Ocean && !visited.contains(&n) {
-                        visited.insert(n);
-                        queue.push_back(n);
-                    }
-                }
-            }
-        }
-
-        if visited.len() < total_ocean {
-            map_data.validation_errors.push("Внутри континента найдены изолированные озера. Океан должен соединяться с краем карты.".to_string());
-        }
-    }
-
-    // 3. Проверка непрерывности территорий фракций (Continuous Territory)
-    let mut factions_on_map = HashSet::new();
-    for tile in map_data.tiles.values() {
-        if let Some(f_id) = tile.faction_id {
-            factions_on_map.insert(f_id);
-        }
-    }
-
-    for f_id in factions_on_map {
-        let faction_tiles: Vec<_> = map_data
-            .tiles
-            .iter()
-            .filter(|(_, t)| t.faction_id == Some(f_id))
-            .map(|(c, _)| *c)
-            .collect();
-
-        if faction_tiles.is_empty() {
-            continue;
-        }
-
-        let mut components = Vec::new();
-        let mut unvisited: HashSet<_> = faction_tiles.iter().copied().collect();
-
-        while !unvisited.is_empty() {
-            let Some(&start) = unvisited.iter().next() else {
-                break;
-            };
-            let mut component = Vec::new();
-            let mut queue = VecDeque::new();
-            queue.push_back(start);
-            unvisited.remove(&start);
-            component.push(start);
-
-            while let Some(curr) = queue.pop_front() {
-                for n in curr.neighbors() {
-                    if unvisited.contains(&n) {
-                        unvisited.remove(&n);
-                        component.push(n);
-                        queue.push_back(n);
-                    }
-                }
-            }
-            components.push(component);
-        }
-
-        if components.len() > 1 {
-            components.sort_by_key(|c| c.len());
-            let Some(_largest) = components.pop() else {
-                continue;
-            };
-            for fragment in components {
-                for coord in fragment {
-                    if let Some(tile) = map_data.tiles.get_mut(&coord) {
-                        tile.faction_id = None;
-                    }
-                }
-            }
-            debug!(
-                "VALIDATION: Autocleaned isolated fragments for faction {}.",
-                f_id
-            );
-        }
-    }
+    clear_isolated_faction_territories(map_data);
 
     // 4. Проверка правила '1-Hex Gap'
     for (coord, tile) in &map_data.tiles {
@@ -168,13 +67,81 @@ pub fn run_map_validation(map_data: &mut MapData) {
                 if let Some(n_tile) = map_data.tiles.get(&n_coord) {
                     if let Some(f2) = n_tile.faction_id {
                         if f1 != f2 {
-                            map_data.validation_errors.push(format!("Нарушено правило 1 гекса между фракциями {} и {} у координат {:?}.", f1, f2, coord));
+                            map_data.validation_errors.push(format!("Нарушено правило 1 гекса между фракциями {f1} и {f2} у координат {coord:?}."));
                         }
                     }
                 }
             }
         }
     }
+}
+
+fn clear_isolated_faction_territories(map_data: &mut MapData) {
+    let faction_ids: HashSet<_> = map_data
+        .tiles
+        .values()
+        .filter_map(|tile| tile.faction_id)
+        .collect();
+    for faction_id in faction_ids {
+        let mut unvisited: HashSet<_> = map_data
+            .tiles
+            .iter()
+            .filter(|(_, tile)| tile.faction_id == Some(faction_id))
+            .map(|(coord, _)| *coord)
+            .collect();
+        let mut components = Vec::new();
+        while let Some(&start) = unvisited.iter().next() {
+            let mut component = vec![start];
+            let mut queue = VecDeque::from([start]);
+            unvisited.remove(&start);
+            while let Some(current) = queue.pop_front() {
+                for neighbor in current.neighbors() {
+                    if unvisited.remove(&neighbor) {
+                        component.push(neighbor);
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+            components.push(component);
+        }
+        if components.len() > 1 {
+            components.sort_by_key(Vec::len);
+            let Some(_largest) = components.pop() else {
+                continue;
+            };
+            for coord in components.into_iter().flatten() {
+                if let Some(tile) = map_data.tiles.get_mut(&coord) {
+                    tile.faction_id = None;
+                }
+            }
+            debug!("VALIDATION: Autocleaned isolated fragments for faction {faction_id}.");
+        }
+    }
+}
+
+fn region_is_connected(
+    map_data: &MapData,
+    start: Option<crate::map::HexCoord>,
+    expected_count: usize,
+    target_state: OceanState,
+) -> bool {
+    let Some(start) = start else {
+        return expected_count == 0;
+    };
+    let mut visited = HashSet::from([start]);
+    let mut queue = VecDeque::from([start]);
+    while let Some(current) = queue.pop_front() {
+        for neighbor in current.neighbors() {
+            if map_data
+                .get_tile(neighbor.q, neighbor.r)
+                .is_some_and(|tile| tile.ocean_state == target_state)
+                && visited.insert(neighbor)
+            {
+                queue.push_back(neighbor);
+            }
+        }
+    }
+    visited.len() == expected_count
 }
 
 pub fn validate_faction_placements(
@@ -186,7 +153,7 @@ pub fn validate_faction_placements(
             let coord = marker.hex_coord;
             let is_invalid = map_data
                 .get_tile(coord.q, coord.r)
-                .map_or(true, |t| t.ocean_state == OceanState::Ocean);
+                .is_none_or(|t| t.ocean_state == OceanState::Ocean);
 
             if is_invalid {
                 let mut visited = HashSet::new();

@@ -29,7 +29,9 @@ pub fn handle_bio_tools(
     let center_coord = HexCoord::from_world(world_pos, HEX_SIZE);
 
     if mouse.pressed(MouseButton::Left) {
-        let brush_size = current_tool.bio_brush_size as i32;
+        let Ok(brush_size) = i32::try_from(current_tool.bio_brush_size) else {
+            return;
+        };
         let mut target_coords = Vec::new();
 
         if brush_size <= 1 {

@@ -10,6 +10,7 @@ impl Plugin for ArtifactToolPlugin {
 }
 
 pub fn handle_artifact_tools(
+    mut commands: Commands,
     phase: Res<State<EditorPhase>>,
     mut state: ResMut<ArtifactToolState>,
     mouse_input: Res<ButtonInput<MouseButton>>,
@@ -36,6 +37,9 @@ pub fn handle_artifact_tools(
         if let Ok((mut artifact, mut transform)) = q_artifact.get_mut(selected_entity) {
             artifact.location = ArtifactLocation::OnGround(hex_coord);
             transform.translation = snapped_pos;
+            commands
+                .entity(selected_entity)
+                .remove::<crate::map::StoredInTreasure>();
         }
         state.placing_on_ground = false;
     }

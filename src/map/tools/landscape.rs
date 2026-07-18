@@ -74,7 +74,7 @@ pub fn handle_landscape_tools(
                         if mouse.just_pressed(MouseButton::Left) {
                             let data = map_data.edges.get(&edge).copied().unwrap_or_default();
                             let mut new_data = data;
-                            if data.edge_type != EdgeType::Cliff {
+                            if data.edge_type == EdgeType::Flat {
                                 new_data.edge_type = EdgeType::Cliff;
                                 new_data.direction = EdgeDirection::Normal;
                             } else {
@@ -86,14 +86,14 @@ pub fn handle_landscape_tools(
                             }
                             map_data.edges.insert(edge, new_data);
                             ev_rebuild.write(RebuildMeshEvent);
-                        } else if mouse.pressed(MouseButton::Right) {
-                            if map_data.edges.remove(&edge).is_some() {
-                                ev_rebuild.write(RebuildMeshEvent);
-                            }
+                        } else if mouse.pressed(MouseButton::Right)
+                            && map_data.edges.remove(&edge).is_some()
+                        {
+                            ev_rebuild.write(RebuildMeshEvent);
                         }
                     }
                 }
-                _ => {}
+                LandscapeTool::None => {}
             }
         }
     }

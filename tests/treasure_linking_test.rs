@@ -36,7 +36,7 @@ fn test_treasure_link_creation() {
 
     // Simulate Link (Semantic Graph Pattern)
     app.world_mut().entity_mut(source).with_children(|parent| {
-        parent.spawn((MapToTarget, Targeting { target }));
+        parent.spawn((MapToTarget, Targeting(target)));
     });
 
     // Verify
@@ -44,5 +44,5 @@ fn test_treasure_link_creation() {
     let (child_of, targeting) = q_links.single(app.world()).unwrap();
 
     assert_eq!(child_of.0, source);
-    assert_eq!(targeting.target, target);
+    assert_eq!(targeting.0, target);
 }

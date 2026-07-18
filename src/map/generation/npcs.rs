@@ -94,10 +94,18 @@ pub fn auto_spawn_npcs(
                     marker: MapEntity,
                 });
             }
-            _ => {}
+            FactionType::Player => {}
         }
     }
 
+    spawn_procedural_pois(commands, map_data, &mut rng);
+}
+
+fn spawn_procedural_pois(
+    commands: &mut Commands,
+    map_data: &MapData,
+    rng: &mut rand::rngs::StdRng,
+) {
     let free_tiles: Vec<_> = map_data
         .tiles
         .iter()
@@ -110,7 +118,7 @@ pub fn auto_spawn_npcs(
         .collect();
 
     for _ in 0..5 {
-        if let Some(coord) = free_tiles.choose(&mut rng) {
+        if let Some(coord) = free_tiles.choose(&mut *rng) {
             let p_type = if rng.gen_bool(0.7) {
                 PoiType::Treasure
             } else {

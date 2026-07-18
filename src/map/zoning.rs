@@ -1,5 +1,5 @@
 use crate::map::data::{MapData, TerrainType, WorldSeed};
-use crate::map::MapEntity;
+use crate::map::{MapEntity, MapVisualEntity};
 use bevy::prelude::*;
 
 #[derive(Component)]
@@ -37,6 +37,7 @@ pub struct GlobalTerrainBundle {
     pub inherited_visibility: InheritedVisibility,
     pub name: Name,
     pub marker: MapEntity,
+    pub visual_marker: MapVisualEntity,
 }
 
 #[derive(Bundle)]
@@ -48,6 +49,7 @@ pub struct WaterBundle {
     pub inherited_visibility: InheritedVisibility,
     pub name: Name,
     pub marker: MapEntity,
+    pub visual_marker: MapVisualEntity,
 }
 
 #[derive(Bundle)]
@@ -60,6 +62,7 @@ pub struct MountainRoofBundle {
     pub roof: Roof,
     pub name: Name,
     pub marker: MapEntity,
+    pub visual_marker: MapVisualEntity,
 }
 
 pub use super::camps::{EnemyCamp, EnemyCampBundle};

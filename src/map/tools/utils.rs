@@ -6,6 +6,7 @@ impl Plugin for UtilsToolPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
+#[must_use]
 pub fn get_mouse_world_pos(
     q_camera: &Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     q_window: &Query<&Window, With<bevy::window::PrimaryWindow>>,

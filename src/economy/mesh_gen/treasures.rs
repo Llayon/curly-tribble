@@ -63,7 +63,7 @@ pub fn draw_treasure_gizmos(
         let Ok((_, source_transform, _, _)) = q_treasures.get(child_of.0) else {
             continue;
         };
-        let Ok((_, target_transform, _, _)) = q_treasures.get(targeting.target) else {
+        let Ok((_, target_transform, _, _)) = q_treasures.get(targeting.0) else {
             continue;
         };
 

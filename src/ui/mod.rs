@@ -64,9 +64,8 @@ fn editor_phase_ui(
         With<crate::map::Artifact>,
     >,
 ) {
-    let ctx = match contexts.ctx_mut().ok() {
-        Some(ctx) => ctx,
-        None => return,
+    let Some(ctx) = contexts.ctx_mut().ok() else {
+        return;
     };
 
     let is_valid = map_data.validation_errors.is_empty();

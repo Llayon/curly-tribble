@@ -7,6 +7,7 @@ impl Plugin for ClimateGenerationPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
+#[must_use]
 pub fn get_terrain_from_climate(temp: f32, humid: f32, elev: f32) -> TerrainType {
     if elev > 0.8 {
         return TerrainType::Stony;

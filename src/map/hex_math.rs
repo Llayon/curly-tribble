@@ -14,10 +14,12 @@ pub struct HexCoord {
 }
 
 impl HexCoord {
+    #[must_use]
     pub const fn new(q: i32, r: i32) -> Self {
         Self { q, r }
     }
 
+    #[must_use]
     pub fn neighbors(&self) -> [Self; 6] {
         let q = self.q;
         let r = self.r;
@@ -47,6 +49,7 @@ impl HexCoord {
         Self::axial_round(q, r)
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn axial_round(q: f32, r: f32) -> Self {
         let s = -q - r;
         let mut rq = q.round();
@@ -66,6 +69,7 @@ impl HexCoord {
         Self::new(rq as i32, rr as i32)
     }
 
+    #[must_use]
     pub fn distance(&self, other: Self) -> i32 {
         ((self.q - other.q).abs()
             + (self.q + self.r - other.q - other.r).abs()

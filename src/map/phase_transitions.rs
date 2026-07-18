@@ -1,6 +1,6 @@
 use crate::game_state::EditorPhase;
-use crate::map::GenerateMapEvent;
 use crate::map::{ForestType, LandscapeFeature, MapData, TerrainType};
+use crate::map::{GenerateMapEvent, GenerationMode};
 use bevy::prelude::*;
 
 pub struct PhaseTransitionsPlugin;
@@ -29,7 +29,7 @@ pub fn extract_artifacts_on_phase_change(
                     .spawn(crate::map::artifacts::ArtifactBundle {
                         artifact: crate::map::artifacts::Artifact {
                             artifact_type: a_type,
-                            location: crate::map::artifacts::ArtifactLocation::InTreasure(entity),
+                            location: crate::map::artifacts::ArtifactLocation::InTreasure,
                         },
                         name: Name::new(format!("{a_type:?} (Artifact)")),
                         marker: crate::map::MapEntity,
@@ -41,10 +41,12 @@ pub fn extract_artifacts_on_phase_change(
                     })
                     .id();
 
+                commands
+                    .entity(artifact_entity)
+                    .insert(crate::map::artifacts::StoredInTreasure(entity));
+
                 commands.entity(entity).with_children(|parent| {
-                    parent.spawn(crate::map::treasures::ContainsArtifact {
-                        artifact: artifact_entity,
-                    });
+                    parent.spawn(crate::map::treasures::ContainsArtifact(artifact_entity));
                 });
 
                 new_contents.push(crate::map::TreasureItem::ArtifactRef(artifact_entity));
@@ -87,7 +89,7 @@ pub fn rebuild_map_on_phase_change(
     };
 
     ev_gen.write(GenerateMapEvent {
-        force_reset: false,
+        mode: GenerationMode::Preserve,
         auto_fill_phase: if needs_auto_fill {
             Some(current_phase)
         } else {

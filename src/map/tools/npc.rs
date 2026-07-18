@@ -93,7 +93,7 @@ pub fn handle_npc_tools(
                                     combat_power: current_tool.camp_power,
                                     camp_count: 1,
                                 },
-                                name: Name::new(format!("Enemy Camp at {:?}", coord)),
+                                name: Name::new(format!("Enemy Camp at {coord:?}")),
                                 transform: Transform::from_translation(coord.to_world(HEX_SIZE)),
                                 visibility: Visibility::Visible,
                                 inherited_visibility: InheritedVisibility::default(),

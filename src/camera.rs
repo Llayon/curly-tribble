@@ -9,6 +9,7 @@ use bevy::post_process::bloom::{Bloom, BloomPlugin};
 use bevy::prelude::*;
 use bevy::render::camera::CameraRenderGraph;
 use bevy::render::view::Hdr;
+use bevy::ui::IsDefaultUiCamera;
 
 pub struct CameraPlugin;
 
@@ -59,6 +60,7 @@ impl Default for CameraConfig {
 #[derive(Bundle)]
 pub struct MainCameraBundle {
     pub camera_3d: Camera3d,
+    pub ui_camera: IsDefaultUiCamera,
     pub render_graph: CameraRenderGraph,
     pub transform: Transform,
     pub focus: CameraFocus,
@@ -79,6 +81,7 @@ fn setup_camera(mut commands: Commands) {
     // В Bevy 0.18.1 используем именованный Bundle для соблюдения архитектурных гвардов.
     commands.spawn(MainCameraBundle {
         camera_3d: Camera3d::default(),
+        ui_camera: IsDefaultUiCamera,
         render_graph: CameraRenderGraph::new(Core3d),
         transform: Transform::from_xyz(0.0, 30.0, 30.0).looking_at(Vec3::ZERO, Vec3::Y),
         focus: CameraFocus(Vec3::ZERO),
@@ -169,6 +172,7 @@ mod tests {
             .world_mut()
             .spawn(MainCameraBundle {
                 camera_3d: Camera3d::default(),
+                ui_camera: IsDefaultUiCamera,
                 render_graph: CameraRenderGraph::new(Core3d),
                 transform: Transform::from_xyz(0.0, 0.0, 0.0),
                 focus: CameraFocus(Vec3::ZERO),

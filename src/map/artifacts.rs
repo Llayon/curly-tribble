@@ -1,4 +1,4 @@
-use crate::map::treasures::{ArtifactType, ResourceType, TargetEntity};
+use crate::map::treasures::{ArtifactType, ResourceType};
 use crate::map::HexCoord;
 use bevy::prelude::*;
 
@@ -12,10 +12,20 @@ pub struct TradeConfig {
 
 #[derive(Debug, Clone, PartialEq, Eq, Reflect)]
 pub enum ArtifactLocation {
-    InTreasure(TargetEntity),
+    InTreasure,
     OnGround(HexCoord),
     InTrade(TradeConfig),
 }
+
+#[derive(Component, Debug, Clone, Copy, Reflect)]
+#[reflect(Component)]
+#[relationship(relationship_target = StoresArtifacts)]
+pub struct StoredInTreasure(pub Entity);
+
+#[derive(Component, Debug, Clone, Reflect, Default)]
+#[reflect(Component)]
+#[relationship_target(relationship = StoredInTreasure)]
+pub struct StoresArtifacts(Vec<Entity>);
 
 #[derive(Component, Debug, Clone, PartialEq, Eq, Reflect)]
 #[reflect(Component)]

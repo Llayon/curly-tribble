@@ -24,7 +24,9 @@ pub mod validation;
 pub mod validation_deposits;
 
 use crate::sets::{GameSet, StartupSet};
-pub use artifacts::{Artifact, ArtifactBundle, ArtifactLocation, TradeConfig};
+pub use artifacts::{
+    Artifact, ArtifactBundle, ArtifactLocation, StoredInTreasure, StoresArtifacts, TradeConfig,
+};
 use bevy::prelude::*;
 pub use camps::{EnemyCamp, EnemyCampBundle};
 pub use data::{
@@ -37,8 +39,9 @@ pub use hex_math::HexCoord;
 pub use poi::{PoiBundle, PoiType, PointOfInterest};
 use terrain_gen::{TerrainConfig, TerrainGenerator};
 pub use treasures::{
-    ArtifactType, ContainsArtifact, HiddenTreasure, LinkToolState, MapToTarget, ResourceType,
-    TargetEntity, Targeting, TreasureBundle, TreasureDeposit, TreasureItem, VisibleTreasure,
+    ArtifactType, ContainedByTreasure, ContainsArtifact, HiddenTreasure, LinkToolState,
+    MapToTarget, ResourceType, TargetEntity, TargetedByTreasureMap, Targeting, TreasureBundle,
+    TreasureDeposit, TreasureItem, VisibleTreasure,
 };
 pub use zoning::Tile;
 
@@ -46,10 +49,22 @@ pub use zoning::Tile;
 #[reflect(Component)]
 pub struct MapEntity;
 
+/// Marker for mesh entities that can be replaced after terrain edits.
+#[derive(Component, Default, Reflect)]
+#[reflect(Component)]
+pub struct MapVisualEntity;
+
 #[derive(Message)]
 pub struct GenerateMapEvent {
-    pub force_reset: bool,
+    pub mode: GenerationMode,
     pub auto_fill_phase: Option<crate::game_state::EditorPhase>,
+}
+
+/// Controls whether generation starts from a fresh world or preserves editor data.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GenerationMode {
+    Reset,
+    Preserve,
 }
 
 #[derive(Message)]
@@ -68,6 +83,7 @@ impl Plugin for MapPlugin {
             .init_resource::<LinkToolState>()
             .register_type::<TerrainConfig>()
             .register_type::<MapEntity>()
+            .register_type::<MapVisualEntity>()
             .register_type::<treasures::ResourceType>()
             .register_type::<treasures::ArtifactType>()
             .register_type::<treasures::TreasureItem>()
@@ -75,10 +91,14 @@ impl Plugin for MapPlugin {
             .register_type::<treasures::VisibleTreasure>()
             .register_type::<treasures::HiddenTreasure>()
             .register_type::<treasures::Targeting>()
+            .register_type::<treasures::TargetedByTreasureMap>()
             .register_type::<treasures::MapToTarget>()
             .register_type::<treasures::ContainsArtifact>()
+            .register_type::<treasures::ContainedByTreasure>()
             .register_type::<artifacts::Artifact>()
             .register_type::<artifacts::ArtifactLocation>()
+            .register_type::<artifacts::StoredInTreasure>()
+            .register_type::<artifacts::StoresArtifacts>()
             .register_type::<artifacts::TradeConfig>()
             .register_type::<LinkToolState>()
             .add_plugins(bevy_inspector_egui::quick::ResourceInspectorPlugin::<
@@ -100,7 +120,7 @@ impl Plugin for MapPlugin {
                 Startup,
                 (|mut ev: MessageWriter<GenerateMapEvent>| {
                     ev.write(GenerateMapEvent {
-                        force_reset: true,
+                        mode: GenerationMode::Reset,
                         auto_fill_phase: None,
                     });
                 })

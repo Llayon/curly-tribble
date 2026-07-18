@@ -54,14 +54,19 @@ fn spawn_resources(
     seed: Res<WorldSeed>,
 ) {
     let mut rng = StdRng::seed_from_u64(u64::from(seed.value()) + 42);
-    let half_w = map_data.width as i32 / 2;
-    let half_h = map_data.height as i32 / 2;
+    let Ok(width) = i32::try_from(map_data.width) else {
+        return;
+    };
+    let Ok(height) = i32::try_from(map_data.height) else {
+        return;
+    };
+    let half_w = width / 2;
+    let half_h = height / 2;
 
     for q in -half_w..half_w {
         for r in -half_h..half_h {
-            let tile = match map_data.get_tile(q, r) {
-                Some(t) => t,
-                None => continue,
+            let Some(tile) = map_data.get_tile(q, r) else {
+                continue;
             };
 
             let mut pos = crate::map::HexCoord::new(q, r).to_world(HEX_SIZE);

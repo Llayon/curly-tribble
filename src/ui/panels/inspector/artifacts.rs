@@ -44,7 +44,7 @@ pub fn show_artifact_properties(
         ui.label(format!("Artifact: {:?}", artifact.artifact_type));
 
         let current_loc_str = match artifact.location {
-            ArtifactLocation::InTreasure(_) => "InTreasure",
+            ArtifactLocation::InTreasure => "InTreasure",
             ArtifactLocation::OnGround(_) => "OnGround",
             ArtifactLocation::InTrade(_) => "InTrade",
         };
@@ -61,7 +61,7 @@ pub fn show_artifact_properties(
         if new_loc_str != current_loc_str {
             match new_loc_str {
                 "InTreasure" => {
-                    artifact.location = ArtifactLocation::InTreasure(Entity::PLACEHOLDER)
+                    artifact.location = ArtifactLocation::InTreasure;
                 }
                 "OnGround" => {
                     artifact.location = ArtifactLocation::OnGround(HexCoord::new(0, 0));
@@ -73,7 +73,7 @@ pub fn show_artifact_properties(
                         cost_type: ResourceType::Gold,
                         cost_amount: 100,
                         unlock_condition: String::new(),
-                    })
+                    });
                 }
                 _ => {}
             }

@@ -1,22 +1,15 @@
-// use savage_fantasy::map::terrain_gen::{TerrainConfig, TerrainGenerator};
+use savage_fantasy::map::terrain_gen::{TerrainConfig, TerrainGenerator};
+use savage_fantasy::map::MAX_HEIGHT;
 
 #[test]
-#[ignore]
 fn test_terrain_height_ranges() {
-    /*
     let config = TerrainConfig::default();
-    let gen = TerrainGenerator::new(config.seed);
-    for x in -100..100 {
-        for z in -100..100 {
-            let h = gen.get_elevation(&config, x as f32, z as f32);
-            assert!(
-                h >= 0.0 && h <= 25.0,
-                "Height {} out of range at ({}, {})",
-                h,
-                x,
-                z
-            );
-        }
+    let generator = TerrainGenerator::new(config.seed);
+    for (x, z) in [(0.0, 0.0), (12.5, -7.25), (-30.0, 18.0)] {
+        let elevation = generator.get_elevation(&config, x, z);
+        assert!(
+            (0.0..=MAX_HEIGHT).contains(&elevation),
+            "elevation at ({x}, {z}) must stay within the mesh height range"
+        );
     }
-    */
 }

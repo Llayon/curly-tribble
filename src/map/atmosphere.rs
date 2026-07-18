@@ -89,7 +89,6 @@ fn setup_atmosphere(mut commands: Commands) {
             maximum_distance: 150.0,
             first_cascade_far_bound: 10.0,
             overlap_proportion: 0.2,
-            ..default()
         }
         .build(),
     });

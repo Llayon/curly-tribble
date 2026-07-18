@@ -55,9 +55,12 @@ fn test_extract_artifacts_on_phase_change() {
         .get::<Artifact>(artifact_entity)
         .expect("Artifact missing");
     assert_eq!(artifact.artifact_type, ArtifactType::AncientRelic);
+    assert_eq!(artifact.location, ArtifactLocation::InTreasure);
     assert_eq!(
-        artifact.location,
-        ArtifactLocation::InTreasure(deposit_entity)
+        app.world()
+            .get::<savage_fantasy::map::StoredInTreasure>(artifact_entity)
+            .map(|storage| storage.0),
+        Some(deposit_entity)
     );
 
     // Check if ContainsArtifact child was spawned on the TreasureDeposit
@@ -68,7 +71,7 @@ fn test_extract_artifacts_on_phase_change() {
     let mut found = false;
     for child in children.iter() {
         if let Some(contains) = app.world().get::<ContainsArtifact>(child) {
-            assert_eq!(contains.artifact, artifact_entity);
+            assert_eq!(contains.0, artifact_entity);
             found = true;
             break;
         }

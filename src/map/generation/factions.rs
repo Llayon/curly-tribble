@@ -27,19 +27,18 @@ pub fn spawn_factions(
             continue;
         }
         let faction = faction_manager.factions.iter().find(|f| f.id == f_id);
-        let f_type = faction
-            .map(|f| f.faction_type)
-            .unwrap_or(FactionType::Neutral);
-        let f_name = faction
-            .map(|f| f.name.clone())
-            .unwrap_or_else(|| format!("Faction {}", f_id));
+        let f_type = faction.map_or(FactionType::Neutral, |f| f.faction_type);
+        let f_name = faction.map_or_else(|| format!("Faction {f_id}"), |f| f.name.clone());
         let mut sum_q = 0;
         let mut sum_r = 0;
         for c in &coords {
             sum_q += c.q;
             sum_r += c.r;
         }
-        let center = HexCoord::new(sum_q / coords.len() as i32, sum_r / coords.len() as i32);
+        let Ok(coord_count) = i32::try_from(coords.len()) else {
+            continue;
+        };
+        let center = HexCoord::new(sum_q / coord_count, sum_r / coord_count);
         let candidates: Vec<_> = coords.iter().filter(|c| c.distance(center) <= 3).collect();
         let best_coord = if candidates.is_empty() {
             match coords.iter().min_by_key(|c| c.distance(center)) {
@@ -57,7 +56,9 @@ pub fn spawn_factions(
                             flatness += (nt.elevation - h_center).abs();
                         }
                     }
-                    (flatness * 1000.0) as i32
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+                    let score = (flatness * 1000.0) as i32;
+                    score
                 })
                 .unwrap_or(&&center)
         };

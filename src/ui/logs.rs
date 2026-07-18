@@ -56,7 +56,8 @@ fn update_game_log(
         if let Some(mut text) = query.iter_mut().next() {
             text.0 = String::new();
             for (msg, _sev) in &buffer {
-                text.0.push_str(&format!("{msg}\n"));
+                text.0.push_str(msg);
+                text.0.push('\n');
             }
         }
     }

@@ -6,7 +6,7 @@ pub mod treasures;
 
 use crate::game_state::EditorPhase;
 use crate::map::zoning::{GlobalTerrainBundle, Roof, WaterBundle};
-use crate::map::{MapData, MapEntity};
+use crate::map::{MapData, MapEntity, MapVisualEntity};
 use bevy::prelude::*;
 use generator::create_global_map_meshes;
 
@@ -87,13 +87,13 @@ impl Command for SpawnGlobalTerrainCommand {
         );
 
         let terrain_handle = meshes.add(mesh);
-        let water_handle = meshes.add(water_mesh);
-        let roof_handle = meshes.add(roof_mesh);
+        let water_handle = water_mesh.map(|mesh| meshes.add(mesh));
+        let roof_handle = roof_mesh.map(|mesh| meshes.add(mesh));
 
         if let Some(mut gen_assets) = world.get_resource_mut::<GeneratedMapAssets>() {
             gen_assets.terrain = Some(terrain_handle.clone());
-            gen_assets.water = Some(water_handle.clone());
-            gen_assets.roof = Some(roof_handle.clone());
+            gen_assets.water.clone_from(&water_handle);
+            gen_assets.roof.clone_from(&roof_handle);
         }
 
         let assets = world.resource::<crate::economy::GameAssets>();
@@ -117,27 +117,34 @@ impl Command for SpawnGlobalTerrainCommand {
             inherited_visibility: InheritedVisibility::default(),
             name: Name::new("Global Terrain"),
             marker: MapEntity,
+            visual_marker: MapVisualEntity,
         });
 
-        world.spawn(WaterBundle {
-            mesh: Mesh3d(water_handle),
-            material: MeshMaterial3d(water_mat),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            visibility: Visibility::default(),
-            inherited_visibility: InheritedVisibility::default(),
-            name: Name::new("Water Layer"),
-            marker: MapEntity,
-        });
+        if let Some(water_handle) = water_handle {
+            world.spawn(WaterBundle {
+                mesh: Mesh3d(water_handle),
+                material: MeshMaterial3d(water_mat),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                visibility: Visibility::default(),
+                inherited_visibility: InheritedVisibility::default(),
+                name: Name::new("Water Layer"),
+                marker: MapEntity,
+                visual_marker: MapVisualEntity,
+            });
+        }
 
-        world.spawn(crate::map::zoning::MountainRoofBundle {
-            mesh: Mesh3d(roof_handle),
-            material: MeshMaterial3d(mountain_mat),
-            transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            visibility: Visibility::default(),
-            inherited_visibility: InheritedVisibility::default(),
-            roof: Roof,
-            name: Name::new("Global Mountain Roofs"),
-            marker: MapEntity,
-        });
+        if let Some(roof_handle) = roof_handle {
+            world.spawn(crate::map::zoning::MountainRoofBundle {
+                mesh: Mesh3d(roof_handle),
+                material: MeshMaterial3d(mountain_mat),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0),
+                visibility: Visibility::default(),
+                inherited_visibility: InheritedVisibility::default(),
+                roof: Roof,
+                name: Name::new("Global Mountain Roofs"),
+                marker: MapEntity,
+                visual_marker: MapVisualEntity,
+            });
+        }
     }
 }

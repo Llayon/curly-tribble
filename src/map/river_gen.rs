@@ -141,8 +141,14 @@ pub fn apply_rivers(map_data: &mut MapData, config: &TerrainConfig, seed: u32) {
 }
 
 pub fn apply_mud_banks(map_data: &mut MapData) {
-    let half_w = (map_data.width / 2) as i32;
-    let half_h = (map_data.height / 2) as i32;
+    let Ok(width) = i32::try_from(map_data.width) else {
+        return;
+    };
+    let Ok(height) = i32::try_from(map_data.height) else {
+        return;
+    };
+    let half_w = width / 2;
+    let half_h = height / 2;
     let mut mud_to_add = Vec::new();
 
     for x in -half_w..half_w {

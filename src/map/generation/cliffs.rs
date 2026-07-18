@@ -5,6 +5,7 @@ use crate::map::{
 use bevy::prelude::*;
 use noise::{Fbm, NoiseFn, OpenSimplex};
 use std::collections::HashMap;
+use std::hash::BuildHasher;
 
 pub struct CliffGenerationPlugin;
 
@@ -12,7 +13,11 @@ impl Plugin for CliffGenerationPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
-pub fn generate_cliffs(map_data: &mut MapData, distance_field: &HashMap<HexCoord, u32>, seed: u32) {
+pub fn generate_cliffs<S: BuildHasher>(
+    map_data: &mut MapData,
+    distance_field: &HashMap<HexCoord, u32, S>,
+    seed: u32,
+) {
     map_data.edges.clear();
     let plateau_noise = Fbm::<OpenSimplex>::new(seed + 60);
     let mut new_cliffs = Vec::new();
@@ -46,9 +51,9 @@ pub fn generate_cliffs(map_data: &mut MapData, distance_field: &HashMap<HexCoord
                         && tile_a.faction_id.is_none()
                         && tile_b.faction_id.is_none()
                     {
-                        let d_a = *distance_field.get(&coord).unwrap_or(&0) as i32;
-                        let d_b = *distance_field.get(&n).unwrap_or(&0) as i32;
-                        if d_a != d_b && (d_a % 8 == 0 || d_b % 8 == 0) {
+                        let d_a = *distance_field.get(&coord).unwrap_or(&0);
+                        let d_b = *distance_field.get(&n).unwrap_or(&0);
+                        if d_a != d_b && (d_a.is_multiple_of(8) || d_b.is_multiple_of(8)) {
                             let fault_noise = plateau_noise
                                 .get([f64::from(coord.q) * 0.05, f64::from(coord.r) * 0.05]);
                             if fault_noise > 0.3 {

@@ -56,10 +56,10 @@ pub fn auto_spawn_treasures(commands: &mut Commands, map_data: &MapData, seed: u
                     ),
                 ]
             } else {
-                vec![TreasureItem::Resources {
-                    resource: ResourceType::Wood,
-                    amount: rng.gen_range(30..80),
-                }]
+                vec![TreasureItem::Resources(
+                    ResourceType::Wood,
+                    rng.gen_range(30..80),
+                )]
             };
             spawn_treasure(commands, coord, TreasureVisibility::Visible, contents);
             occupied.insert(coord);
@@ -79,10 +79,10 @@ pub fn auto_spawn_treasures(commands: &mut Commands, map_data: &MapData, seed: u
             let contents = if rng.gen_bool(0.5) {
                 vec![TreasureItem::Gold(rng.gen_range(20..60))]
             } else {
-                vec![TreasureItem::Resources {
-                    resource: ResourceType::Wood,
-                    amount: rng.gen_range(15..40),
-                }]
+                vec![TreasureItem::Resources(
+                    ResourceType::Wood,
+                    rng.gen_range(15..40),
+                )]
             };
             spawn_treasure(commands, coord, TreasureVisibility::Hidden, contents);
             occupied.insert(coord);

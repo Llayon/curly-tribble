@@ -24,44 +24,7 @@ pub fn show_tools_sidebar(
             ui.separator();
 
             match current_phase {
-                EditorPhase::Treasures => {
-                    ui.label("Treasure Tools:");
-                    if ui
-                        .selectable_label(
-                            current_tool.treasure_mode == TreasureToolMode::SpawnVisible,
-                            "Spawn Visible",
-                        )
-                        .clicked()
-                    {
-                        current_tool.treasure_mode = TreasureToolMode::SpawnVisible;
-                    }
-                    if ui
-                        .selectable_label(
-                            current_tool.treasure_mode == TreasureToolMode::SpawnHidden,
-                            "Spawn Hidden",
-                        )
-                        .clicked()
-                    {
-                        current_tool.treasure_mode = TreasureToolMode::SpawnHidden;
-                    }
-                    if ui
-                        .selectable_label(
-                            current_tool.treasure_mode == TreasureToolMode::Link,
-                            "Link Tool",
-                        )
-                        .clicked()
-                    {
-                        current_tool.treasure_mode = TreasureToolMode::Link;
-                    }
-
-                    if !matches!(**link_state, LinkToolState::Idle) {
-                        ui.separator();
-                        ui.colored_label(egui::Color32::YELLOW, "Link Active");
-                        if ui.button("Reset Link Tool").clicked() {
-                            **link_state = LinkToolState::Idle;
-                        }
-                    }
-                }
+                EditorPhase::Treasures => show_treasure_tools(ui, current_tool, link_state),
                 EditorPhase::Shape => {
                     ui.label("Island Shape:");
                     if ui
@@ -117,76 +80,7 @@ pub fn show_tools_sidebar(
                         }
                     }
                 }
-                EditorPhase::Sediments => {
-                    ui.label("Sediment Tool:");
-                    ui.checkbox(&mut current_tool.active_sediment_tool, "Active");
-                    egui::ComboBox::from_id_salt("sediment_type")
-                        .selected_text(format!("{:?}", current_tool.sediment))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut current_tool.sediment,
-                                TerrainType::Dirt,
-                                "Dirt",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.sediment,
-                                TerrainType::Dusty,
-                                "Dusty",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.sediment,
-                                TerrainType::Fertile,
-                                "Fertile",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.sediment,
-                                TerrainType::Mossy,
-                                "Mossy",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.sediment,
-                                TerrainType::Steppe,
-                                "Steppe",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.sediment,
-                                TerrainType::Stony,
-                                "Stony",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.sediment,
-                                TerrainType::Swamp,
-                                "Swamp",
-                            );
-                        });
-
-                    ui.separator();
-                    ui.label("Forest Tool:");
-                    ui.checkbox(&mut current_tool.active_forest_tool, "Active");
-                    egui::ComboBox::from_id_salt("forest_type")
-                        .selected_text(format!("{:?}", current_tool.forest_type))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut current_tool.forest_type,
-                                ForestType::None,
-                                "None",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.forest_type,
-                                ForestType::Deciduous,
-                                "Deciduous",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.forest_type,
-                                ForestType::Coniferous,
-                                "Coniferous",
-                            );
-                        });
-                    ui.add(
-                        egui::Slider::new(&mut current_tool.forest_density, 0.0..=1.0)
-                            .text("Density"),
-                    );
-                }
+                EditorPhase::Sediments => show_sediment_tools(ui, current_tool),
                 EditorPhase::NPCs => {
                     ui.label("NPC Tools:");
                     let tools = [
@@ -204,61 +98,90 @@ pub fn show_tools_sidebar(
                         }
                     }
                 }
-                EditorPhase::Plants => {
-                    ui.label("Bio-Deposit Tools:");
-                    egui::ComboBox::from_id_salt("bio_resource_type")
-                        .selected_text(format!("{:?}", current_tool.bio_resource))
-                        .show_ui(ui, |ui| {
-                            ui.selectable_value(
-                                &mut current_tool.bio_resource,
-                                DepositType::Rabbit,
-                                "Rabbit",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.bio_resource,
-                                DepositType::Deer,
-                                "Deer",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.bio_resource,
-                                DepositType::Boar,
-                                "Boar",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.bio_resource,
-                                DepositType::WildFlax,
-                                "WildFlax",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.bio_resource,
-                                DepositType::Raspberries,
-                                "Raspberries",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.bio_resource,
-                                DepositType::Pumpkin,
-                                "Pumpkin",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.bio_resource,
-                                DepositType::WildWheat,
-                                "WildWheat",
-                            );
-                            ui.selectable_value(
-                                &mut current_tool.bio_resource,
-                                DepositType::OceanFish,
-                                "OceanFish",
-                            );
-                        });
-                    ui.add(egui::Slider::new(&mut current_tool.bio_amount, 1..=100).text("Amount"));
-                    ui.add(
-                        egui::Slider::new(&mut current_tool.bio_brush_size, 1..=5)
-                            .text("Brush Size"),
-                    );
-                }
+                EditorPhase::Plants => show_bio_tools(ui, current_tool),
                 _ => {
                     ui.label("No tools for this phase.");
                 }
             }
         });
+}
+
+fn show_sediment_tools(ui: &mut egui::Ui, tool: &mut CurrentTool) {
+    ui.label("Sediment Tool:");
+    ui.checkbox(&mut tool.active_sediment_tool, "Active");
+    egui::ComboBox::from_id_salt("sediment_type")
+        .selected_text(format!("{:?}", tool.sediment))
+        .show_ui(ui, |ui| {
+            for (terrain, label) in [
+                (TerrainType::Dirt, "Dirt"),
+                (TerrainType::Dusty, "Dusty"),
+                (TerrainType::Fertile, "Fertile"),
+                (TerrainType::Mossy, "Mossy"),
+                (TerrainType::Steppe, "Steppe"),
+                (TerrainType::Stony, "Stony"),
+                (TerrainType::Swamp, "Swamp"),
+            ] {
+                ui.selectable_value(&mut tool.sediment, terrain, label);
+            }
+        });
+    ui.separator();
+    ui.label("Forest Tool:");
+    ui.checkbox(&mut tool.active_forest_tool, "Active");
+    egui::ComboBox::from_id_salt("forest_type")
+        .selected_text(format!("{:?}", tool.forest_type))
+        .show_ui(ui, |ui| {
+            for (forest, label) in [
+                (ForestType::None, "None"),
+                (ForestType::Deciduous, "Deciduous"),
+                (ForestType::Coniferous, "Coniferous"),
+            ] {
+                ui.selectable_value(&mut tool.forest_type, forest, label);
+            }
+        });
+    ui.add(egui::Slider::new(&mut tool.forest_density, 0.0..=1.0).text("Density"));
+}
+
+fn show_treasure_tools(ui: &mut egui::Ui, tool: &mut CurrentTool, link_state: &mut LinkToolState) {
+    ui.label("Treasure Tools:");
+    for (mode, label) in [
+        (TreasureToolMode::SpawnVisible, "Spawn Visible"),
+        (TreasureToolMode::SpawnHidden, "Spawn Hidden"),
+        (TreasureToolMode::Link, "Link Tool"),
+    ] {
+        if ui
+            .selectable_label(tool.treasure_mode == mode, label)
+            .clicked()
+        {
+            tool.treasure_mode = mode;
+        }
+    }
+    if !matches!(link_state, LinkToolState::Idle) {
+        ui.separator();
+        ui.colored_label(egui::Color32::YELLOW, "Link Active");
+        if ui.button("Reset Link Tool").clicked() {
+            *link_state = LinkToolState::Idle;
+        }
+    }
+}
+
+fn show_bio_tools(ui: &mut egui::Ui, tool: &mut CurrentTool) {
+    ui.label("Bio-Deposit Tools:");
+    egui::ComboBox::from_id_salt("bio_resource_type")
+        .selected_text(format!("{:?}", tool.bio_resource))
+        .show_ui(ui, |ui| {
+            for (deposit, label) in [
+                (DepositType::Rabbit, "Rabbit"),
+                (DepositType::Deer, "Deer"),
+                (DepositType::Boar, "Boar"),
+                (DepositType::WildFlax, "WildFlax"),
+                (DepositType::Raspberries, "Raspberries"),
+                (DepositType::Pumpkin, "Pumpkin"),
+                (DepositType::WildWheat, "WildWheat"),
+                (DepositType::OceanFish, "OceanFish"),
+            ] {
+                ui.selectable_value(&mut tool.bio_resource, deposit, label);
+            }
+        });
+    ui.add(egui::Slider::new(&mut tool.bio_amount, 1..=100).text("Amount"));
+    ui.add(egui::Slider::new(&mut tool.bio_brush_size, 1..=5).text("Brush Size"));
 }

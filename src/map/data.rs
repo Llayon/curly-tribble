@@ -115,6 +115,7 @@ pub struct EdgeCoord {
 }
 
 impl EdgeCoord {
+    #[must_use]
     pub fn new(mut a: HexCoord, mut b: HexCoord) -> Self {
         // Гарантируем стабильный порядок для HashMap
         if a.q > b.q || (a.q == b.q && a.r > b.r) {

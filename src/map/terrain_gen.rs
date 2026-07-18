@@ -9,6 +9,42 @@ impl Plugin for TerrainGenPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum GenerationRequest {
+    #[default]
+    None,
+    RandomizeSeed,
+    Regenerate,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum MudBankMode {
+    Disabled,
+    #[default]
+    Enabled,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum LayerVisibility {
+    Hidden,
+    #[default]
+    Visible,
+}
+
+impl LayerVisibility {
+    #[must_use]
+    pub const fn is_visible(self) -> bool {
+        matches!(self, Self::Visible)
+    }
+
+    pub fn toggle(&mut self) {
+        *self = match self {
+            Self::Hidden => Self::Visible,
+            Self::Visible => Self::Hidden,
+        };
+    }
+}
+
 #[derive(Resource, Reflect, InspectorOptions, Clone)]
 #[reflect(Resource, InspectorOptions)]
 pub struct TerrainConfig {
@@ -16,9 +52,8 @@ pub struct TerrainConfig {
     pub map_height: u32,
     pub seed: u32,
 
-    // --- INTEGRATED TOOLS (appear as checkboxes/buttons in inspector) ---
-    pub randomize_seed: bool,
-    pub regenerate_world: bool,
+    // --- INTEGRATED TOOLS (appear as a state selector in inspector) ---
+    pub generation_request: GenerationRequest,
 
     #[inspector(min = 0.001, max = 0.1)]
     pub macro_freq: f64,
@@ -46,13 +81,13 @@ pub struct TerrainConfig {
     pub river_start_elevation: f32,
     #[inspector(min = 0.0, max = 0.2)]
     pub river_depth: f32,
-    pub generate_mud_banks: bool,
+    pub mud_banks: MudBankMode,
 
     // --- VISUAL FILTERS ---
-    pub show_build_area: bool,
-    pub show_forests: bool,
-    pub show_factions: bool,
-    pub show_cliffs: bool,
+    pub build_area_layer: LayerVisibility,
+    pub forest_layer: LayerVisibility,
+    pub faction_layer: LayerVisibility,
+    pub cliff_layer: LayerVisibility,
 }
 
 impl Default for TerrainConfig {
@@ -61,8 +96,7 @@ impl Default for TerrainConfig {
             map_width: 40,
             map_height: 40,
             seed: 42,
-            randomize_seed: false,
-            regenerate_world: false,
+            generation_request: GenerationRequest::None,
             macro_freq: 0.04,
             macro_height: 12.0,
             macro_sharpness: 4.0,
@@ -75,11 +109,11 @@ impl Default for TerrainConfig {
             river_count: 8,
             river_start_elevation: 0.4,
             river_depth: 0.05,
-            generate_mud_banks: true,
-            show_build_area: false,
-            show_forests: true,
-            show_factions: true,
-            show_cliffs: true,
+            mud_banks: MudBankMode::Enabled,
+            build_area_layer: LayerVisibility::Hidden,
+            forest_layer: LayerVisibility::Visible,
+            faction_layer: LayerVisibility::Visible,
+            cliff_layer: LayerVisibility::Visible,
         }
     }
 }
@@ -118,6 +152,7 @@ impl TerrainGenerator {
         let distance_sq = nx * nx + nz * nz;
 
         let island_shape = config.island_shape_weight * (0.75 - 2.0 * distance_sq);
+        #[allow(clippy::cast_possible_truncation)] // Noise is normalized before mesh generation.
         let ridge_val = self
             .macro_noise
             .get([x64 * config.macro_freq, z64 * config.macro_freq]) as f32;

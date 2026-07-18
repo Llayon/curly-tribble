@@ -8,7 +8,7 @@ pub fn draw_cliffs_gizmos(
     map_data: Res<MapData>,
     config: Res<crate::map::terrain_gen::TerrainConfig>,
 ) {
-    if !config.show_cliffs {
+    if !config.cliff_layer.is_visible() {
         return;
     }
     let size = HEX_SIZE;
@@ -95,7 +95,7 @@ pub fn draw_forest_gizmos(
     map_data: Res<MapData>,
     config: Res<crate::map::terrain_gen::TerrainConfig>,
 ) {
-    if !config.show_forests {
+    if !config.forest_layer.is_visible() {
         return;
     }
     let size = HEX_SIZE;
@@ -106,8 +106,9 @@ pub fn draw_forest_gizmos(
             let color = match tile.forest_type {
                 ForestType::Deciduous => Color::srgb(0.0, 0.8, 0.2),
                 ForestType::Coniferous => Color::srgb(0.0, 0.4, 0.1),
-                _ => Color::NONE,
+                ForestType::None => Color::NONE,
             };
+            #[allow(clippy::cast_possible_truncation)]
             let density_count = (tile.forest_density * 5.0) as i32 + 1;
             for i in 0..density_count {
                 let offset_x = (i as f32 * 1.3).cos() * 0.3;
