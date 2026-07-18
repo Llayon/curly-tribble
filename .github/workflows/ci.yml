@@ -16,6 +16,7 @@ jobs:
     timeout-minutes: 60
     env:
       CARGO_INCREMENTAL: "0"
+      CARGO_BUILD_JOBS: "2"
       RUSTFLAGS: -C debuginfo=0
 
     steps:
@@ -31,7 +32,7 @@ jobs:
         run: cargo fmt --check
 
       - name: Lint library
-        run: cargo clippy -j 1 --lib -- -D warnings
+        run: cargo clippy --lib -- -D warnings
 
       - name: Run tests
-        run: cargo test -j 1
+        run: cargo test
