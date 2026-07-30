@@ -119,9 +119,12 @@ pub fn validate_starter_resources(
                 StarterResource::Flax => def_names.push("Flax"),
             }
         }
-        map_data.validation_errors.push(format!(
+        let err_msg = format!(
             "Faction 1 territory is deficient in {}. Use Auto-Balance to fix.",
             def_names.join("/")
-        ));
+        );
+        if !map_data.validation_errors.contains(&err_msg) {
+            map_data.validation_errors.push(err_msg);
+        }
     }
 }

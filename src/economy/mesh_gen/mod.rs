@@ -82,11 +82,29 @@ impl Command for SpawnGlobalTerrainCommand {
             meshes.remove(&h);
         }
 
+        let start_time = std::time::Instant::now();
+        let topology = crate::map::topology::generate_topology_from_map_data(&self.map_data);
+        let shared_count = topology
+            .vertex_influences
+            .iter()
+            .filter(|inf| inf.len() > 1)
+            .count();
+
         let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(
             &self.map_data,
             self.phase,
             &self.faction_manager,
             &self.config,
+        );
+
+        let elapsed_ms = start_time.elapsed().as_secs_f64() * 1000.0;
+        debug!(
+            "TOPOLOGY MESH REBUILD [{:?}]: Vertices={}, Triangles={}, SharedBoundaryVertices={}, Duration={:.2}ms",
+            self.phase,
+            topology.vertices_xz.len(),
+            topology.triangles.len(),
+            shared_count,
+            elapsed_ms
         );
 
         let terrain_handle = meshes.add(mesh);
