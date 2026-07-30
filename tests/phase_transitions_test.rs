@@ -1,9 +1,7 @@
 use bevy::prelude::*;
 use savage_fantasy::game_state::EditorPhase;
-use savage_fantasy::map::artifacts::{Artifact, ArtifactBundle, ArtifactLocation};
-use savage_fantasy::map::phase_transitions::{
-    extract_artifacts_on_phase_change, PhaseTransitionsPlugin,
-};
+use savage_fantasy::map::artifacts::{Artifact, ArtifactLocation};
+use savage_fantasy::map::phase_transitions::PhaseTransitionsPlugin;
 use savage_fantasy::map::treasures::{
     ArtifactType, ContainsArtifact, TreasureDeposit, TreasureItem,
 };

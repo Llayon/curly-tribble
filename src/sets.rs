@@ -30,7 +30,7 @@ impl Plugin for SetsPlugin {
 
         app.configure_sets(
             Update,
-            (GameSet::Input, GameSet::Logic).run_if(in_state(GameState::Playing)),
+            (GameSet::Input, GameSet::Logic).run_if(not(in_state(GameState::Loading))),
         );
 
         // 2. Конфигурация для расписания FixedUpdate (Симуляция)

@@ -1,7 +1,7 @@
 use crate::game_state::{EditorPhase, FactionManager};
 use crate::map::data::{OceanState, RoofState};
 use crate::map::terrain_gen::TerrainConfig;
-use crate::map::{LandscapeFeature, MapData, TerrainType, HEX_SIZE, MAX_HEIGHT};
+use crate::map::{LandscapeFeature, MapData, TerrainType, HEX_SIZE};
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::Indices;
 use bevy::prelude::*;
@@ -20,7 +20,7 @@ pub fn create_global_map_meshes(
     faction_manager: &FactionManager,
     config: &TerrainConfig,
 ) -> (Mesh, Option<Mesh>, Option<Mesh>) {
-    let is_flat = phase != EditorPhase::Height3D;
+    let is_flat = phase < EditorPhase::Height3D;
     let is_factions_filter = phase == EditorPhase::Factions;
 
     let mut vertices = Vec::new();
@@ -41,7 +41,7 @@ pub fn create_global_map_meshes(
         let center_y = if is_flat || tile_data.ocean_state == OceanState::Ocean {
             0.0
         } else {
-            tile_data.elevation * MAX_HEIGHT
+            map.get_hex_height(coord.q, coord.r)
         };
 
         let color = tile_color(
@@ -56,12 +56,20 @@ pub fn create_global_map_meshes(
 
         vertices.push([center_world.x, center_y, center_world.z]);
         colors.push(color);
+
         for i in 0..6 {
+            #[allow(clippy::cast_precision_loss)]
             let angle_deg = 60.0 * i as f32 + 30.0;
             let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
             let vx = center_world.x + size * angle_rad.cos();
             let vz = center_world.z + size * angle_rad.sin();
-            vertices.push([vx, center_y, vz]);
+            let vy = if is_flat {
+                0.0
+            } else {
+                let n_hex = crate::map::HexCoord::from_world(Vec3::new(vx, 0.0, vz), size);
+                map.get_hex_height(n_hex.q, n_hex.r)
+            };
+            vertices.push([vx, vy, vz]);
             colors.push(color);
         }
         let base = vertex_count;

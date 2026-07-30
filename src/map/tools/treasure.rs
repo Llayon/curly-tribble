@@ -53,7 +53,7 @@ pub fn handle_treasure_tools(
                 let entity = commands
                     .spawn(TreasureBundle {
                         deposit: TreasureDeposit {
-                            contents: vec![],
+                            contents: vec![TreasureItem::Gold(50)],
                             hex_coord,
                         },
                         name: Name::new(if is_visible {

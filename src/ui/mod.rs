@@ -18,6 +18,7 @@ impl Plugin for UiPlugin {
             resources::ResourceUiPlugin,
             details::DetailUiPlugin,
             logs::GameLogPlugin,
+            panels::tools_sub::ToolsSubPlugin,
         ));
 
         app.add_systems(Startup, setup_ui.in_set(StartupSet::SpawnEntities))
@@ -28,12 +29,15 @@ impl Plugin for UiPlugin {
                         .run_if(resource_changed::<GlobalResources>)
                         .in_set(GameSet::Visuals),
                     details::update_settler_detail_ui.in_set(GameSet::Visuals),
+                    toggle_gameplay_hud
+                        .run_if(state_changed::<GameState>)
+                        .in_set(GameSet::Visuals),
                 ),
             );
 
         app.add_systems(
             EguiPrimaryContextPass,
-            editor_phase_ui.run_if(in_state(GameState::Playing)),
+            editor_phase_ui.run_if(in_state(GameState::Editing)),
         );
     }
 }
@@ -42,6 +46,7 @@ fn editor_phase_ui(
     mut contexts: EguiContexts,
     current_phase: Res<State<EditorPhase>>,
     mut next_phase: ResMut<NextState<EditorPhase>>,
+    mut next_game_state: ResMut<NextState<GameState>>,
     mut current_tool: ResMut<CurrentTool>,
     mut link_state: ResMut<crate::map::LinkToolState>,
     mut faction_manager: ResMut<crate::game_state::FactionManager>,
@@ -63,7 +68,23 @@ fn editor_phase_ui(
         (crate::map::TargetEntity, &mut crate::map::Artifact),
         With<crate::map::Artifact>,
     >,
+    mut commands: Commands,
+    (q_mines, mut q_selected_mines): (
+        Query<(Entity, &crate::map::mines::MineDeposit), Without<crate::game_state::Selected>>,
+        Query<
+            (Entity, &mut crate::map::mines::MineDeposit),
+            (
+                With<crate::game_state::Selected>,
+                With<crate::map::mines::MineDeposit>,
+            ),
+        >,
+    ),
+    q_starter_resources: (
+        Query<&crate::map::ResourceDeposit>,
+        Query<&Transform, With<crate::map::resources::BerryBush>>,
+    ),
 ) {
+    let (q_deposits, q_bushes) = q_starter_resources;
     let Some(ctx) = contexts.ctx_mut().ok() else {
         return;
     };
@@ -88,7 +109,17 @@ fn editor_phase_ui(
         &mut next_phase,
         validation_state,
     );
-    panels::tools::show_tools_sidebar(ctx, current_phase.get(), &mut current_tool, &mut link_state);
+    panels::tools::show_tools_sidebar(
+        ctx,
+        current_phase.get(),
+        &mut current_tool,
+        &mut link_state,
+        &map_data,
+        &q_deposits,
+        &q_bushes,
+        &mut commands,
+        &mut next_game_state,
+    );
     panels::inspector::show_inspector_sidebar(
         ctx,
         current_phase.get(),
@@ -99,6 +130,9 @@ fn editor_phase_ui(
         validation_state,
         &mut artifact_state,
         &mut q_artifacts,
+        &mut commands,
+        &q_mines,
+        &mut q_selected_mines,
     );
 }
 
@@ -113,6 +147,8 @@ fn setup_ui(mut commands: Commands) {
             ..default()
         },
         BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.8)),
+        Visibility::Hidden,
+        GameplayHud,
     ));
     resources::setup_resource_ui(&mut resources_node);
 
@@ -127,6 +163,8 @@ fn setup_ui(mut commands: Commands) {
             ..default()
         },
         BackgroundColor(Color::srgba(0.1, 0.1, 0.2, 0.9)),
+        Visibility::Hidden,
+        GameplayHud,
     ));
     details::setup_detail_ui(&mut details_node);
 
@@ -138,6 +176,23 @@ fn setup_ui(mut commands: Commands) {
         ..default()
     });
     logs::setup_log_ui(&mut log_node);
+}
+
+#[derive(Component)]
+pub struct GameplayHud;
+
+fn toggle_gameplay_hud(
+    state: Res<State<GameState>>,
+    mut q_hud: Query<&mut Visibility, With<GameplayHud>>,
+) {
+    let vis = if *state.get() == GameState::Playing {
+        Visibility::Inherited
+    } else {
+        Visibility::Hidden
+    };
+    for mut v in &mut q_hud {
+        *v = vis;
+    }
 }
 
 #[cfg(test)]

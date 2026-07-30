@@ -7,6 +7,7 @@ use bevy::prelude::*;
 use bevy_egui::egui;
 
 pub mod artifacts;
+pub mod mines;
 pub mod treasures;
 
 pub struct InspectorPlugin;
@@ -31,6 +32,12 @@ pub fn show_inspector_sidebar(
         (crate::map::TargetEntity, &mut crate::map::Artifact),
         With<crate::map::Artifact>,
     >,
+    commands: &mut Commands,
+    q_mines: &Query<(Entity, &crate::map::mines::MineDeposit), Without<Selected>>,
+    q_selected_mines: &mut Query<
+        (Entity, &mut crate::map::mines::MineDeposit),
+        (With<Selected>, With<crate::map::mines::MineDeposit>),
+    >,
 ) {
     let is_valid = validation_state == super::bottom_bar::MapValidationState::Valid;
     egui::SidePanel::right("inspector_sidebar")
@@ -50,9 +57,23 @@ pub fn show_inspector_sidebar(
                     treasures::show_treasure_properties(ui, &mut deposit);
                 }
 
+                // Selected Mine Properties
+                if let Ok((_entity, mut mine)) = q_selected_mines.single_mut() {
+                    mines::show_mine_properties(ui, &mut mine);
+                }
+
                 show_faction_hierarchy(ui, *current_phase, faction_manager);
 
                 show_artifact_hierarchy(ui, *current_phase, artifact_state, q_artifacts);
+
+                mines::show_mine_hierarchy(
+                    ui,
+                    *current_phase,
+                    current_tool,
+                    commands,
+                    q_mines,
+                    q_selected_mines,
+                );
 
                 show_selection_properties(
                     ui,

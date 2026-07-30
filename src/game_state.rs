@@ -4,6 +4,7 @@ use bevy::prelude::*;
 pub enum GameState {
     #[default]
     Loading,
+    Editing,
     Playing,
     #[allow(dead_code)]
     Paused,
@@ -20,7 +21,41 @@ pub enum EditorPhase {
     Plants,
     Treasures,
     Artifacts,
+    Mines,
+    Balance,
     Height3D,
+    Finetuning,
+    Deposits,
+    Buildings,
+    Villages,
+    Props,
+    Export,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum MineType {
+    #[default]
+    Coal,
+    Iron,
+    Copper,
+    Gold,
+    Stone,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect, PartialOrd, Ord)]
+pub enum MineDepth {
+    #[default]
+    Shallow,
+    Medium,
+    Deep,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+pub enum MineTool {
+    #[default]
+    None,
+    Paint,
+    Delete,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
@@ -133,6 +168,11 @@ pub struct CurrentTool {
     pub bio_amount: u32,
     pub bio_brush_size: u32,
     pub treasure_mode: TreasureToolMode,
+    pub mine_type: MineType,
+    pub mine_depth: MineDepth,
+    pub mine_amount: u32,
+    pub mine_brush_size: u32,
+    pub mine_tool: MineTool,
 }
 
 impl Default for CurrentTool {
@@ -154,6 +194,11 @@ impl Default for CurrentTool {
             bio_amount: 10,
             bio_brush_size: 1,
             treasure_mode: TreasureToolMode::default(),
+            mine_type: MineType::default(),
+            mine_depth: MineDepth::default(),
+            mine_amount: 500,
+            mine_brush_size: 1,
+            mine_tool: MineTool::default(),
         }
     }
 }
@@ -180,6 +225,9 @@ impl Plugin for GameStatePlugin {
             .register_type::<crate::map::DepositType>()
             .register_type::<crate::map::TerrainType>()
             .register_type::<crate::map::ForestType>()
+            .register_type::<MineType>()
+            .register_type::<MineDepth>()
+            .register_type::<MineTool>()
             .init_resource::<ArtifactToolState>()
             .register_type::<ArtifactToolState>()
             .add_systems(PostStartup, start_game);
@@ -187,6 +235,6 @@ impl Plugin for GameStatePlugin {
 }
 
 fn start_game(mut next_state: ResMut<NextState<GameState>>) {
-    info!("Transitioning from Loading to Playing state");
-    next_state.set(GameState::Playing);
+    info!("Transitioning from Loading to Editing state");
+    next_state.set(GameState::Editing);
 }

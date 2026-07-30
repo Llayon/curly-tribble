@@ -66,6 +66,7 @@ pub fn rebuild_map_on_phase_change(
     q_camps: Query<&crate::map::EnemyCamp>,
     q_deposits: Query<&crate::map::ResourceDeposit>,
     q_treasures: Query<&crate::map::TreasureDeposit>,
+    q_mines: Query<&crate::map::mines::MineDeposit>,
 ) {
     debug!(
         "MAP_GEN: Phase changed to {:?}. Checking for auto-fill...",
@@ -85,6 +86,7 @@ pub fn rebuild_map_on_phase_change(
         EditorPhase::NPCs => q_pois.is_empty() && q_camps.is_empty(),
         EditorPhase::Plants => q_deposits.is_empty(),
         EditorPhase::Treasures => q_treasures.is_empty(),
+        EditorPhase::Mines => q_mines.is_empty(),
         _ => false,
     };
 

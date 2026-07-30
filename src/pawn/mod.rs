@@ -1,6 +1,5 @@
 use crate::economy::GameAssets;
 use crate::events::{GameLogMessage, LogSeverity};
-use crate::sets::StartupSet;
 use bevy::prelude::*;
 
 pub mod behaviors;
@@ -72,8 +71,12 @@ impl Plugin for PawnPlugin {
             RelationsPlugin,
         ))
         .add_systems(
-            Startup,
-            spawn_starting_settler.in_set(StartupSet::SpawnEntities),
+            OnEnter(crate::game_state::GameState::Playing),
+            spawn_starting_settler,
+        )
+        .add_systems(
+            OnExit(crate::game_state::GameState::Playing),
+            despawn_settlers,
         );
     }
 }
@@ -139,7 +142,7 @@ pub struct SettlerBundle {
     pub transform: Transform,
 }
 
-fn spawn_starting_settler(
+pub fn spawn_starting_settler(
     mut commands: Commands,
     assets: Res<GameAssets>,
     map_data: Res<crate::map::MapData>,
@@ -200,4 +203,10 @@ fn spawn_starting_settler(
                 }
             },
         );
+}
+
+pub fn despawn_settlers(mut commands: Commands, q_settlers: Query<Entity, With<Settler>>) {
+    for entity in &q_settlers {
+        commands.entity(entity).despawn();
+    }
 }

@@ -6,10 +6,27 @@ use std::collections::{HashSet, VecDeque};
 pub struct ValidationPlugin;
 
 impl Plugin for ValidationPlugin {
-    fn build(&self, _app: &mut App) {}
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            Update,
+            update_map_validation_on_change
+                .run_if(resource_changed::<MapData>)
+                .in_set(crate::sets::GameSet::Logic),
+        );
+    }
 }
 
-pub fn run_map_validation(map_data: &mut MapData) {
+pub fn update_map_validation_on_change(
+    mut map_data: ResMut<MapData>,
+    phase: Res<State<crate::game_state::EditorPhase>>,
+) {
+    if map_data.is_changed() {
+        let current_phase = *phase.get();
+        run_map_validation(&mut map_data, current_phase);
+    }
+}
+
+pub fn run_map_validation(map_data: &mut MapData, phase: crate::game_state::EditorPhase) {
     map_data.validation_errors.clear();
 
     let mut total_land = 0;
@@ -58,16 +75,18 @@ pub fn run_map_validation(map_data: &mut MapData) {
         map_data.validation_errors.push("Внутри континента найдены изолированные озера. Океан должен соединяться с краем карты.".to_string());
     }
 
-    clear_isolated_faction_territories(map_data);
+    if phase >= crate::game_state::EditorPhase::Factions {
+        clear_isolated_faction_territories(map_data);
 
-    // 4. Проверка правила '1-Hex Gap'
-    for (coord, tile) in &map_data.tiles {
-        if let Some(f1) = tile.faction_id {
-            for n_coord in coord.neighbors() {
-                if let Some(n_tile) = map_data.tiles.get(&n_coord) {
-                    if let Some(f2) = n_tile.faction_id {
-                        if f1 != f2 {
-                            map_data.validation_errors.push(format!("Нарушено правило 1 гекса между фракциями {f1} и {f2} у координат {coord:?}."));
+        // 4. Проверка правила '1-Hex Gap'
+        for (coord, tile) in &map_data.tiles {
+            if let Some(f1) = tile.faction_id {
+                for n_coord in coord.neighbors() {
+                    if let Some(n_tile) = map_data.tiles.get(&n_coord) {
+                        if let Some(f2) = n_tile.faction_id {
+                            if f1 != f2 {
+                                map_data.validation_errors.push(format!("Нарушено правило 1 гекса между фракциями {f1} и {f2} у координат {coord:?}."));
+                            }
                         }
                     }
                 }
@@ -147,8 +166,9 @@ fn region_is_connected(
 pub fn validate_faction_placements(
     map_data: Res<MapData>,
     mut q_factions: Query<(&mut FactionMarker, &mut Transform), With<FactionMarker>>,
+    phase: Res<State<crate::game_state::EditorPhase>>,
 ) {
-    if map_data.is_changed() {
+    if map_data.is_changed() && *phase.get() >= crate::game_state::EditorPhase::Factions {
         for (mut marker, mut transform) in &mut q_factions {
             let coord = marker.hex_coord;
             let is_invalid = map_data

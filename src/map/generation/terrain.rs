@@ -44,11 +44,11 @@ pub fn spawn_map_internal(
 
     let distance_field = distance_to_ocean(map_data);
 
-    if reset || auto_fill == Some(EditorPhase::Landscape) {
+    if auto_fill == Some(EditorPhase::Landscape) {
         apply_landscape_generation(map_data, terrain_config, *seed, &distance_field);
     }
 
-    if reset || !map_data.tiles.values().any(|t| t.faction_id == Some(1)) {
+    if auto_fill == Some(EditorPhase::Factions) {
         super::factions::auto_spawn_player_territory(map_data, seed.value());
     }
 
@@ -112,7 +112,7 @@ fn build_base_tiles(
                         .clamp(0.0, 1.0),
                 )
             };
-            let refresh = reset || auto_fill == Some(EditorPhase::Sediments);
+            let refresh = auto_fill == Some(EditorPhase::Sediments);
             let terrain = if phase == EditorPhase::Shape || ocean {
                 TerrainType::Grass
             } else if refresh {

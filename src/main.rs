@@ -1,5 +1,4 @@
 use bevy::prelude::*;
-use bevy_ai_remote::BevyAiRemotePlugin;
 use savage_fantasy::{camera, economy, events, game_state, map, pawn, sets, ui};
 
 // --- CONSTANTS ---
@@ -38,7 +37,7 @@ fn main() {
                     ..default()
                 })
                 .set(bevy::log::LogPlugin {
-                    filter: "info,wgpu_core=warn,wgpu_hal=warn,bevy_ai_remote=debug".into(),
+                    filter: "info,wgpu_core=warn,wgpu_hal=warn".into(),
                     level: bevy::log::Level::INFO,
                     ..default()
                 })
@@ -46,11 +45,7 @@ fn main() {
         )
         // 2. Grouped Registration
         // External/Integration Plugins
-        .add_plugins((
-            bevy_egui::EguiPlugin::default(),
-            BevyAiRemotePlugin,
-            MeshPickingPlugin,
-        ))
+        .add_plugins((bevy_egui::EguiPlugin::default(), MeshPickingPlugin))
         // Internal Game Plugins
         .add_plugins((
             sets::SetsPlugin,

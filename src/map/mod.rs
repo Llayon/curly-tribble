@@ -1,17 +1,25 @@
 // src/map/mod.rs
 pub mod artifacts;
 pub mod atmosphere;
+pub mod balance;
+pub mod balance_commands;
+pub mod buildings;
 pub mod camps;
 pub mod construction;
 pub mod data;
 pub mod deposits;
+pub mod export;
 pub mod factions;
 pub mod hex_math;
+pub mod mines;
 pub mod navigation;
 pub mod phase_transitions;
 pub mod poi;
+pub mod props;
 pub mod resources;
 pub mod river_gen;
+pub mod roads;
+pub mod subhex;
 pub mod terrain_gen;
 pub mod treasures;
 pub mod visibility;
@@ -36,6 +44,7 @@ pub use data::{
 pub use deposits::{DepositType, ResourceDeposit, ResourceDepositBundle};
 pub use factions::{FactionMarker, FactionMarkerBundle};
 pub use hex_math::HexCoord;
+pub use mines::{auto_spawn_mines, MineBundle, MineDeposit};
 pub use poi::{PoiBundle, PoiType, PointOfInterest};
 use terrain_gen::{TerrainConfig, TerrainGenerator};
 pub use treasures::{
@@ -116,6 +125,19 @@ impl Plugin for MapPlugin {
                 river_gen::RiverGenPlugin,
                 terrain_gen::TerrainGenPlugin,
             ))
+            .add_plugins((
+                mines::MinesPlugin,
+                tools::mine::MineToolPlugin,
+                balance::BalancePlugin,
+                balance_commands::BalanceCommandsPlugin,
+                subhex::SubHexPlacementPlugin,
+                buildings::BuildingsPlugin,
+                roads::RoadsPlugin,
+                props::PropsPlugin,
+                export::MapExportPlugin,
+                phase_transitions::PhaseTransitionsPlugin,
+                validation::ValidationPlugin,
+            ))
             .add_systems(
                 Startup,
                 (|mut ev: MessageWriter<GenerateMapEvent>| {
@@ -139,10 +161,12 @@ impl Plugin for MapPlugin {
                     tools::handle_npc_tools.in_set(GameSet::Logic),
                     tools::handle_treasure_tools.in_set(GameSet::Logic),
                     tools::handle_artifact_tools.in_set(GameSet::Logic),
+                    tools::handle_mine_tools.in_set(GameSet::Logic),
                     systems::handle_faction_auto_relocation.in_set(GameSet::Logic),
                     validation::validate_faction_placements.in_set(GameSet::Logic),
                     validation_deposits::validate_bio_habitats.in_set(GameSet::Logic),
                     validation_deposits::validate_treasures.in_set(GameSet::Logic),
+                    validation_deposits::validate_mines.in_set(GameSet::Logic),
                     systems::monitor_inspector_triggers
                         .run_if(resource_changed::<TerrainConfig>)
                         .in_set(GameSet::Logic),

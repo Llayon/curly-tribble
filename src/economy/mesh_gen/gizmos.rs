@@ -70,23 +70,100 @@ impl Plugin for GizmosPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
-pub fn draw_hex_grid_gizmos(mut gizmos: Gizmos, map: Res<MapData>) {
+pub fn draw_hex_grid_gizmos(
+    mut gizmos: Gizmos,
+    map: Res<MapData>,
+    phase: Res<State<crate::game_state::EditorPhase>>,
+) {
+    let current_phase = *phase.get();
+    if current_phase > crate::game_state::EditorPhase::Deposits {
+        return;
+    }
+
     let size = HEX_SIZE;
-    let color = Color::BLACK;
-    let y = 0.02;
+    let color = Color::srgba(0.0, 0.0, 0.0, 0.5);
+    let sub_color = Color::srgba(0.25, 0.25, 0.25, 0.35);
+    let show_subtriangles = matches!(
+        current_phase,
+        crate::game_state::EditorPhase::Balance
+            | crate::game_state::EditorPhase::Height3D
+            | crate::game_state::EditorPhase::Finetuning
+            | crate::game_state::EditorPhase::Deposits
+    );
+    let is_3d = current_phase >= crate::game_state::EditorPhase::Height3D;
+
     for &coord in map.tiles.keys() {
         let center = coord.to_world(size);
-        let mut points = Vec::new();
+        let center_y = if is_3d {
+            map.get_hex_height(coord.q, coord.r) + 0.02
+        } else {
+            0.02
+        };
+        let center_v = Vec3::new(center.x, center_y, center.z);
+        let mut points = Vec::with_capacity(6);
+        let mut mid_points = Vec::with_capacity(6);
+
         for i in 0..6 {
+            #[allow(clippy::cast_precision_loss)]
             let angle_deg = 60.0 * i as f32 + 30.0;
             let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
             let vx = center.x + size * angle_rad.cos();
             let vz = center.z + size * angle_rad.sin();
-            points.push(Vec3::new(vx, y, vz));
+            let vy = if is_3d {
+                let n_hex = crate::map::HexCoord::from_world(Vec3::new(vx, 0.0, vz), size);
+                map.get_hex_height(n_hex.q, n_hex.r) + 0.02
+            } else {
+                0.02
+            };
+            let v = Vec3::new(vx, vy, vz);
+            points.push(v);
+            mid_points.push((center_v + v) * 0.5);
         }
-        let first = points[0];
-        points.push(first);
-        gizmos.linestrip(points, color);
+
+        // 1. Outer hex perimeter
+        let mut perimeter = points.clone();
+        perimeter.push(points[0]);
+        gizmos.linestrip(perimeter, color);
+
+        // 2. 3D Sub-triangle grid (24 triangles per hex in 3D relief)
+        if show_subtriangles {
+            for i in 0..6 {
+                gizmos.line(center_v, points[i], sub_color);
+
+                let next_idx = (i + 1) % 6;
+                gizmos.line(mid_points[i], mid_points[next_idx], sub_color);
+
+                let edge_mid = (points[i] + points[next_idx]) * 0.5;
+                gizmos.line(mid_points[i], edge_mid, sub_color);
+                gizmos.line(mid_points[next_idx], edge_mid, sub_color);
+            }
+        }
+
+        // 3. 1x1m Sub-cell grid placement nodes on Deposits phase (3D snapped)
+        if current_phase == crate::game_state::EditorPhase::Deposits {
+            let dot_color = Color::srgba(0.0, 0.8, 1.0, 0.6);
+            let step = 1.0;
+            let mut dx = -size;
+            while dx <= size {
+                let mut dz = -size;
+                while dz <= size {
+                    if dx * dx + dz * dz <= size * size {
+                        let wx = center.x + dx;
+                        let wz = center.z + dz;
+                        let n_hex = crate::map::HexCoord::from_world(Vec3::new(wx, 0.0, wz), size);
+                        let dot_y = if is_3d {
+                            map.get_hex_height(n_hex.q, n_hex.r) + 0.02
+                        } else {
+                            0.02
+                        };
+                        let dot_pos = Vec3::new(wx, dot_y, wz);
+                        gizmos.sphere(Isometry3d::from_translation(dot_pos), 0.08, dot_color);
+                    }
+                    dz += step;
+                }
+                dx += step;
+            }
+        }
     }
 }
 
@@ -160,5 +237,47 @@ pub fn draw_npc_objects_gizmos(
             center - Vec3::Z * 0.4,
             Color::srgb(1.0, 0.0, 0.0),
         );
+    }
+}
+
+pub fn draw_mines_gizmos(
+    mut gizmos: Gizmos,
+    map_data: Res<MapData>,
+    q_mines: Query<&crate::map::mines::MineDeposit>,
+) {
+    let size = HEX_SIZE * 0.75;
+    for mine in &q_mines {
+        let coord = mine.hex_coord;
+        let mut center = coord.to_world(HEX_SIZE);
+        center.y = map_data.get_hex_height(coord.q, coord.r) + 0.05;
+
+        let color = match mine.mine_type {
+            crate::game_state::MineType::Coal => Color::srgb(0.15, 0.15, 0.15),
+            crate::game_state::MineType::Iron => Color::srgb(0.75, 0.25, 0.1),
+            crate::game_state::MineType::Copper => Color::srgb(0.85, 0.5, 0.15),
+            crate::game_state::MineType::Gold => Color::srgb(0.95, 0.8, 0.1),
+            crate::game_state::MineType::Stone => Color::srgb(0.55, 0.55, 0.6),
+        };
+
+        let mut points = Vec::new();
+        for i in 0..6 {
+            let angle_deg = 60.0 * i as f32 + 30.0;
+            let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
+            let vx = center.x + size * angle_rad.cos();
+            let vz = center.z + size * angle_rad.sin();
+            points.push(Vec3::new(vx, center.y, vz));
+        }
+        let first = points[0];
+        points.push(first);
+        for pair in points.windows(2) {
+            gizmos.line(pair[0], pair[1], color);
+        }
+
+        let depth_len = match mine.depth {
+            crate::game_state::MineDepth::Shallow => 1.0,
+            crate::game_state::MineDepth::Medium => 2.5,
+            crate::game_state::MineDepth::Deep => 4.5,
+        };
+        gizmos.line(center, center - Vec3::Y * depth_len, color);
     }
 }

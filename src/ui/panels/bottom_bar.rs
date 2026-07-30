@@ -22,39 +22,49 @@ pub fn show_bottom_bar(
 ) {
     let is_valid = validation_state == MapValidationState::Valid;
     egui::TopBottomPanel::bottom("phase_timeline").show(ctx, |ui| {
-        ui.horizontal_centered(|ui| {
-            let phases = [
-                (EditorPhase::Shape, "1. Shape"),
-                (EditorPhase::Factions, "2. Factions"),
-                (EditorPhase::Landscape, "3. Landscape"),
-                (EditorPhase::Sediments, "4. Sediments"),
-                (EditorPhase::NPCs, "5. NPCs"),
-                (EditorPhase::Plants, "6. Plants"),
-                (EditorPhase::Treasures, "7. Treasures"),
-                (EditorPhase::Artifacts, "8. Artifacts"),
-                (EditorPhase::Height3D, "9. Height3D"),
-            ];
+        egui::ScrollArea::horizontal().show(ui, |ui| {
+            ui.horizontal_centered(|ui| {
+                let phases = [
+                    (EditorPhase::Shape, "1. Shape"),
+                    (EditorPhase::Factions, "2. Factions"),
+                    (EditorPhase::Landscape, "3. Landscape"),
+                    (EditorPhase::Sediments, "4. Sediments"),
+                    (EditorPhase::NPCs, "5. NPCs"),
+                    (EditorPhase::Plants, "6. Plants"),
+                    (EditorPhase::Treasures, "7. Treasures"),
+                    (EditorPhase::Artifacts, "8. Artifacts"),
+                    (EditorPhase::Mines, "9. Mines"),
+                    (EditorPhase::Balance, "10. Balance"),
+                    (EditorPhase::Height3D, "11. Height"),
+                    (EditorPhase::Finetuning, "12. Finetuning"),
+                    (EditorPhase::Deposits, "13. Deposits"),
+                    (EditorPhase::Buildings, "14. Buildings"),
+                    (EditorPhase::Villages, "15. Villages"),
+                    (EditorPhase::Props, "16. Props"),
+                    (EditorPhase::Export, "17. Export"),
+                ];
 
-            let current_idx = phases
-                .iter()
-                .position(|(p, _)| p == current_phase)
-                .unwrap_or(0);
+                let current_idx = phases
+                    .iter()
+                    .position(|(p, _)| p == current_phase)
+                    .unwrap_or(0);
 
-            for (idx, (phase, label)) in phases.into_iter().enumerate() {
-                let is_current = *current_phase == phase;
-                let is_physically_reachable = idx <= current_idx + 1;
-                let needs_validation = idx > 1;
-                let can_click = is_physically_reachable && (!needs_validation || is_valid);
+                for (idx, (phase, label)) in phases.into_iter().enumerate() {
+                    let is_current = *current_phase == phase;
+                    let is_physically_reachable = idx <= current_idx + 1;
+                    let needs_validation = idx > 1;
+                    let can_click = is_physically_reachable && (!needs_validation || is_valid);
 
-                ui.add_enabled_ui(can_click, |ui| {
-                    if ui.selectable_label(is_current, label).clicked() {
-                        next_phase.set(phase);
+                    ui.add_enabled_ui(can_click, |ui| {
+                        if ui.selectable_label(is_current, label).clicked() {
+                            next_phase.set(phase);
+                        }
+                    });
+                    if idx < phases.len() - 1 {
+                        ui.label("→");
                     }
-                });
-                if idx < phases.len() - 1 {
-                    ui.label("→");
                 }
-            }
+            });
         });
     });
 }

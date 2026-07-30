@@ -28,7 +28,7 @@ impl Plugin for CameraPlugin {
             .add_systems(
                 Update,
                 move_camera
-                    .run_if(in_state(GameState::Playing))
+                    .run_if(not(in_state(GameState::Loading)))
                     .in_set(GameSet::Input),
             );
     }

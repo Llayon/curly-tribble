@@ -23,6 +23,7 @@ pub fn handle_regeneration(
     mut ev_gen: MessageReader<GenerateMapEvent>,
     q_map_entities: Query<Entity, With<MapEntity>>,
     q_faction_markers: Query<Entity, With<FactionMarker>>,
+    q_mines: Query<Entity, With<super::mines::MineDeposit>>,
     config: Res<TerrainConfig>,
     mut seed: ResMut<WorldSeed>,
     mut terrain_gen: ResMut<TerrainGenerator>,
@@ -66,23 +67,30 @@ pub fn handle_regeneration(
             ev.auto_fill_phase,
         );
 
-        if reset || ev.auto_fill_phase == Some(EditorPhase::Factions) {
+        if ev.auto_fill_phase == Some(EditorPhase::Factions) {
             super::generation::spawn_factions(&mut commands, &map_data, &faction_manager);
         }
 
-        if reset || ev.auto_fill_phase == Some(EditorPhase::NPCs) {
+        if ev.auto_fill_phase == Some(EditorPhase::NPCs) {
             auto_spawn_npcs(&mut commands, &map_data, &faction_manager, seed.value());
         }
 
-        if reset || ev.auto_fill_phase == Some(EditorPhase::Plants) {
+        if ev.auto_fill_phase == Some(EditorPhase::Plants) {
             auto_spawn_bio_deposits(&mut commands, &map_data, seed.value());
         }
 
-        if reset || ev.auto_fill_phase == Some(EditorPhase::Treasures) {
+        if ev.auto_fill_phase == Some(EditorPhase::Treasures) {
             auto_spawn_treasures(&mut commands, &map_data, seed.value());
         }
 
-        crate::map::validation::run_map_validation(&mut map_data);
+        if ev.auto_fill_phase == Some(EditorPhase::Mines) {
+            for entity in &q_mines {
+                commands.entity(entity).despawn();
+            }
+            super::mines::auto_spawn_mines(&mut commands, &map_data, seed.value());
+        }
+
+        crate::map::validation::run_map_validation(&mut map_data, *phase.get());
 
         log_writer.write(GameLogMessage {
             message: format!(
@@ -190,7 +198,7 @@ pub fn handle_faction_auto_relocation(
             GenerationMode::Preserve,
             None,
         );
-        crate::map::validation::run_map_validation(&mut map_data);
+        crate::map::validation::run_map_validation(&mut map_data, *phase.get());
         ev_rebuild.write(RebuildMeshEvent);
     }
 }

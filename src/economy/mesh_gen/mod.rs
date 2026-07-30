@@ -31,7 +31,7 @@ impl Plugin for MeshGenPlugin {
             .add_systems(
                 Update,
                 (
-                    gizmos::draw_hex_grid_gizmos.run_if(not(in_state(EditorPhase::Height3D))),
+                    gizmos::draw_hex_grid_gizmos,
                     gizmos::draw_factions_gizmos.run_if(in_state(EditorPhase::Factions)),
                     gizmos::draw_cliffs_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
                         *phase.get() >= EditorPhase::Landscape
@@ -41,6 +41,9 @@ impl Plugin for MeshGenPlugin {
                     }),
                     gizmos::draw_npc_objects_gizmos
                         .run_if(|phase: Res<State<EditorPhase>>| *phase.get() >= EditorPhase::NPCs),
+                    gizmos::draw_mines_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
+                        *phase.get() >= EditorPhase::Mines
+                    }),
                 ),
             );
     }
@@ -55,7 +58,7 @@ pub struct SpawnGlobalTerrainCommand {
 
 impl Command for SpawnGlobalTerrainCommand {
     fn apply(self, world: &mut World) {
-        let is_flat = self.phase != EditorPhase::Height3D;
+        let is_flat = self.phase < EditorPhase::Height3D;
 
         let old_handles =
             if let Some(mut gen_assets) = world.get_resource_mut::<GeneratedMapAssets>() {

@@ -37,7 +37,10 @@ pub fn handle_shape_tools(
                     if is_ocean {
                         tile.faction_id = None;
                     }
-                    crate::map::validation::run_map_validation(&mut map_data);
+                    crate::map::validation::run_map_validation(
+                        &mut map_data,
+                        crate::game_state::EditorPhase::Shape,
+                    );
                     ev_rebuild.write(RebuildMeshEvent);
                 }
             }
