@@ -184,8 +184,8 @@ pub fn show_tools_sidebar(
                         }
                     }
                     if ui.button("💾 Export Map Package (.json)").clicked() {
-                        let path = std::path::Path::new("assets/maps/custom_map.json");
-                        let _ = crate::map::export::export_map_to_json(map_data, path);
+                        use crate::map::export::ExportMapExt;
+                        commands.export_map_package("assets/maps/custom_map.json");
                     }
                     if ui.button("🎮 Launch Playtest").clicked() {
                         next_game_state.set(crate::game_state::GameState::Playing);

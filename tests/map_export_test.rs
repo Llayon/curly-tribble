@@ -1,7 +1,7 @@
 // tests/map_export_test.rs
 use bevy::prelude::*;
 use savage_fantasy::game_state::{EditorPhase, GameState};
-use savage_fantasy::map::export::{export_map_to_json, import_map_from_json, MapExportPlugin};
+use savage_fantasy::map::export::{export_world_to_json, import_map_from_json, MapExportPlugin};
 use savage_fantasy::map::{HexCoord, MapData, RebuildMeshEvent, TileData};
 
 #[test]
@@ -26,12 +26,13 @@ fn test_map_export_and_import() {
             ..default()
         },
     );
+    app.insert_resource(map_data);
 
     let test_dir = std::env::temp_dir().join("savage_fantasy_test_export");
     let export_path = test_dir.join("test_map.json");
 
     // 1. Test export
-    let export_res = export_map_to_json(&map_data, &export_path);
+    let export_res = export_world_to_json(app.world_mut(), &export_path);
     assert!(export_res.is_ok(), "Map export to JSON must succeed");
     assert!(export_path.exists(), "Exported JSON file must exist");
 

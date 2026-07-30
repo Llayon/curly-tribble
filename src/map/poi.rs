@@ -1,7 +1,8 @@
 use crate::map::{HexCoord, MapEntity};
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 pub enum PoiType {
     #[default]
     TradePost,

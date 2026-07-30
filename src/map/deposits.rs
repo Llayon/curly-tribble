@@ -1,7 +1,8 @@
 use crate::map::{HexCoord, MapEntity};
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect, Default)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect, Default)]
 pub enum DepositType {
     #[default]
     Rabbit,

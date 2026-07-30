@@ -10,7 +10,9 @@ impl Plugin for BuildingsPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect, Default)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Reflect, Default)]
 pub enum BuildingType {
     #[default]
     TradePost,

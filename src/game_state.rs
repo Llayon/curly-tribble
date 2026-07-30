@@ -32,7 +32,9 @@ pub enum EditorPhase {
     Export,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 pub enum MineType {
     #[default]
     Coal,
@@ -42,7 +44,9 @@ pub enum MineType {
     Stone,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect, PartialOrd, Ord)]
+#[derive(
+    Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Default, Reflect, PartialOrd, Ord,
+)]
 pub enum MineDepth {
     #[default]
     Shallow,

@@ -1,7 +1,8 @@
 use crate::map::{HexCoord, MapEntity};
 use bevy::prelude::*;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 pub enum ResourceType {
     Wood,
     Stone,
@@ -10,14 +11,14 @@ pub enum ResourceType {
     Food,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Reflect)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Reflect)]
 pub enum ArtifactType {
     AncientRelic,
     TradeLedger,
     MagicCompass,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Reflect)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq, Reflect)]
 pub enum TreasureItem {
     Gold(u32),
     Resources(ResourceType, u32),
