@@ -40,28 +40,30 @@ pub fn create_global_map_meshes(
         vertices.push([pos_xz.x, y, pos_xz.y]);
 
         let influences = &topology.vertex_influences[k];
-        let mut sum_r = 0.0;
-        let mut sum_g = 0.0;
-        let mut sum_b = 0.0;
-        let count = influences.len().max(1) as f32;
 
-        for &coord in influences {
-            let tile_data = map.get_tile(coord.q, coord.r).copied().unwrap_or_default();
-            let c = tile_color(
-                map,
-                coord,
-                &tile_data,
-                phase,
-                faction_manager,
-                config,
-                is_factions_filter,
-            );
-            sum_r += c[0];
-            sum_g += c[1];
-            sum_b += c[2];
-        }
+        // Prefer land cell color if any influencing cell is land
+        let land_coord = influences.iter().copied().find(|c| {
+            map.get_tile(c.q, c.r)
+                .is_some_and(|t| t.ocean_state == OceanState::Land)
+        });
 
-        colors.push([sum_r / count, sum_g / count, sum_b / count, 1.0]);
+        let eval_coord =
+            land_coord.unwrap_or_else(|| influences.first().copied().unwrap_or_default());
+
+        let tile_data = map
+            .get_tile(eval_coord.q, eval_coord.r)
+            .copied()
+            .unwrap_or_default();
+        let color = tile_color(
+            map,
+            eval_coord,
+            &tile_data,
+            phase,
+            faction_manager,
+            config,
+            is_factions_filter,
+        );
+        colors.push(color);
     }
 
     let mut indices = Vec::with_capacity(topology.triangles.len() * 3);
@@ -160,7 +162,7 @@ fn tile_color(
         return [0.2, 1.0, 0.2, 1.0];
     }
     if tile.ocean_state == OceanState::Ocean {
-        return [0.0, 0.2, 0.5, 1.0];
+        return [0.05, 0.25, 0.65, 1.0];
     }
     let base = feature_color(tile, phase);
     if !config.faction_layer.is_visible() {
@@ -192,7 +194,7 @@ fn feature_color(tile: &crate::map::TileData, _phase: EditorPhase) -> [f32; 4] {
         LandscapeFeature::River => [0.0, 0.8, 1.0, 1.0],
         LandscapeFeature::Plateau => [0.5, 0.5, 0.5, 1.0],
         LandscapeFeature::None => match tile.terrain {
-            TerrainType::Grass => [0.2, 0.5, 0.1, 1.0],
+            TerrainType::Grass => [0.15, 0.65, 0.25, 1.0],
             TerrainType::Dirt => [0.4, 0.3, 0.2, 1.0],
             TerrainType::Dusty => [0.6, 0.5, 0.4, 1.0],
             TerrainType::Fertile => [0.1, 0.4, 0.05, 1.0],
