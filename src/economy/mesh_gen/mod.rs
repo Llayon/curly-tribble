@@ -57,9 +57,8 @@ pub struct SpawnGlobalTerrainCommand {
 }
 
 impl Command for SpawnGlobalTerrainCommand {
+    #[allow(clippy::too_many_lines)]
     fn apply(self, world: &mut World) {
-        let is_flat = self.phase < EditorPhase::Height3D;
-
         let old_handles =
             if let Some(mut gen_assets) = world.get_resource_mut::<GeneratedMapAssets>() {
                 (
@@ -98,12 +97,26 @@ impl Command for SpawnGlobalTerrainCommand {
         );
 
         let elapsed_ms = start_time.elapsed().as_secs_f64() * 1000.0;
+        let land_tile_count = self
+            .map_data
+            .tiles
+            .values()
+            .filter(|t| t.ocean_state == crate::map::data::OceanState::Land)
+            .count();
+        let ocean_tile_count = self
+            .map_data
+            .tiles
+            .values()
+            .filter(|t| t.ocean_state == crate::map::data::OceanState::Ocean)
+            .count();
         debug!(
-            "TOPOLOGY MESH REBUILD [{:?}]: Vertices={}, Triangles={}, SharedBoundaryVertices={}, Duration={:.2}ms",
+            "TOPOLOGY MESH REBUILD [{:?}]: Vertices={}, Triangles={}, SharedBoundaryVertices={}, LandTiles={}, OceanTiles={}, Duration={:.2}ms",
             self.phase,
             topology.vertices_xz.len(),
             topology.triangles.len(),
             shared_count,
+            land_tile_count,
+            ocean_tile_count,
             elapsed_ms
         );
 
@@ -124,17 +137,21 @@ impl Command for SpawnGlobalTerrainCommand {
 
         let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
         if let Some(mat) = materials.get_mut(&ground_mat) {
-            mat.unlit = is_flat;
+            mat.unlit = true;
+            mat.double_sided = true;
+            mat.cull_mode = None;
         }
         if let Some(mat) = materials.get_mut(&water_mat) {
-            mat.unlit = is_flat;
+            mat.unlit = true;
+            mat.double_sided = true;
+            mat.cull_mode = None;
         }
 
         world.spawn(GlobalTerrainBundle {
             mesh: Mesh3d(terrain_handle),
             material: MeshMaterial3d(ground_mat),
             transform: Transform::from_xyz(0.0, 0.0, 0.0),
-            visibility: Visibility::default(),
+            visibility: Visibility::Visible,
             inherited_visibility: InheritedVisibility::default(),
             name: Name::new("Global Terrain"),
             marker: MapEntity,
@@ -146,7 +163,7 @@ impl Command for SpawnGlobalTerrainCommand {
                 mesh: Mesh3d(water_handle),
                 material: MeshMaterial3d(water_mat),
                 transform: Transform::from_xyz(0.0, 0.0, 0.0),
-                visibility: Visibility::default(),
+                visibility: Visibility::Visible,
                 inherited_visibility: InheritedVisibility::default(),
                 name: Name::new("Water Layer"),
                 marker: MapEntity,

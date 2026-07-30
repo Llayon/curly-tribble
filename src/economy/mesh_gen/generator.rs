@@ -133,10 +133,13 @@ pub fn create_global_map_meshes(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
     );
+    let normals = vec![[0.0, 1.0, 0.0]; vertices.len()];
+    let uvs = vec![[0.5, 0.5]; vertices.len()];
     terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
+    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
+    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     terrain_mesh.insert_indices(Indices::U32(indices));
-    terrain_mesh.compute_normals();
 
     let water_mesh = create_optional_mesh(water_vertices, water_indices);
     let roof_mesh = create_optional_mesh(roof_vertices, roof_indices);
@@ -162,7 +165,7 @@ fn tile_color(
         return [0.2, 1.0, 0.2, 1.0];
     }
     if tile.ocean_state == OceanState::Ocean {
-        return [0.05, 0.25, 0.65, 1.0];
+        return [0.1, 0.4, 0.9, 1.0];
     }
     let base = feature_color(tile, phase);
     if !config.faction_layer.is_visible() {
@@ -194,7 +197,7 @@ fn feature_color(tile: &crate::map::TileData, _phase: EditorPhase) -> [f32; 4] {
         LandscapeFeature::River => [0.0, 0.8, 1.0, 1.0],
         LandscapeFeature::Plateau => [0.5, 0.5, 0.5, 1.0],
         LandscapeFeature::None => match tile.terrain {
-            TerrainType::Grass => [0.15, 0.65, 0.25, 1.0],
+            TerrainType::Grass => [0.3, 0.8, 0.2, 1.0],
             TerrainType::Dirt => [0.4, 0.3, 0.2, 1.0],
             TerrainType::Dusty => [0.6, 0.5, 0.4, 1.0],
             TerrainType::Fertile => [0.1, 0.4, 0.05, 1.0],

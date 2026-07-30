@@ -1,13 +1,11 @@
 use crate::game_state::GameState;
 use crate::sets::{GameSet, StartupSet};
 use bevy::anti_alias::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing};
-use bevy::core_pipeline::core_3d::graph::Core3d;
 use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
 use bevy::core_pipeline::tonemapping::Tonemapping;
 use bevy::pbr::ScreenSpaceAmbientOcclusion;
 use bevy::post_process::bloom::{Bloom, BloomPlugin};
 use bevy::prelude::*;
-use bevy::render::camera::CameraRenderGraph;
 use bevy::render::view::Hdr;
 use bevy::ui::IsDefaultUiCamera;
 
@@ -61,7 +59,6 @@ impl Default for CameraConfig {
 pub struct MainCameraBundle {
     pub camera_3d: Camera3d,
     pub ui_camera: IsDefaultUiCamera,
-    pub render_graph: CameraRenderGraph,
     pub transform: Transform,
     pub focus: CameraFocus,
     pub config: CameraConfig,
@@ -77,12 +74,23 @@ pub struct MainCameraBundle {
     pub name: Name,
 }
 
+#[derive(Bundle)]
+pub struct SunLightBundle {
+    pub light: DirectionalLight,
+    pub transform: Transform,
+    pub name: Name,
+}
+
+#[derive(Bundle)]
+pub struct AmbientLightBundle {
+    pub light: AmbientLight,
+    pub name: Name,
+}
+
 fn setup_camera(mut commands: Commands) {
-    // В Bevy 0.18.1 используем именованный Bundle для соблюдения архитектурных гвардов.
     commands.spawn(MainCameraBundle {
         camera_3d: Camera3d::default(),
         ui_camera: IsDefaultUiCamera,
-        render_graph: CameraRenderGraph::new(Core3d),
         transform: Transform::from_xyz(0.0, 30.0, 30.0).looking_at(Vec3::ZERO, Vec3::Y),
         focus: CameraFocus(Vec3::ZERO),
         config: CameraConfig::default(),
@@ -96,6 +104,25 @@ fn setup_camera(mut commands: Commands) {
         taa: TemporalAntiAliasing::default(),
         ssao: ScreenSpaceAmbientOcclusion::default(),
         name: Name::new("Main Camera"),
+    });
+
+    commands.spawn(SunLightBundle {
+        light: DirectionalLight {
+            illuminance: 10_000.0,
+            shadows_enabled: true,
+            ..default()
+        },
+        transform: Transform::from_xyz(20.0, 50.0, 20.0).looking_at(Vec3::ZERO, Vec3::Y),
+        name: Name::new("Sun Light"),
+    });
+
+    commands.spawn(AmbientLightBundle {
+        light: AmbientLight {
+            color: Color::WHITE,
+            brightness: 10_000.0,
+            affects_lightmapped_meshes: false,
+        },
+        name: Name::new("Ambient Light"),
     });
 }
 
