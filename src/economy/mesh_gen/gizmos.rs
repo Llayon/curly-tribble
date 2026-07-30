@@ -73,6 +73,7 @@ impl Plugin for GizmosPlugin {
 pub fn draw_hex_grid_gizmos(
     mut gizmos: Gizmos,
     map: Res<MapData>,
+    topology: Res<crate::map::topology::TerrainTopology>,
     phase: Res<State<crate::game_state::EditorPhase>>,
 ) {
     let current_phase = *phase.get();
@@ -91,18 +92,39 @@ pub fn draw_hex_grid_gizmos(
             | crate::game_state::EditorPhase::Deposits
     );
     let is_3d = current_phase >= crate::game_state::EditorPhase::Height3D;
+    let mode = if is_3d {
+        crate::map::topology::TerrainHeightMode::Relief3D
+    } else {
+        crate::map::topology::TerrainHeightMode::Flat
+    };
+    let heights = crate::map::topology::compute_vertex_heights(&topology, &map, mode);
+
+    if show_subtriangles && !topology.triangles.is_empty() {
+        for tri in &topology.triangles {
+            let idx0 = tri[0] as usize;
+            let idx1 = tri[1] as usize;
+            let idx2 = tri[2] as usize;
+            if idx0 < topology.vertices_xz.len()
+                && idx1 < topology.vertices_xz.len()
+                && idx2 < topology.vertices_xz.len()
+            {
+                let p0 = topology.vertices_xz[idx0];
+                let p1 = topology.vertices_xz[idx1];
+                let p2 = topology.vertices_xz[idx2];
+                let v0 = Vec3::new(p0.x, heights[idx0] + 0.02, p0.y);
+                let v1 = Vec3::new(p1.x, heights[idx1] + 0.02, p1.y);
+                let v2 = Vec3::new(p2.x, heights[idx2] + 0.02, p2.y);
+
+                gizmos.line(v0, v1, sub_color);
+                gizmos.line(v1, v2, sub_color);
+                gizmos.line(v2, v0, sub_color);
+            }
+        }
+    }
 
     for &coord in map.tiles.keys() {
         let center = coord.to_world(size);
-        let center_y = if is_3d {
-            map.get_hex_height(coord.q, coord.r) + 0.02
-        } else {
-            0.02
-        };
-        let center_v = Vec3::new(center.x, center_y, center.z);
         let mut points = Vec::with_capacity(6);
-        let mut mid_points = Vec::with_capacity(6);
-
         for i in 0..6 {
             #[allow(clippy::cast_precision_loss)]
             let angle_deg = 60.0 * i as f32 + 30.0;
@@ -115,30 +137,13 @@ pub fn draw_hex_grid_gizmos(
             } else {
                 0.02
             };
-            let v = Vec3::new(vx, vy, vz);
-            points.push(v);
-            mid_points.push((center_v + v) * 0.5);
+            points.push(Vec3::new(vx, vy, vz));
         }
 
-        // 1. Outer hex perimeter
+        // Outer hex perimeter outline
         let mut perimeter = points.clone();
         perimeter.push(points[0]);
         gizmos.linestrip(perimeter, color);
-
-        // 2. 3D Sub-triangle grid (24 triangles per hex in 3D relief)
-        if show_subtriangles {
-            for i in 0..6 {
-                gizmos.line(center_v, points[i], sub_color);
-
-                let next_idx = (i + 1) % 6;
-                gizmos.line(mid_points[i], mid_points[next_idx], sub_color);
-
-                let edge_mid = (points[i] + points[next_idx]) * 0.5;
-                gizmos.line(mid_points[i], edge_mid, sub_color);
-                gizmos.line(mid_points[next_idx], edge_mid, sub_color);
-            }
-        }
-
         // 3. 1x1m Sub-cell grid placement nodes on Deposits phase (3D snapped)
         if current_phase == crate::game_state::EditorPhase::Deposits {
             let dot_color = Color::srgba(0.0, 0.8, 1.0, 0.6);

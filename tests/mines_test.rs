@@ -1,10 +1,11 @@
 // tests/mines_test.rs
 use bevy::prelude::*;
 use savage_fantasy::game_state::{EditorPhase, GameState, MineDepth, MineType};
+use savage_fantasy::map::data::{OceanState, TerrainType, TileData};
 use savage_fantasy::map::mines::{MineBundle, MineDeposit};
 use savage_fantasy::map::navigation::NavigationMap;
 use savage_fantasy::map::validation_deposits::validate_mines;
-use savage_fantasy::map::{HexCoord, LandscapeFeature, MapData, TerrainType, TileData};
+use savage_fantasy::map::{HexCoord, LandscapeFeature, MapData, MapEntity};
 
 #[test]
 fn test_mines_validation() {

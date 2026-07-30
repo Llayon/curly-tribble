@@ -14,6 +14,7 @@ impl Plugin for MeshGeneratorPlugin {
 }
 
 #[must_use]
+#[allow(clippy::too_many_lines)]
 pub fn create_global_map_meshes(
     map: &MapData,
     phase: EditorPhase,
@@ -22,17 +23,55 @@ pub fn create_global_map_meshes(
 ) -> (Mesh, Option<Mesh>, Option<Mesh>) {
     let is_flat = phase < EditorPhase::Height3D;
     let is_factions_filter = phase == EditorPhase::Factions;
+    let mode = if is_flat {
+        crate::map::topology::TerrainHeightMode::Flat
+    } else {
+        crate::map::topology::TerrainHeightMode::Relief3D
+    };
 
-    let mut vertices = Vec::new();
-    let mut colors = Vec::new();
-    let mut indices = Vec::new();
+    let topology = crate::map::topology::generate_topology_from_map_data(map);
+    let heights = crate::map::topology::compute_vertex_heights(&topology, map, mode);
+
+    let mut vertices = Vec::with_capacity(topology.vertices_xz.len());
+    let mut colors = Vec::with_capacity(topology.vertices_xz.len());
+
+    for (k, pos_xz) in topology.vertices_xz.iter().enumerate() {
+        let y = heights[k];
+        vertices.push([pos_xz.x, y, pos_xz.y]);
+
+        let primary_coord = topology.vertex_influences[k]
+            .first()
+            .copied()
+            .unwrap_or_default();
+        let tile_data = map
+            .get_tile(primary_coord.q, primary_coord.r)
+            .copied()
+            .unwrap_or_default();
+        let color = tile_color(
+            map,
+            primary_coord,
+            &tile_data,
+            phase,
+            faction_manager,
+            config,
+            is_factions_filter,
+        );
+        colors.push(color);
+    }
+
+    let mut indices = Vec::with_capacity(topology.triangles.len() * 3);
+    for tri in &topology.triangles {
+        indices.push(tri[0]);
+        indices.push(tri[1]);
+        indices.push(tri[2]);
+    }
+
     let mut water_vertices = Vec::new();
     let mut water_indices = Vec::new();
     let mut roof_vertices = Vec::new();
     let mut roof_indices = Vec::new();
 
     let size = HEX_SIZE;
-    let mut vertex_count = 0;
     let mut water_vertex_count = 0;
     let mut roof_vertex_count = 0;
 
@@ -43,41 +82,6 @@ pub fn create_global_map_meshes(
         } else {
             map.get_hex_height(coord.q, coord.r)
         };
-
-        let color = tile_color(
-            map,
-            coord,
-            tile_data,
-            phase,
-            faction_manager,
-            config,
-            is_factions_filter,
-        );
-
-        vertices.push([center_world.x, center_y, center_world.z]);
-        colors.push(color);
-
-        for i in 0..6 {
-            #[allow(clippy::cast_precision_loss)]
-            let angle_deg = 60.0 * i as f32 + 30.0;
-            let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
-            let vx = center_world.x + size * angle_rad.cos();
-            let vz = center_world.z + size * angle_rad.sin();
-            let vy = if is_flat {
-                0.0
-            } else {
-                let n_hex = crate::map::HexCoord::from_world(Vec3::new(vx, 0.0, vz), size);
-                map.get_hex_height(n_hex.q, n_hex.r)
-            };
-            vertices.push([vx, vy, vz]);
-            colors.push(color);
-        }
-        let base = vertex_count;
-        for i in 1..=6 {
-            let next = if i == 6 { 1 } else { i + 1 };
-            indices.extend_from_slice(&[base, base + next, base + i]);
-        }
-        vertex_count += 7;
 
         if (tile_data.landscape_feature == LandscapeFeature::River
             || tile_data.landscape_feature == LandscapeFeature::Lake)

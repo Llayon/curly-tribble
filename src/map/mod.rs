@@ -21,6 +21,7 @@ pub mod river_gen;
 pub mod roads;
 pub mod subhex;
 pub mod terrain_gen;
+pub mod topology;
 pub mod treasures;
 pub mod visibility;
 pub mod zoning;
@@ -121,6 +122,7 @@ impl Plugin for MapPlugin {
                 construction::ConstructionPlugin,
                 navigation::NavigationPlugin,
                 visibility::VisibilityPlugin,
+                topology::TopologyPlugin,
                 crate::economy::mesh_gen::MeshGenPlugin,
                 river_gen::RiverGenPlugin,
                 terrain_gen::TerrainGenPlugin,

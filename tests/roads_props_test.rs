@@ -1,6 +1,5 @@
 // tests/roads_props_test.rs
 use bevy::prelude::*;
-use savage_fantasy::economy::assets::GameAssets;
 use savage_fantasy::game_state::{EditorPhase, GameState};
 use savage_fantasy::map::data::OceanState;
 use savage_fantasy::map::props::{
