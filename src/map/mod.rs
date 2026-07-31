@@ -9,6 +9,7 @@ pub mod construction;
 pub mod data;
 pub mod deposits;
 pub mod export;
+pub mod face_topology;
 pub mod factions;
 pub mod hex_math;
 pub mod mines;
@@ -123,6 +124,7 @@ impl Plugin for MapPlugin {
                 navigation::NavigationPlugin,
                 visibility::VisibilityPlugin,
                 topology::TopologyPlugin,
+                face_topology::FaceTopologyPlugin,
                 crate::economy::mesh_gen::MeshGenPlugin,
                 river_gen::RiverGenPlugin,
                 terrain_gen::TerrainGenPlugin,
