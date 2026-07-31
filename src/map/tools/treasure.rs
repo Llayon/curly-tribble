@@ -19,6 +19,7 @@ pub struct MapToTargetBundle {
     pub targeting: Targeting,
 }
 
+#[allow(clippy::too_many_lines)]
 pub fn handle_treasure_tools(
     mut commands: Commands,
     phase: Res<State<EditorPhase>>,
@@ -49,6 +50,12 @@ pub fn handle_treasure_tools(
     match tool.treasure_mode {
         TreasureToolMode::SpawnVisible | TreasureToolMode::SpawnHidden => {
             if mouse_input.just_pressed(MouseButton::Left) {
+                for (entity, transform) in &q_deposits {
+                    let existing_coord = HexCoord::from_world(transform.translation(), HEX_SIZE);
+                    if existing_coord == hex_coord {
+                        commands.entity(entity).despawn();
+                    }
+                }
                 let is_visible = tool.treasure_mode == TreasureToolMode::SpawnVisible;
                 let entity = commands
                     .spawn(TreasureBundle {

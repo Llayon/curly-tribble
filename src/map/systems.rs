@@ -24,6 +24,7 @@ pub fn handle_regeneration(
     q_map_entities: Query<Entity, With<MapEntity>>,
     q_faction_markers: Query<Entity, With<FactionMarker>>,
     q_mines: Query<Entity, With<super::mines::MineDeposit>>,
+    q_treasures: Query<Entity, With<crate::map::treasures::TreasureDeposit>>,
     config: Res<TerrainConfig>,
     mut seed: ResMut<WorldSeed>,
     mut terrain_gen: ResMut<TerrainGenerator>,
@@ -80,6 +81,9 @@ pub fn handle_regeneration(
         }
 
         if ev.auto_fill_phase == Some(EditorPhase::Treasures) {
+            for entity in &q_treasures {
+                commands.entity(entity).despawn();
+            }
             auto_spawn_treasures(&mut commands, &map_data, seed.value());
         }
 
