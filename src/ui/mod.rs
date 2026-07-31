@@ -9,8 +9,6 @@ pub mod logs;
 pub mod panels;
 pub mod resources;
 
-pub use editor_ui::UiExecutionTracker;
-
 pub struct UiPlugin;
 
 impl Plugin for UiPlugin {

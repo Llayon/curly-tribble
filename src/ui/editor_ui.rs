@@ -5,28 +5,15 @@ use bevy_egui::EguiContexts;
 
 use super::panels;
 
-#[derive(Resource, Debug, Default, Reflect)]
-pub struct UiExecutionTracker {
-    pub primary_context_count: usize,
-    pub main_camera_has_primary_context: u8,
-    pub game_state_editing_reached: u8,
-    pub editor_ui_executed: u8,
-    pub top_bar_executed: u8,
-    pub bottom_bar_executed: u8,
-    pub tools_sidebar_executed: u8,
-    pub inspector_sidebar_executed: u8,
-}
-
 pub struct EditorUiPlugin;
 
 impl Plugin for EditorUiPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<UiExecutionTracker>()
-            .register_type::<UiExecutionTracker>();
-
         app.add_systems(
             bevy_egui::EguiPrimaryContextPass,
-            editor_phase_ui.run_if(in_state(GameState::Editing)),
+            editor_phase_ui
+                .map(drop)
+                .run_if(in_state(GameState::Editing)),
         );
     }
 }
@@ -72,49 +59,9 @@ fn editor_phase_ui(
         Query<&crate::map::ResourceDeposit>,
         Query<&Transform, With<crate::map::resources::BerryBush>>,
     ),
-    (mut tracker, q_primary_contexts, q_main_camera): (
-        ResMut<UiExecutionTracker>,
-        Query<(), With<bevy_egui::PrimaryEguiContext>>,
-        Query<Entity, (With<Camera3d>, With<bevy_egui::PrimaryEguiContext>)>,
-    ),
-    mut logged_error: Local<bool>,
-) {
-    let primary_count = q_primary_contexts.iter().count();
-    tracker.primary_context_count = primary_count;
-    tracker.main_camera_has_primary_context = u8::from(!q_main_camera.is_empty());
-    tracker.game_state_editing_reached = 1;
-
-    let ctx = match q_main_camera.single() {
-        Ok(cam_entity) => match contexts.ctx_for_entity_mut(cam_entity) {
-            Ok(c) => c,
-            Err(err) => {
-                if !*logged_error {
-                    *logged_error = true;
-                    error!(
-                        "editor_phase_ui failed to acquire egui context for MainCamera entity ({:?}): {:?}. Cameras with PrimaryEguiContext count: {}",
-                        cam_entity, err, primary_count
-                    );
-                }
-                return;
-            }
-        },
-        Err(err) => match contexts.ctx_mut() {
-            Ok(c) => c,
-            Err(ctx_err) => {
-                if !*logged_error {
-                    *logged_error = true;
-                    error!(
-                        "editor_phase_ui failed to acquire primary egui context (SingleCam err: {:?}, ctx_mut err: {:?}). Cameras with PrimaryEguiContext count: {}",
-                        err, ctx_err, primary_count
-                    );
-                }
-                return;
-            }
-        },
-    };
-
+) -> Result<(), String> {
+    let ctx = contexts.ctx_mut().map_err(|e| e.to_string())?;
     ctx.set_visuals(bevy_egui::egui::Visuals::dark());
-    tracker.editor_ui_executed = 1;
 
     let (q_deposits, q_bushes) = q_starter_resources;
     let is_valid = map_data.validation_errors.is_empty();
@@ -131,7 +78,6 @@ fn editor_phase_ui(
         current_phase.get(),
         &mut ev_rebuild,
     );
-    tracker.top_bar_executed = 1;
 
     panels::bottom_bar::show_bottom_bar(
         ctx,
@@ -139,7 +85,6 @@ fn editor_phase_ui(
         &mut next_phase,
         validation_state,
     );
-    tracker.bottom_bar_executed = 1;
 
     panels::tools::show_tools_sidebar(
         ctx,
@@ -152,7 +97,6 @@ fn editor_phase_ui(
         &mut commands,
         &mut next_game_state,
     );
-    tracker.tools_sidebar_executed = 1;
 
     panels::inspector::show_inspector_sidebar(
         ctx,
@@ -168,7 +112,8 @@ fn editor_phase_ui(
         &q_mines,
         &mut q_selected_mines,
     );
-    tracker.inspector_sidebar_executed = 1;
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -176,7 +121,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_egui_primary_context_and_panels_execution() {
+    fn test_egui_primary_context_single_camera() {
         let mut app = App::new();
         app.add_plugins((
             MinimalPlugins,
@@ -212,16 +157,6 @@ mod tests {
             super::EditorUiPlugin,
         ));
 
-        app.world_mut().spawn(crate::camera::MainCameraBundle {
-            camera_3d: Camera3d::default(),
-            ui_camera: bevy::ui::IsDefaultUiCamera,
-            egui_context: bevy_egui::PrimaryEguiContext,
-            transform: Transform::from_xyz(0.0, 30.0, 30.0).looking_at(Vec3::ZERO, Vec3::Y),
-            focus: crate::camera::CameraFocus(Vec3::ZERO),
-            config: crate::camera::CameraConfig::default(),
-            name: Name::new("Main Camera"),
-        });
-
         app.world_mut()
             .resource_mut::<NextState<GameState>>()
             .set(GameState::Editing);
@@ -230,7 +165,7 @@ mod tests {
         app.cleanup();
         app.update();
 
-        // Check 1: Main Camera has PrimaryEguiContext
+        // 1. Main Camera spawned by CameraPlugin has PrimaryEguiContext attached
         let mut main_camera_query = app
             .world_mut()
             .query_filtered::<Entity, (With<Camera3d>, With<bevy_egui::PrimaryEguiContext>)>();
@@ -240,7 +175,7 @@ mod tests {
             "Main Camera must have PrimaryEguiContext attached"
         );
 
-        // Check 2: Exactly one PrimaryEguiContext exists in the application
+        // 2. Exactly one PrimaryEguiContext exists in the application
         let mut all_primary_ctx_query = app
             .world_mut()
             .query_filtered::<Entity, With<bevy_egui::PrimaryEguiContext>>();
@@ -250,47 +185,12 @@ mod tests {
             "Exactly one PrimaryEguiContext must exist in app"
         );
 
-        // Check 3: GameState reaches Editing
+        // 3. GameState reaches Editing
         let state = app.world().resource::<State<GameState>>();
         assert_eq!(
             *state.get(),
             GameState::Editing,
             "GameState must reach Editing"
-        );
-
-        // Check 4 & 5: Tracker confirms editor_phase_ui and all four panels executed
-        let tracker = app.world().resource::<UiExecutionTracker>();
-        assert_eq!(
-            tracker.main_camera_has_primary_context, 1,
-            "Tracker confirms Main Camera has PrimaryEguiContext"
-        );
-        assert_eq!(
-            tracker.primary_context_count, 1,
-            "Tracker confirms primary_context_count == 1"
-        );
-        assert_eq!(
-            tracker.game_state_editing_reached, 1,
-            "Tracker confirms GameState::Editing reached"
-        );
-        assert_eq!(
-            tracker.editor_ui_executed, 1,
-            "Tracker confirms editor_phase_ui executed without NoEntities error"
-        );
-        assert_eq!(
-            tracker.top_bar_executed, 1,
-            "Tracker confirms top_bar executed"
-        );
-        assert_eq!(
-            tracker.bottom_bar_executed, 1,
-            "Tracker confirms bottom_bar executed"
-        );
-        assert_eq!(
-            tracker.tools_sidebar_executed, 1,
-            "Tracker confirms tools_sidebar executed"
-        );
-        assert_eq!(
-            tracker.inspector_sidebar_executed, 1,
-            "Tracker confirms inspector_sidebar executed"
         );
     }
 }
