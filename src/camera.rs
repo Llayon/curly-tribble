@@ -10,12 +10,35 @@ impl Plugin for CameraPlugin {
         app.register_type::<CameraFocus>()
             .register_type::<CameraConfig>()
             .add_systems(Startup, setup_camera.in_set(StartupSet::SpawnEntities))
+            .add_observer(on_primary_egui_context_added)
             .add_systems(
                 Update,
                 move_camera
                     .run_if(not(in_state(GameState::Loading)))
                     .in_set(GameSet::Input),
             );
+    }
+}
+
+fn on_primary_egui_context_added(
+    trigger: On<Add, bevy_egui::PrimaryEguiContext>,
+    mut commands: Commands,
+    q_window: Query<
+        Entity,
+        Or<(
+            With<bevy::window::PrimaryWindow>,
+            With<bevy_egui::EguiContext>,
+        )>,
+    >,
+) {
+    let triggered = trigger.entity;
+    for window_entity in &q_window {
+        if window_entity != triggered {
+            commands
+                .entity(window_entity)
+                .remove::<bevy_egui::PrimaryEguiContext>()
+                .remove::<bevy_egui::EguiContext>();
+        }
     }
 }
 
@@ -46,6 +69,7 @@ impl Default for CameraConfig {
 pub struct MainCameraBundle {
     pub camera_3d: Camera3d,
     pub ui_camera: IsDefaultUiCamera,
+    pub egui_context: bevy_egui::PrimaryEguiContext,
     pub transform: Transform,
     pub focus: CameraFocus,
     pub config: CameraConfig,
@@ -65,34 +89,55 @@ pub struct AmbientLightBundle {
     pub name: Name,
 }
 
+pub struct SetupCameraCommand;
+
+impl Command for SetupCameraCommand {
+    fn apply(self, world: &mut World) {
+        let mut q_existing_egui = world.query_filtered::<Entity, Or<(
+            With<bevy_egui::PrimaryEguiContext>,
+            With<bevy_egui::EguiContext>,
+        )>>();
+        let existing_entities: Vec<_> = q_existing_egui.iter(world).collect();
+        for entity in existing_entities {
+            world
+                .entity_mut(entity)
+                .remove::<bevy_egui::PrimaryEguiContext>();
+            world.entity_mut(entity).remove::<bevy_egui::EguiContext>();
+        }
+
+        world.spawn(MainCameraBundle {
+            camera_3d: Camera3d::default(),
+            ui_camera: IsDefaultUiCamera,
+            egui_context: bevy_egui::PrimaryEguiContext,
+            transform: Transform::from_xyz(0.0, 30.0, 30.0).looking_at(Vec3::ZERO, Vec3::Y),
+            focus: CameraFocus(Vec3::ZERO),
+            config: CameraConfig::default(),
+            name: Name::new("Main Camera"),
+        });
+
+        world.spawn(SunLightBundle {
+            light: DirectionalLight {
+                illuminance: 10_000.0,
+                shadows_enabled: true,
+                ..default()
+            },
+            transform: Transform::from_xyz(20.0, 50.0, 20.0).looking_at(Vec3::ZERO, Vec3::Y),
+            name: Name::new("Sun Light"),
+        });
+
+        world.spawn(AmbientLightBundle {
+            light: AmbientLight {
+                color: Color::WHITE,
+                brightness: 10_000.0,
+                affects_lightmapped_meshes: false,
+            },
+            name: Name::new("Ambient Light"),
+        });
+    }
+}
+
 fn setup_camera(mut commands: Commands) {
-    commands.spawn(MainCameraBundle {
-        camera_3d: Camera3d::default(),
-        ui_camera: IsDefaultUiCamera,
-        transform: Transform::from_xyz(0.0, 30.0, 30.0).looking_at(Vec3::ZERO, Vec3::Y),
-        focus: CameraFocus(Vec3::ZERO),
-        config: CameraConfig::default(),
-        name: Name::new("Main Camera"),
-    });
-
-    commands.spawn(SunLightBundle {
-        light: DirectionalLight {
-            illuminance: 10_000.0,
-            shadows_enabled: true,
-            ..default()
-        },
-        transform: Transform::from_xyz(20.0, 50.0, 20.0).looking_at(Vec3::ZERO, Vec3::Y),
-        name: Name::new("Sun Light"),
-    });
-
-    commands.spawn(AmbientLightBundle {
-        light: AmbientLight {
-            color: Color::WHITE,
-            brightness: 10_000.0,
-            affects_lightmapped_meshes: false,
-        },
-        name: Name::new("Ambient Light"),
-    });
+    commands.queue(SetupCameraCommand);
 }
 
 fn move_camera(
@@ -169,6 +214,7 @@ mod tests {
             .spawn(MainCameraBundle {
                 camera_3d: Camera3d::default(),
                 ui_camera: IsDefaultUiCamera,
+                egui_context: bevy_egui::PrimaryEguiContext,
                 transform: Transform::from_xyz(0.0, 0.0, 0.0),
                 focus: CameraFocus(Vec3::ZERO),
                 config: CameraConfig::default(),
