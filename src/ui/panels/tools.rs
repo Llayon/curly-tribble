@@ -22,7 +22,12 @@ pub fn show_tools_sidebar(
     commands: &mut Commands,
     next_game_state: &mut ResMut<NextState<crate::game_state::GameState>>,
 ) {
+    let panel_frame = egui::Frame::NONE
+        .fill(egui::Color32::from_rgb(20, 22, 30))
+        .inner_margin(egui::Margin::symmetric(10, 8))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 65, 80)));
     egui::SidePanel::left("tool_sidebar")
+        .frame(panel_frame)
         .default_width(120.0)
         .show(ctx, |ui| {
             ui.heading("Tools");

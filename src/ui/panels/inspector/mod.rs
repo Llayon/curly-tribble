@@ -40,7 +40,12 @@ pub fn show_inspector_sidebar(
     >,
 ) {
     let is_valid = validation_state == super::bottom_bar::MapValidationState::Valid;
+    let panel_frame = egui::Frame::NONE
+        .fill(egui::Color32::from_rgb(20, 22, 30))
+        .inner_margin(egui::Margin::symmetric(10, 8))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 65, 80)));
     egui::SidePanel::right("inspector_sidebar")
+        .frame(panel_frame)
         .default_width(250.0)
         .show(ctx, |ui| {
             egui::ScrollArea::vertical().show(ui, |ui| {

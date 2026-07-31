@@ -15,41 +15,47 @@ pub fn show_top_bar(
     current_phase: &EditorPhase,
     ev_rebuild: &mut MessageWriter<RebuildMeshEvent>,
 ) {
-    egui::TopBottomPanel::top("top_filter_bar").show(ctx, |ui| {
-        ui.horizontal(|ui| {
-            ui.label("VIEW:");
-            if ui
-                .selectable_label(terrain_config.forest_layer.is_visible(), "🌲 Forests")
-                .clicked()
-            {
-                terrain_config.forest_layer.toggle();
-                ev_rebuild.write(RebuildMeshEvent);
-            }
-            if ui
-                .selectable_label(terrain_config.faction_layer.is_visible(), "🚩 Factions")
-                .clicked()
-            {
-                terrain_config.faction_layer.toggle();
-                ev_rebuild.write(RebuildMeshEvent);
-            }
-            if ui
-                .selectable_label(terrain_config.cliff_layer.is_visible(), "📐 Cliffs")
-                .clicked()
-            {
-                terrain_config.cliff_layer.toggle();
-            }
-            if ui
-                .selectable_label(
-                    terrain_config.build_area_layer.is_visible(),
-                    "🧱 Build Area",
-                )
-                .clicked()
-            {
-                terrain_config.build_area_layer.toggle();
-                ev_rebuild.write(RebuildMeshEvent);
-            }
-            ui.separator();
-            ui.label(format!("Phase: {current_phase:?}"));
+    let panel_frame = egui::Frame::NONE
+        .fill(egui::Color32::from_rgb(20, 22, 30))
+        .inner_margin(egui::Margin::symmetric(10, 8))
+        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(60, 65, 80)));
+    egui::TopBottomPanel::top("top_filter_bar")
+        .frame(panel_frame)
+        .show(ctx, |ui| {
+            ui.horizontal(|ui| {
+                ui.label("VIEW:");
+                if ui
+                    .selectable_label(terrain_config.forest_layer.is_visible(), "🌲 Forests")
+                    .clicked()
+                {
+                    terrain_config.forest_layer.toggle();
+                    ev_rebuild.write(RebuildMeshEvent);
+                }
+                if ui
+                    .selectable_label(terrain_config.faction_layer.is_visible(), "🚩 Factions")
+                    .clicked()
+                {
+                    terrain_config.faction_layer.toggle();
+                    ev_rebuild.write(RebuildMeshEvent);
+                }
+                if ui
+                    .selectable_label(terrain_config.cliff_layer.is_visible(), "📐 Cliffs")
+                    .clicked()
+                {
+                    terrain_config.cliff_layer.toggle();
+                }
+                if ui
+                    .selectable_label(
+                        terrain_config.build_area_layer.is_visible(),
+                        "🧱 Build Area",
+                    )
+                    .clicked()
+                {
+                    terrain_config.build_area_layer.toggle();
+                    ev_rebuild.write(RebuildMeshEvent);
+                }
+                ui.separator();
+                ui.label(format!("Phase: {current_phase:?}"));
+            });
         });
-    });
 }

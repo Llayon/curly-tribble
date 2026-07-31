@@ -85,16 +85,9 @@ fn editor_phase_ui(
     ),
 ) {
     let (q_deposits, q_bushes) = q_starter_resources;
-    let ctx = match contexts.ctx_mut() {
-        Ok(c) => c,
-        Err(err) => {
-            info!(
-                "editor_phase_ui: contexts.ctx_mut() returned Err: {:?}",
-                err
-            );
-            return;
-        }
-    };
+    let Ok(ctx) = contexts.ctx_mut() else { return };
+
+    ctx.set_visuals(bevy_egui::egui::Visuals::dark());
 
     let is_valid = map_data.validation_errors.is_empty();
     let validation_state = if is_valid {
