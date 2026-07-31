@@ -3,7 +3,7 @@ use crate::game_state::{CurrentTool, EditorPhase, GameState};
 use crate::map::MapData;
 use crate::sets::{GameSet, StartupSet};
 use bevy::prelude::*;
-use bevy_egui::{EguiContexts, EguiPrimaryContextPass};
+use bevy_egui::EguiContexts;
 
 pub mod details;
 pub mod logs;
@@ -36,7 +36,7 @@ impl Plugin for UiPlugin {
             );
 
         app.add_systems(
-            EguiPrimaryContextPass,
+            bevy_egui::EguiPrimaryContextPass,
             editor_phase_ui.run_if(in_state(GameState::Editing)),
         );
     }
