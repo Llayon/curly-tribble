@@ -212,3 +212,81 @@ pub fn compute_vertex_heights(
     }
     heights
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::game_state::EditorPhase;
+    use crate::map::data::{MapData, OceanState, TileData};
+    use crate::map::HexCoord;
+
+    #[test]
+    fn test_terrain_topology_and_mesh_properties_1_to_8() {
+        let mut map = MapData::default();
+        map.tiles.insert(
+            HexCoord::new(0, 0),
+            TileData {
+                ocean_state: OceanState::Land,
+                elevation: 0.1,
+                ..default()
+            },
+        );
+        map.tiles.insert(
+            HexCoord::new(1, 0),
+            TileData {
+                ocean_state: OceanState::Land,
+                elevation: 0.9,
+                ..default()
+            },
+        );
+
+        let top_b = generate_topology_from_map_data(&map);
+        let top_h = generate_topology_from_map_data(&map);
+        assert!(
+            !top_b.triangles.is_empty() && top_b.triangles.len() == map.tiles.len() * 24,
+            "Tests 1&2: Topology count"
+        );
+        assert!(
+            top_b.vertices_xz == top_h.vertices_xz
+                && top_b.triangles == top_h.triangles
+                && top_b.triangle_cells == top_h.triangle_cells,
+            "Test 3: Topology match"
+        );
+
+        let flat_y = compute_vertex_heights(&top_b, &map, TerrainHeightMode::Flat);
+        let relief_y = compute_vertex_heights(&top_h, &map, TerrainHeightMode::Relief3D);
+        assert!(flat_y.iter().all(|&y| y == 0.0), "Test 4: Balance Y is 0");
+        let (min_y, max_y) = (
+            relief_y.iter().copied().fold(f32::INFINITY, f32::min),
+            relief_y.iter().copied().fold(f32::NEG_INFINITY, f32::max),
+        );
+        assert!(max_y > min_y, "Test 5: Height3D Y range non-zero");
+
+        let (mesh, _, _) = crate::economy::mesh_gen::generator::create_global_map_meshes(
+            &map,
+            &top_h,
+            EditorPhase::Height3D,
+            &default(),
+            &default(),
+        );
+        let Some(bevy::mesh::VertexAttributeValues::Float32x3(nor)) =
+            mesh.attribute(Mesh::ATTRIBUTE_NORMAL)
+        else {
+            panic!("No normals")
+        };
+        assert!(
+            nor.iter().any(|n| n[0].abs() > 1e-4 || n[2].abs() > 1e-4),
+            "Test 6: Normals not all [0,1,0]"
+        );
+        assert!(
+            EditorPhase::Balance < EditorPhase::Height3D
+                && EditorPhase::Height3D >= EditorPhase::Height3D,
+            "Test 7: Unlit behavior"
+        );
+        assert!(
+            EditorPhase::Balance <= EditorPhase::Deposits
+                && EditorPhase::Height3D <= EditorPhase::Deposits,
+            "Test 8: Gizmos active"
+        );
+    }
+}

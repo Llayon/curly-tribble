@@ -70,59 +70,100 @@ impl Command for SpawnGlobalTerrainCommand {
                 (None, None, None)
             };
 
-        let mut meshes = world.resource_mut::<Assets<Mesh>>();
-        if let Some(h) = old_handles.0 {
-            meshes.remove(&h);
-        }
-        if let Some(h) = old_handles.1 {
-            meshes.remove(&h);
-        }
-        if let Some(h) = old_handles.2 {
-            meshes.remove(&h);
+        {
+            let mut meshes = world.resource_mut::<Assets<Mesh>>();
+            if let Some(h) = old_handles.0 {
+                meshes.remove(&h);
+            }
+            if let Some(h) = old_handles.1 {
+                meshes.remove(&h);
+            }
+            if let Some(h) = old_handles.2 {
+                meshes.remove(&h);
+            }
         }
 
-        let start_time = std::time::Instant::now();
         let topology = crate::map::topology::generate_topology_from_map_data(&self.map_data);
-        let shared_count = topology
-            .vertex_influences
-            .iter()
-            .filter(|inf| inf.len() > 1)
-            .count();
+        world.insert_resource(topology.clone());
 
         let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(
             &self.map_data,
+            &topology,
             self.phase,
             &self.faction_manager,
             &self.config,
         );
 
-        let elapsed_ms = start_time.elapsed().as_secs_f64() * 1000.0;
-        let land_tile_count = self
+        let min_elev = self
             .map_data
             .tiles
             .values()
-            .filter(|t| t.ocean_state == crate::map::data::OceanState::Land)
-            .count();
-        let ocean_tile_count = self
+            .map(|t| t.elevation)
+            .fold(f32::INFINITY, f32::min);
+        let max_elev = self
             .map_data
             .tiles
             .values()
-            .filter(|t| t.ocean_state == crate::map::data::OceanState::Ocean)
-            .count();
+            .map(|t| t.elevation)
+            .fold(f32::NEG_INFINITY, f32::max);
+
+        let (min_mesh_y, max_mesh_y) =
+            if let Some(bevy::mesh::VertexAttributeValues::Float32x3(pos)) =
+                mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+            {
+                let min_y = pos.iter().map(|p| p[1]).fold(f32::INFINITY, f32::min);
+                let max_y = pos.iter().map(|p| p[1]).fold(f32::NEG_INFINITY, f32::max);
+                (min_y, max_y)
+            } else {
+                (0.0, 0.0)
+            };
+
+        let (exact_up_normals, sloped_normals) =
+            if let Some(bevy::mesh::VertexAttributeValues::Float32x3(nor)) =
+                mesh.attribute(Mesh::ATTRIBUTE_NORMAL)
+            {
+                let exact_up = nor
+                    .iter()
+                    .filter(|n| n[0].abs() < 1e-4 && (n[1] - 1.0).abs() < 1e-4 && n[2].abs() < 1e-4)
+                    .count();
+                let sloped = nor
+                    .iter()
+                    .filter(|n| n[0].abs() > 1e-4 || n[2].abs() > 1e-4)
+                    .count();
+                (exact_up, sloped)
+            } else {
+                (0, 0)
+            };
+
+        let is_flat = self.phase < EditorPhase::Height3D;
+
+        let res_tri_count = world
+            .get_resource::<crate::map::topology::TerrainTopology>()
+            .map_or(0, |t| t.triangles.len());
+
         debug!(
-            "TOPOLOGY MESH REBUILD [{:?}]: Vertices={}, Triangles={}, SharedBoundaryVertices={}, LandTiles={}, OceanTiles={}, Duration={:.2}ms",
+            "TERRAIN REBUILD DIAGNOSTICS [Phase: {:?}]: TileCount={}, TopVerts={}, TopTris={}, ResTris={}, MinElev={:.3}, MaxElev={:.3}, MinMeshY={:.3}, MaxMeshY={:.3}, GroundUnlit={}, ExactUpNormals={}, SlopedNormals={}",
             self.phase,
+            self.map_data.tiles.len(),
             topology.vertices_xz.len(),
             topology.triangles.len(),
-            shared_count,
-            land_tile_count,
-            ocean_tile_count,
-            elapsed_ms
+            res_tri_count,
+            min_elev,
+            max_elev,
+            min_mesh_y,
+            max_mesh_y,
+            is_flat,
+            exact_up_normals,
+            sloped_normals
         );
 
-        let terrain_handle = meshes.add(mesh);
-        let water_handle = water_mesh.map(|mesh| meshes.add(mesh));
-        let roof_handle = roof_mesh.map(|mesh| meshes.add(mesh));
+        let (terrain_handle, water_handle, roof_handle) = {
+            let mut meshes = world.resource_mut::<Assets<Mesh>>();
+            let t_h = meshes.add(mesh);
+            let w_h = water_mesh.map(|m| meshes.add(m));
+            let r_h = roof_mesh.map(|m| meshes.add(m));
+            (t_h, w_h, r_h)
+        };
 
         if let Some(mut gen_assets) = world.get_resource_mut::<GeneratedMapAssets>() {
             gen_assets.terrain = Some(terrain_handle.clone());
@@ -137,7 +178,7 @@ impl Command for SpawnGlobalTerrainCommand {
 
         let mut materials = world.resource_mut::<Assets<StandardMaterial>>();
         if let Some(mat) = materials.get_mut(&ground_mat) {
-            mat.unlit = true;
+            mat.unlit = is_flat;
             mat.double_sided = true;
             mat.cull_mode = None;
         }

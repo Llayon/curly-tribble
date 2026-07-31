@@ -17,6 +17,7 @@ impl Plugin for MeshGeneratorPlugin {
 #[allow(clippy::too_many_lines)]
 pub fn create_global_map_meshes(
     map: &MapData,
+    topology: &crate::map::topology::TerrainTopology,
     phase: EditorPhase,
     faction_manager: &FactionManager,
     config: &TerrainConfig,
@@ -29,8 +30,7 @@ pub fn create_global_map_meshes(
         crate::map::topology::TerrainHeightMode::Relief3D
     };
 
-    let topology = crate::map::topology::generate_topology_from_map_data(map);
-    let heights = crate::map::topology::compute_vertex_heights(&topology, map, mode);
+    let heights = crate::map::topology::compute_vertex_heights(topology, map, mode);
 
     let mut vertices = Vec::with_capacity(topology.vertices_xz.len());
     let mut colors = Vec::with_capacity(topology.vertices_xz.len());
@@ -133,13 +133,12 @@ pub fn create_global_map_meshes(
         PrimitiveTopology::TriangleList,
         RenderAssetUsages::default(),
     );
-    let normals = vec![[0.0, 1.0, 0.0]; vertices.len()];
     let uvs = vec![[0.5, 0.5]; vertices.len()];
     terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-    terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_NORMAL, normals);
     terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_UV_0, uvs);
     terrain_mesh.insert_attribute(Mesh::ATTRIBUTE_COLOR, colors);
     terrain_mesh.insert_indices(Indices::U32(indices));
+    terrain_mesh.compute_normals();
 
     let water_mesh = create_optional_mesh(water_vertices, water_indices);
     let roof_mesh = create_optional_mesh(roof_vertices, roof_indices);
@@ -233,9 +232,11 @@ mod tests {
     fn omits_empty_overlay_meshes() {
         let mut map = MapData::default();
         map.tiles.insert(HexCoord::new(0, 0), TileData::default());
+        let topology = crate::map::topology::generate_topology_from_map_data(&map);
 
         let (_terrain, water, roof) = create_global_map_meshes(
             &map,
+            &topology,
             EditorPhase::Shape,
             &FactionManager::default(),
             &TerrainConfig::default(),
