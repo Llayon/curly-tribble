@@ -85,8 +85,15 @@ fn editor_phase_ui(
     ),
 ) {
     let (q_deposits, q_bushes) = q_starter_resources;
-    let Some(ctx) = contexts.ctx_mut().ok() else {
-        return;
+    let ctx = match contexts.ctx_mut() {
+        Ok(c) => c,
+        Err(err) => {
+            info!(
+                "editor_phase_ui: contexts.ctx_mut() returned Err: {:?}",
+                err
+            );
+            return;
+        }
     };
 
     let is_valid = map_data.validation_errors.is_empty();

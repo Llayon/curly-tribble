@@ -1,25 +1,12 @@
 use crate::game_state::GameState;
 use crate::sets::{GameSet, StartupSet};
-use bevy::anti_alias::taa::{TemporalAntiAliasPlugin, TemporalAntiAliasing};
-use bevy::core_pipeline::prepass::{DepthPrepass, MotionVectorPrepass, NormalPrepass};
-use bevy::core_pipeline::tonemapping::Tonemapping;
-use bevy::pbr::ScreenSpaceAmbientOcclusion;
-use bevy::post_process::bloom::{Bloom, BloomPlugin};
 use bevy::prelude::*;
-use bevy::render::view::Hdr;
 use bevy::ui::IsDefaultUiCamera;
 
 pub struct CameraPlugin;
 
 impl Plugin for CameraPlugin {
     fn build(&self, app: &mut App) {
-        if !app.is_plugin_added::<TemporalAntiAliasPlugin>() {
-            app.add_plugins(TemporalAntiAliasPlugin);
-        }
-        if !app.is_plugin_added::<BloomPlugin>() {
-            app.add_plugins(BloomPlugin);
-        }
-
         app.register_type::<CameraFocus>()
             .register_type::<CameraConfig>()
             .add_systems(Startup, setup_camera.in_set(StartupSet::SpawnEntities))
@@ -62,15 +49,6 @@ pub struct MainCameraBundle {
     pub transform: Transform,
     pub focus: CameraFocus,
     pub config: CameraConfig,
-    pub tonemapping: Tonemapping,
-    pub bloom: Bloom,
-    pub hdr: Hdr,
-    pub msaa: Msaa,
-    pub depth_prepass: DepthPrepass,
-    pub normal_prepass: NormalPrepass,
-    pub motion_vector_prepass: MotionVectorPrepass,
-    pub taa: TemporalAntiAliasing,
-    pub ssao: ScreenSpaceAmbientOcclusion,
     pub name: Name,
 }
 
@@ -94,15 +72,6 @@ fn setup_camera(mut commands: Commands) {
         transform: Transform::from_xyz(0.0, 30.0, 30.0).looking_at(Vec3::ZERO, Vec3::Y),
         focus: CameraFocus(Vec3::ZERO),
         config: CameraConfig::default(),
-        tonemapping: Tonemapping::TonyMcMapface,
-        bloom: Bloom::default(),
-        hdr: Hdr,
-        msaa: Msaa::Off,
-        depth_prepass: DepthPrepass,
-        normal_prepass: NormalPrepass,
-        motion_vector_prepass: MotionVectorPrepass,
-        taa: TemporalAntiAliasing::default(),
-        ssao: ScreenSpaceAmbientOcclusion::default(),
         name: Name::new("Main Camera"),
     });
 
@@ -200,19 +169,9 @@ mod tests {
             .spawn(MainCameraBundle {
                 camera_3d: Camera3d::default(),
                 ui_camera: IsDefaultUiCamera,
-                render_graph: CameraRenderGraph::new(Core3d),
                 transform: Transform::from_xyz(0.0, 0.0, 0.0),
                 focus: CameraFocus(Vec3::ZERO),
                 config: CameraConfig::default(),
-                tonemapping: Tonemapping::None,
-                bloom: Bloom::default(),
-                hdr: Hdr,
-                msaa: Msaa::Off,
-                depth_prepass: DepthPrepass,
-                normal_prepass: NormalPrepass,
-                motion_vector_prepass: MotionVectorPrepass,
-                taa: TemporalAntiAliasing::default(),
-                ssao: ScreenSpaceAmbientOcclusion::default(),
                 name: Name::new("Test Camera"),
             })
             .id();
