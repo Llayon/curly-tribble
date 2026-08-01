@@ -1,19 +1,11 @@
 /// Stress tests, golden vectors, and cluster tests for hex face topology.
-use bevy::prelude::*;
-
-#[allow(dead_code)]
-pub struct FaceTopologyStressTestsPlugin;
-impl Plugin for FaceTopologyStressTestsPlugin {
-    fn build(&self, _app: &mut App) {}
-}
-
 #[cfg(test)]
 mod stress_tests {
     use crate::map::data::{MapData, TileData};
     use crate::map::face_topology::corner_key::{canonical_corner_key, seed_for_corner};
     use crate::map::face_topology::generator::generate_hex_face_topology;
     use crate::map::face_topology::types::{HalfEdgeId, SharedCornerKey};
-    use crate::map::face_topology::validation::validate_complete_topology;
+    use crate::map::face_topology::validate_complete_topology;
     use crate::map::HexCoord;
     use crate::map::WorldSeed;
 
@@ -24,6 +16,22 @@ mod stress_tests {
             for q in -r_offset..(40 - r_offset) {
                 map.tiles.insert(HexCoord::new(q, r), TileData::default());
             }
+        }
+        map
+    }
+
+    fn map_40x40_reverse_insertion() -> MapData {
+        let mut coords = Vec::new();
+        for r in 0..40 {
+            let r_offset = r >> 1;
+            for q in -r_offset..(40 - r_offset) {
+                coords.push(HexCoord::new(q, r));
+            }
+        }
+        coords.sort_by_key(|coord| (coord.q, coord.r));
+        let mut map = MapData::default();
+        for coord in coords.into_iter().rev() {
+            map.tiles.insert(coord, TileData::default());
         }
         map
     }
@@ -84,6 +92,15 @@ mod stress_tests {
         let seed = WorldSeed::new(42);
         let t1 = generate_hex_face_topology(&map, seed).expect("gen 1");
         let t2 = generate_hex_face_topology(&map, seed).expect("gen 2");
+        assert_eq!(t1, t2);
+    }
+
+    #[test]
+    fn test_hashmap_iteration_order_does_not_change_topology() {
+        let ordered = map_40x40();
+        let reverse = map_40x40_reverse_insertion();
+        let t1 = generate_hex_face_topology(&ordered, WorldSeed::new(42)).expect("ordered");
+        let t2 = generate_hex_face_topology(&reverse, WorldSeed::new(42)).expect("reverse");
         assert_eq!(t1, t2);
     }
 
@@ -201,6 +218,8 @@ mod stress_tests {
             ("l_shape", sparse_l_shape()),
             ("diagonal", diagonal_strip()),
         ];
+        let mut reduced_displacements = 0;
+        let mut regular_fallbacks = 0;
 
         for seed_val in 0..256u32 {
             let seed = WorldSeed::new(seed_val);
@@ -209,7 +228,14 @@ mod stress_tests {
                     .unwrap_or_else(|e| panic!("seed={seed_val} map={name}: {e:?}"));
                 validate_complete_topology(&topo, map)
                     .unwrap_or_else(|e| panic!("seed={seed_val} map={name}: {e:?}"));
+                reduced_displacements += topo.stats.reduced_displacement_fallbacks;
+                regular_fallbacks += topo.stats.regular_position_fallbacks;
             }
         }
+        assert_eq!(
+            reduced_displacements, 0,
+            "unexpected displacement reduction"
+        );
+        assert_eq!(regular_fallbacks, 0, "unexpected regular position fallback");
     }
 }

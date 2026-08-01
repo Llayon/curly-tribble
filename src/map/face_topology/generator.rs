@@ -7,19 +7,13 @@ use crate::map::face_topology::types::{
     FaceId, HalfEdge, HalfEdgeId, HexFace, HexFaceTopology, HexFaceTopologyError, MapVertex,
     SharedCornerKey, TopologyStats, VertexId,
 };
-use crate::map::face_topology::validation::{
-    min_edge_length, signed_area, validate_complete_topology,
-};
+use crate::map::face_topology::validation::{min_edge_length, signed_area};
+use crate::map::face_topology::validation_complete::validate_complete_topology;
 use crate::map::HexCoord;
 use crate::map::WorldSeed;
-use bevy::prelude::*;
+use bevy::prelude::Vec2;
 use rand::prelude::*;
 use std::collections::HashMap;
-
-pub struct GeneratorPlugin;
-impl Plugin for GeneratorPlugin {
-    fn build(&self, _app: &mut App) {}
-}
 
 /// Generates deterministic `HexFaceTopology` from `MapData` and `WorldSeed`.
 ///
@@ -83,7 +77,11 @@ pub fn generate_hex_face_topology(
         for i in 0..6 {
             let key = canonical_corner_key(coord, i);
             let base_pos = regular_corner_position(key)?;
-            let disp = disp_map.get(&key).copied().unwrap_or(Vec2::ZERO);
+            let Some(&disp) = disp_map.get(&key) else {
+                return Err(HexFaceTopologyError::ValidationFailed(format!(
+                    "Missing displacement for corner {key:?}"
+                )));
+            };
             pts[i] = base_pos + disp;
         }
         Ok(pts)
@@ -94,8 +92,16 @@ pub fn generate_hex_face_topology(
 
     // 2. Validate geometry per corner and apply displacement reduction fallback
     for &key in &sorted_keys {
-        let raw_disp = raw_displacements.get(&key).copied().unwrap_or(Vec2::ZERO);
-        let incident_coords = &corner_incident_faces[&key];
+        let Some(&raw_disp) = raw_displacements.get(&key) else {
+            return Err(HexFaceTopologyError::ValidationFailed(format!(
+                "Missing raw displacement for corner {key:?}"
+            )));
+        };
+        let Some(incident_coords) = corner_incident_faces.get(&key) else {
+            return Err(HexFaceTopologyError::ValidationFailed(format!(
+                "Missing incident face list for corner {key:?}"
+            )));
+        };
 
         let reduction_factors = [1.0f32, 0.75, 0.5, 0.25, 0.0];
         let mut chosen_factor = 0.0f32;
@@ -142,11 +148,12 @@ pub fn generate_hex_face_topology(
     // 3. Construct MapVertex list
     for &key in &sorted_keys {
         let base_pos = regular_corner_position(key)?;
-        let disp = active_displacements
-            .get(&key)
-            .copied()
-            .unwrap_or(Vec2::ZERO);
         let v_id = VertexId::new(topology.vertices.len());
+        let Some(&disp) = active_displacements.get(&key) else {
+            return Err(HexFaceTopologyError::ValidationFailed(format!(
+                "Missing active displacement for corner {key:?}"
+            )));
+        };
         topology.vertices.push(MapVertex {
             position: base_pos + disp,
             canonical_key: key,
@@ -162,7 +169,10 @@ pub fn generate_hex_face_topology(
         let mut face_vertices = [VertexId::new(0); 6];
         for i in 0..6 {
             let key = canonical_corner_key(coord, i);
-            face_vertices[i] = key_to_vertex[&key];
+            let Some(&vertex_id) = key_to_vertex.get(&key) else {
+                return Err(HexFaceTopologyError::CornerKeyMismatch(key));
+            };
+            face_vertices[i] = vertex_id;
         }
 
         let base_edge_idx = topology.half_edges.len();
@@ -176,7 +186,11 @@ pub fn generate_hex_face_topology(
             let destination = face_vertices[(i + 1) % 6];
 
             let edge_dir_key = (origin, destination);
-            directed_edge_map.insert(edge_dir_key, e_id);
+            if directed_edge_map.insert(edge_dir_key, e_id).is_some() {
+                return Err(HexFaceTopologyError::ValidationFailed(format!(
+                    "Duplicate directed edge ({origin:?}, {destination:?})"
+                )));
+            }
 
             topology.half_edges.push(HalfEdge {
                 origin,

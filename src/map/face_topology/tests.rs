@@ -1,19 +1,13 @@
 /// Core unit tests for hex face topology.
-use bevy::prelude::*;
-#[allow(dead_code)]
-pub struct FaceTopologyTestsPlugin;
-impl Plugin for FaceTopologyTestsPlugin {
-    fn build(&self, _app: &mut App) {}
-}
 #[cfg(test)]
 mod unit_tests {
     use crate::map::data::{MapData, TileData};
     use crate::map::face_topology::corner_key::{canonical_corner_key, regular_corner_position};
     use crate::map::face_topology::generator::generate_hex_face_topology;
-    use crate::map::face_topology::types::HalfEdgeId;
+    use crate::map::face_topology::types::{FaceId, HalfEdgeId, SharedCornerKey};
+    use crate::map::face_topology::validate_complete_topology;
     use crate::map::face_topology::validation::{
-        min_edge_length, segments_intersect, signed_area, validate_complete_topology,
-        validate_face_geometry,
+        min_edge_length, segments_intersect, signed_area, validate_face_geometry, MIN_EDGE_LENGTH,
     };
     use crate::map::HexCoord;
     use crate::map::WorldSeed;
@@ -133,6 +127,7 @@ mod unit_tests {
             for k in 0..6 {
                 pts[k] = topo.vertices[face.vertices[k].index()].position;
             }
+            validate_face_geometry(&pts, FaceId::new(i)).expect("production geometry validation");
             assert!(signed_area(&pts) > 0.0, "Face {i} non-positive area");
         }
     }
@@ -163,7 +158,10 @@ mod unit_tests {
             for k in 0..6 {
                 pts[k] = topo.vertices[face.vertices[k].index()].position;
             }
-            assert!(min_edge_length(&pts) > 0.05, "Face {i} near-zero edge");
+            assert!(
+                min_edge_length(&pts) > MIN_EDGE_LENGTH,
+                "Face {i} near-zero edge"
+            );
         }
     }
 
@@ -239,13 +237,15 @@ mod unit_tests {
     fn test_border_edges_have_no_twin() {
         let map = generate_test_map(40, 40);
         let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
-        for (e_idx, edge) in topo.half_edges.iter().enumerate() {
-            if edge.twin.is_none() {
-                let hex = topo.faces[edge.incident_face.index()].hex;
-                let missing = hex.neighbors().iter().any(|n| !map.tiles.contains_key(n));
-                assert!(missing, "Edge {e_idx} borderless but no twin");
-            }
-        }
+        crate::map::face_topology::validation_twins::validate_border_edges(&topo, &map)
+            .expect("Border edges should all be valid outer boundaries");
+        assert_eq!(
+            topo.half_edges
+                .iter()
+                .filter(|edge| edge.twin.is_none())
+                .count(),
+            topo.stats.border_edge_count
+        );
     }
 
     #[test]
@@ -281,5 +281,15 @@ mod unit_tests {
             let pos = regular_corner_position(key).expect("should be Ok");
             assert!(pos.x.is_finite() && pos.y.is_finite());
         }
+    }
+
+    #[test]
+    fn test_regular_corner_position_rejects_unknown_key() {
+        let key = SharedCornerKey::new(
+            HexCoord::new(0, 0),
+            HexCoord::new(100, 100),
+            HexCoord::new(200, 200),
+        );
+        assert!(regular_corner_position(key).is_err());
     }
 }

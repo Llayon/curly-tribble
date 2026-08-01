@@ -2,21 +2,29 @@
 use crate::map::data::HEX_SIZE;
 use crate::map::face_topology::types::{HexFaceTopologyError, SharedCornerKey};
 use crate::map::HexCoord;
-use bevy::prelude::*;
+use bevy::prelude::Vec2;
 
-pub struct CornerKeyPlugin;
-impl Plugin for CornerKeyPlugin {
-    fn build(&self, _app: &mut App) {}
+/// Applies one fixed SplitMix64-style round with wrapping u64 arithmetic.
+#[must_use]
+fn splitmix64_round(state: u64, word: u64) -> u64 {
+    let mut mixed = state.wrapping_add(word).wrapping_mul(0x9e37_79b9_7f4a_7c15);
+    mixed = (mixed ^ (mixed >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
+    mixed = (mixed ^ (mixed >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
+    mixed ^ (mixed >> 31)
+}
+
+#[allow(clippy::cast_sign_loss)]
+fn coordinate_bits(value: i32) -> u64 {
+    // Rust's signed-to-unsigned cast is modulo 2^32 and is endian-independent.
+    u64::from(value as u32)
 }
 
 /// Computes a stable, deterministic 64-bit seed for a corner.
 ///
-/// Uses explicit wrapping 64-bit integer arithmetic (`SplitMix64` finalizer)
-/// depending strictly on `WorldSeed` and `SharedCornerKey` coordinates `(c0, c1, c2)`.
-/// This guarantees bit-identical results across Rust compiler versions, platforms,
-/// and endianness.
+/// Six coordinate words are mixed in `(q, r)` order for each canonical key cell.
+/// The fixed constants and explicit u32-to-u64 conversion make this independent
+/// of Rust hashers, platform endianness, and `usize` width.
 #[must_use]
-#[allow(clippy::cast_sign_loss)]
 pub fn seed_for_corner(seed_val: u32, key: SharedCornerKey) -> u64 {
     let c0 = key.first();
     let c1 = key.second();
@@ -24,20 +32,17 @@ pub fn seed_for_corner(seed_val: u32, key: SharedCornerKey) -> u64 {
 
     // Convert i32 to u32 first (preserving bit pattern), then to u64
     let inputs: [u64; 6] = [
-        u64::from(c0.q as u32),
-        u64::from(c0.r as u32),
-        u64::from(c1.q as u32),
-        u64::from(c1.r as u32),
-        u64::from(c2.q as u32),
-        u64::from(c2.r as u32),
+        coordinate_bits(c0.q),
+        coordinate_bits(c0.r),
+        coordinate_bits(c1.q),
+        coordinate_bits(c1.r),
+        coordinate_bits(c2.q),
+        coordinate_bits(c2.r),
     ];
 
     let mut h = u64::from(seed_val);
     for val in inputs {
-        h = h.wrapping_add(val).wrapping_mul(0x9e37_79b9_7f4a_7c15);
-        h = (h ^ (h >> 30)).wrapping_mul(0xbf58_476d_1ce4_e5b9);
-        h = (h ^ (h >> 27)).wrapping_mul(0x94d0_49bb_1331_11eb);
-        h ^= h >> 31;
+        h = splitmix64_round(h, val);
     }
 
     h

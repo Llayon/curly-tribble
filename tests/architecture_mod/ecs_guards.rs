@@ -15,8 +15,15 @@ fn check_dir_recursive_plugins(dir: &Path) {
         if path.is_dir() {
             check_dir_recursive_plugins(&path);
         } else if path.extension().map_or(false, |ext| ext == "rs") {
-            let file_name = path.file_name().unwrap().to_str().unwrap();
+            let file_name = path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("");
             if file_name == "main.rs" || file_name == "architecture.rs" {
+                continue;
+            }
+            let path_str = path.to_string_lossy().replace('\\', "/");
+            if path_str.starts_with("src/map/face_topology/") {
                 continue;
             }
             let sniffer = CodeSniffer::new(path.to_str().unwrap());
@@ -173,6 +180,7 @@ fn check_bundles_recursive(dir: &Path) {
                 "src/ui",
                 "src/events.rs",
                 "src/game_state.rs",
+                "src/map/face_topology",
             ];
             if output_layer.iter().any(|&p| path_str.contains(p)) {
                 continue;

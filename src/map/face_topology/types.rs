@@ -1,12 +1,7 @@
 /// Data types for the hex face topology sub-module.
 use crate::map::HexCoord;
-use bevy::prelude::*;
+use bevy::prelude::{Resource, Vec2};
 use std::collections::HashMap;
-
-pub struct FaceTopologyTypesPlugin;
-impl Plugin for FaceTopologyTypesPlugin {
-    fn build(&self, _app: &mut App) {}
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct VertexId(usize);
