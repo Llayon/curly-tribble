@@ -2,7 +2,9 @@
 #[cfg(test)]
 mod stress_tests {
     use crate::map::data::{MapData, TileData};
-    use crate::map::face_topology::corner_key::{canonical_corner_key, seed_for_corner};
+    use crate::map::face_topology::corner_key::{
+        canonical_corner_key, corner_displacement, seed_for_corner,
+    };
     use crate::map::face_topology::generator::generate_hex_face_topology;
     use crate::map::face_topology::types::{HalfEdgeId, SharedCornerKey};
     use crate::map::face_topology::validate_complete_topology;
@@ -180,6 +182,31 @@ mod stress_tests {
     }
 
     #[test]
+    fn test_corner_displacement_golden_vectors() {
+        let negative_key = SharedCornerKey::new(
+            HexCoord::new(-1, 0),
+            HexCoord::new(0, -1),
+            HexCoord::new(0, 0),
+        );
+        let positive_key = SharedCornerKey::new(
+            HexCoord::new(10, 10),
+            HexCoord::new(10, 11),
+            HexCoord::new(11, 10),
+        );
+        // Changing these values intentionally changes persistent world geometry.
+        for (seed, key, radius, expected_x, expected_y) in [
+            (42, negative_key, 1.0, 0xbd9d_e73b, 0x3d02_cd4c),
+            (42, positive_key, 1.0, 0x3d14_8020, 0x3db3_44d3),
+            (99, negative_key, 1.0, 0x3d1b_ddef, 0x3dbc_295b),
+            (42, negative_key, 2.5, 0xbe45_610a, 0x3da3_809e),
+        ] {
+            let displacement = corner_displacement(seed, key, radius);
+            assert_eq!(displacement.x.to_bits(), expected_x);
+            assert_eq!(displacement.y.to_bits(), expected_y);
+        }
+    }
+
+    #[test]
     fn test_seed_for_corner_is_order_independent() {
         let key = canonical_corner_key(HexCoord::new(0, 0), 0);
         let n0 = HexCoord::new(0, 0).neighbors()[0];
@@ -208,8 +235,7 @@ mod stress_tests {
         assert!(found_n5, "n5 should share corner");
     }
 
-    #[test]
-    fn test_multi_seed_stress_256_seeds() {
+    fn validate_seed_set(seeds: &[u32]) {
         let maps: Vec<(&str, MapData)> = vec![
             ("40x40", map_40x40()),
             ("isolated", isolated_hex()),
@@ -220,8 +246,9 @@ mod stress_tests {
         ];
         let mut reduced_displacements = 0;
         let mut regular_fallbacks = 0;
+        let mut validated_topologies = 0;
 
-        for seed_val in 0..256u32 {
+        for &seed_val in seeds {
             let seed = WorldSeed::new(seed_val);
             for (name, map) in &maps {
                 let topo = generate_hex_face_topology(map, seed)
@@ -230,12 +257,26 @@ mod stress_tests {
                     .unwrap_or_else(|e| panic!("seed={seed_val} map={name}: {e:?}"));
                 reduced_displacements += topo.stats.reduced_displacement_fallbacks;
                 regular_fallbacks += topo.stats.regular_position_fallbacks;
+                validated_topologies += 1;
             }
         }
+        assert_eq!(validated_topologies, seeds.len() * maps.len());
         assert_eq!(
             reduced_displacements, 0,
             "unexpected displacement reduction"
         );
         assert_eq!(regular_fallbacks, 0, "unexpected regular position fallback");
+    }
+
+    #[test]
+    fn test_fast_hex_face_topology_stress() {
+        validate_seed_set(&[0, 1, 7, 42, 99, 128, 200, 255]);
+    }
+
+    #[test]
+    #[ignore = "full deterministic topology stress suite"]
+    fn full_hex_face_topology_stress_256_seeds() {
+        let seeds: Vec<u32> = (0..256).collect();
+        validate_seed_set(&seeds);
     }
 }

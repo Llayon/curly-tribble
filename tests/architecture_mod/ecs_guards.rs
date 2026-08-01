@@ -2,6 +2,25 @@ use crate::utils::{is_data_only, CodeSniffer};
 use std::fs;
 use std::path::Path;
 
+// These are the current pure data/algorithm files. Keep this list explicit so
+// a future runtime system, plugin, bundle, or query is still scanned normally.
+const FACE_TOPOLOGY_DATA_FILES: [&str; 10] = [
+    "src/map/face_topology/corner_key.rs",
+    "src/map/face_topology/generator.rs",
+    "src/map/face_topology/logical_adjacency.rs",
+    "src/map/face_topology/tests.rs",
+    "src/map/face_topology/tests_mutation.rs",
+    "src/map/face_topology/tests_stress.rs",
+    "src/map/face_topology/types.rs",
+    "src/map/face_topology/validation.rs",
+    "src/map/face_topology/validation_complete.rs",
+    "src/map/face_topology/validation_twins.rs",
+];
+
+fn is_face_topology_data_file(path: &str) -> bool {
+    FACE_TOPOLOGY_DATA_FILES.contains(&path)
+}
+
 /// 6. Проверка "Все есть Плагин": каждый файл с логикой должен быть модульным.
 #[test]
 fn test_all_src_files_are_plugins() {
@@ -23,7 +42,7 @@ fn check_dir_recursive_plugins(dir: &Path) {
                 continue;
             }
             let path_str = path.to_string_lossy().replace('\\', "/");
-            if path_str.starts_with("src/map/face_topology/") {
+            if is_face_topology_data_file(&path_str) {
                 continue;
             }
             let sniffer = CodeSniffer::new(path.to_str().unwrap());
@@ -180,9 +199,10 @@ fn check_bundles_recursive(dir: &Path) {
                 "src/ui",
                 "src/events.rs",
                 "src/game_state.rs",
-                "src/map/face_topology",
             ];
-            if output_layer.iter().any(|&p| path_str.contains(p)) {
+            if output_layer.iter().any(|&p| path_str.contains(p))
+                || is_face_topology_data_file(&path_str)
+            {
                 continue;
             }
             let sniffer = CodeSniffer::new(&path_str);

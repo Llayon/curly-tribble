@@ -1,7 +1,7 @@
 /// Generator for deterministic hex face topology.
 use crate::map::data::{MapData, HEX_SIZE};
 use crate::map::face_topology::corner_key::{
-    canonical_corner_key, regular_corner_position, seed_for_corner,
+    canonical_corner_key, corner_displacement, regular_corner_position,
 };
 use crate::map::face_topology::types::{
     FaceId, HalfEdge, HalfEdgeId, HexFace, HexFaceTopology, HexFaceTopologyError, MapVertex,
@@ -12,7 +12,6 @@ use crate::map::face_topology::validation_complete::validate_complete_topology;
 use crate::map::HexCoord;
 use crate::map::WorldSeed;
 use bevy::prelude::Vec2;
-use rand::prelude::*;
 use std::collections::HashMap;
 
 /// Generates deterministic `HexFaceTopology` from `MapData` and `WorldSeed`.
@@ -56,16 +55,8 @@ pub fn generate_hex_face_topology(
     });
 
     let mut raw_displacements: HashMap<SharedCornerKey, Vec2> = HashMap::new();
-    let max_disp_cap = 0.16 * HEX_SIZE;
-
     for &key in &sorted_keys {
-        let corner_seed = seed_for_corner(seed.value(), key);
-        let mut rng = rand::rngs::StdRng::seed_from_u64(corner_seed);
-        let angle = rng.gen_range(0.0..std::f32::consts::TAU);
-        let mag = rng
-            .gen_range(0.08 * HEX_SIZE..0.12 * HEX_SIZE)
-            .min(max_disp_cap);
-        let disp = Vec2::new(mag * angle.cos(), mag * angle.sin());
+        let disp = corner_displacement(seed.value(), key, HEX_SIZE);
         raw_displacements.insert(key, disp);
     }
 

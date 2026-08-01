@@ -1,8 +1,44 @@
-/// Canonical corner key derivation and stable seed mixing for hex face topology.
+//! Canonical corner keys and portable displacement determinism for hex topology.
+//!
+//! The persistent displacement contract is scoped to `HexFaceTopology`: integer
+//! axial coordinates feed a fixed wrapping mixer, low hash bits select an
+//! immutable Q15 direction, and other hash bits select a Q16 magnitude. The
+//! generator sorts map keys before construction, so `HashMap` iteration order does
+//! not affect geometry. No random-number algorithm or runtime trigonometry is
+//! involved in corner displacement; its f32 bit patterns are golden-tested.
 use crate::map::data::HEX_SIZE;
 use crate::map::face_topology::types::{HexFaceTopologyError, SharedCornerKey};
 use crate::map::HexCoord;
 use bevy::prelude::Vec2;
+
+const DIRECTION_INDEX_MASK: u8 = 0x0f;
+const MAGNITUDE_SHIFT: u32 = 8;
+const MAGNITUDE_MASK: u64 = 0xff;
+const Q16_ONE: f32 = 65_536.0;
+const Q15_ONE: f32 = 32_767.0;
+const MIN_MAGNITUDE_Q16: u16 = 5_243;
+const MAX_MAGNITUDE_Q16: u16 = 7_864;
+const MAX_DISPLACEMENT_Q16: u16 = 10_486;
+
+/// Sixteen immutable Q15 unit directions, spaced at 22.5 degree intervals.
+pub const DISPLACEMENT_DIRECTIONS_Q15: [(i16, i16); 16] = [
+    (32_767, 0),
+    (30_274, 12_539),
+    (23_170, 23_170),
+    (12_539, 30_274),
+    (0, 32_767),
+    (-12_539, 30_274),
+    (-23_170, 23_170),
+    (-30_274, 12_539),
+    (-32_767, 0),
+    (-30_274, -12_539),
+    (-23_170, -23_170),
+    (-12_539, -30_274),
+    (0, -32_767),
+    (12_539, -30_274),
+    (23_170, -23_170),
+    (30_274, -12_539),
+];
 
 /// Applies one fixed SplitMix64-style round with wrapping u64 arithmetic.
 #[must_use]
@@ -46,6 +82,32 @@ pub fn seed_for_corner(seed_val: u32, key: SharedCornerKey) -> u64 {
     }
 
     h
+}
+
+/// Derives a portable corner displacement from a fixed mixed corner seed.
+///
+/// Bits 0..=3 select one of the sixteen Q15 directions. Bits 8..=15 select
+/// one of 256 Q16 magnitudes spanning 8% through 12% of `radius`; the 16%
+/// Q16 cap is retained as an explicit upper bound. Floating-point conversion
+/// occurs only when constructing the final `Vec2`.
+#[must_use]
+pub fn corner_displacement(seed_val: u32, key: SharedCornerKey, radius: f32) -> Vec2 {
+    let mixed = seed_for_corner(seed_val, key);
+    let direction_index =
+        usize::from(u8::try_from(mixed & u64::from(DIRECTION_INDEX_MASK)).unwrap_or_default());
+    let direction = DISPLACEMENT_DIRECTIONS_Q15[direction_index];
+    let magnitude_sample = u16::from(((mixed >> MAGNITUDE_SHIFT) & MAGNITUDE_MASK) as u8);
+    let magnitude_span = u32::from(MAX_MAGNITUDE_Q16 - MIN_MAGNITUDE_Q16);
+    let magnitude_delta =
+        u16::try_from(u32::from(magnitude_sample) * magnitude_span / u32::from(u8::MAX))
+            .unwrap_or_default();
+    let magnitude_q16 = MIN_MAGNITUDE_Q16 + magnitude_delta;
+    let magnitude_q16 = magnitude_q16.min(MAX_DISPLACEMENT_Q16);
+
+    Vec2::new(
+        radius * (f32::from(magnitude_q16) / Q16_ONE) * (f32::from(direction.0) / Q15_ONE),
+        radius * (f32::from(magnitude_q16) / Q16_ONE) * (f32::from(direction.1) / Q15_ONE),
+    )
 }
 
 /// Derives the canonical `SharedCornerKey` for a corner index (0..6) of a `HexCoord`.

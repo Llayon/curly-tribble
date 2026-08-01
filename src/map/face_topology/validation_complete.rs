@@ -199,6 +199,17 @@ pub fn validate_complete_topology(
         }
     }
 
+    for (index, face) in topology.faces.iter().enumerate() {
+        for vertex_id in face.vertices {
+            if vertex_id.index() >= topology.vertices.len() {
+                return Err(invalid(format!(
+                    "Face {index} references invalid vertex {vertex_id:?}"
+                )));
+            }
+        }
+    }
+    crate::map::face_topology::logical_adjacency::validate_logical_adjacency(topology, map_data)?;
+
     let mut edge_seen = vec![false; topology.half_edges.len()];
     let mut directed_edges = HashSet::new();
     for (index, face) in topology.faces.iter().enumerate() {
