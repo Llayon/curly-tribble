@@ -1,11 +1,15 @@
-// src/map/face_topology/generator.rs
+/// Generator for deterministic hex face topology.
 use crate::map::data::{MapData, HEX_SIZE};
-use crate::map::face_topology::corner_key::{canonical_corner_key, regular_corner_position};
+use crate::map::face_topology::corner_key::{
+    canonical_corner_key, regular_corner_position, seed_for_corner,
+};
 use crate::map::face_topology::types::{
     FaceId, HalfEdge, HalfEdgeId, HexFace, HexFaceTopology, HexFaceTopologyError, MapVertex,
     SharedCornerKey, TopologyStats, VertexId,
 };
-use crate::map::face_topology::validation::signed_area;
+use crate::map::face_topology::validation::{
+    min_edge_length, signed_area, validate_complete_topology,
+};
 use crate::map::HexCoord;
 use crate::map::WorldSeed;
 use bevy::prelude::*;
@@ -13,18 +17,8 @@ use rand::prelude::*;
 use std::collections::HashMap;
 
 pub struct GeneratorPlugin;
-
 impl Plugin for GeneratorPlugin {
     fn build(&self, _app: &mut App) {}
-}
-
-#[must_use]
-pub fn seed_for_corner(seed_val: u32, key: SharedCornerKey) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    seed_val.hash(&mut hasher);
-    key.hash(&mut hasher);
-    hasher.finish()
 }
 
 /// Generates deterministic `HexFaceTopology` from `MapData` and `WorldSeed`.
@@ -82,21 +76,23 @@ pub fn generate_hex_face_topology(
     }
 
     // Helper to evaluate 6 corner positions of a hex given current corner displacements
-    let get_face_pts = |coord: HexCoord, disp_map: &HashMap<SharedCornerKey, Vec2>| -> [Vec2; 6] {
+    let get_face_pts = |coord: HexCoord,
+                        disp_map: &HashMap<SharedCornerKey, Vec2>|
+     -> Result<[Vec2; 6], HexFaceTopologyError> {
         let mut pts = [Vec2::ZERO; 6];
         for i in 0..6 {
             let key = canonical_corner_key(coord, i);
-            let base_pos = regular_corner_position(key);
+            let base_pos = regular_corner_position(key)?;
             let disp = disp_map.get(&key).copied().unwrap_or(Vec2::ZERO);
             pts[i] = base_pos + disp;
         }
-        pts
+        Ok(pts)
     };
 
     let mut active_displacements = raw_displacements.clone();
     let mut stats = TopologyStats::default();
 
-    // 2. Validate geometry per corner and apply displacement reduction fallback if needed
+    // 2. Validate geometry per corner and apply displacement reduction fallback
     for &key in &sorted_keys {
         let raw_disp = raw_displacements.get(&key).copied().unwrap_or(Vec2::ZERO);
         let incident_coords = &corner_incident_faces[&key];
@@ -110,7 +106,7 @@ pub fn generate_hex_face_topology(
 
             let mut valid_all = true;
             for &coord in incident_coords {
-                let pts = get_face_pts(coord, &active_displacements);
+                let pts = get_face_pts(coord, &active_displacements)?;
                 if crate::map::face_topology::validation::validate_face_geometry(
                     &pts,
                     FaceId::new(0),
@@ -145,7 +141,7 @@ pub fn generate_hex_face_topology(
 
     // 3. Construct MapVertex list
     for &key in &sorted_keys {
-        let base_pos = regular_corner_position(key);
+        let base_pos = regular_corner_position(key)?;
         let disp = active_displacements
             .get(&key)
             .copied()
@@ -243,7 +239,7 @@ pub fn generate_hex_face_topology(
         if area > max_area {
             max_area = area;
         }
-        let edge_len = crate::map::face_topology::validation::min_edge_length(&pts);
+        let edge_len = min_edge_length(&pts);
         if edge_len < min_edge {
             min_edge = edge_len;
         }
@@ -254,5 +250,9 @@ pub fn generate_hex_face_topology(
     stats.min_edge_length = min_edge;
 
     topology.stats = stats;
+
+    // 7. Final complete topology validation
+    validate_complete_topology(&topology, map_data)?;
+
     Ok(topology)
 }

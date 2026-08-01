@@ -1,10 +1,9 @@
-// src/map/face_topology/types.rs
+/// Data types for the hex face topology sub-module.
 use crate::map::HexCoord;
 use bevy::prelude::*;
 use std::collections::HashMap;
 
 pub struct FaceTopologyTypesPlugin;
-
 impl Plugin for FaceTopologyTypesPlugin {
     fn build(&self, _app: &mut App) {}
 }
@@ -121,6 +120,7 @@ pub struct HexFaceTopology {
 pub enum HexFaceTopologyError {
     EmptyMap,
     DuplicateCornerKey(SharedCornerKey),
+    CornerKeyMismatch(SharedCornerKey),
     NonConvexFace(FaceId),
     SelfIntersectingFace(FaceId),
     InvalidWinding(FaceId),
@@ -128,4 +128,5 @@ pub enum HexFaceTopologyError {
     NonPositiveArea(FaceId),
     InconsistentTwin { edge: HalfEdgeId, twin: HalfEdgeId },
     DisplacementFailed(FaceId),
+    ValidationFailed(String),
 }

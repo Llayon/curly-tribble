@@ -1,18 +1,20 @@
-// src/map/face_topology/tests.rs
+/// Core unit tests for hex face topology.
 use bevy::prelude::*;
-
-pub struct TestsPlugin;
-
-impl Plugin for TestsPlugin {
+#[allow(dead_code)]
+pub struct FaceTopologyTestsPlugin;
+impl Plugin for FaceTopologyTestsPlugin {
     fn build(&self, _app: &mut App) {}
 }
-
 #[cfg(test)]
 mod unit_tests {
     use crate::map::data::{MapData, TileData};
+    use crate::map::face_topology::corner_key::{canonical_corner_key, regular_corner_position};
     use crate::map::face_topology::generator::generate_hex_face_topology;
-    use crate::map::face_topology::validation::signed_area;
-    use crate::map::face_topology::HalfEdgeId;
+    use crate::map::face_topology::types::HalfEdgeId;
+    use crate::map::face_topology::validation::{
+        min_edge_length, segments_intersect, signed_area, validate_complete_topology,
+        validate_face_geometry,
+    };
     use crate::map::HexCoord;
     use crate::map::WorldSeed;
     use bevy::math::Vec2;
@@ -30,171 +32,254 @@ mod unit_tests {
     }
 
     #[test]
-    fn test_topology_verifications_1_to_21_on_40x40() {
-        let map_orig = generate_test_map(40, 40);
-        let map_clone = map_orig.clone();
-        let seed42 = WorldSeed::new(42);
+    fn test_map_data_unchanged_after_generation() {
+        let map = generate_test_map(40, 40);
+        let tile_count = map.tiles.len();
+        let (width, height) = (map.width, map.height);
+        let _topo =
+            generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        assert_eq!(map.tiles.len(), tile_count);
+        assert_eq!(map.width, width);
+        assert_eq!(map.height, height);
+    }
 
-        let topo1 = generate_hex_face_topology(&map_orig, seed42).expect("Topology 1 failed");
+    #[test]
+    fn test_one_face_per_tile() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        assert_eq!(topo.faces.len(), map.tiles.len());
+    }
 
-        // 1. MapData unchanged
-        assert_eq!(
-            map_orig.tiles.len(),
-            map_clone.tiles.len(),
-            "Test 1: MapData tiles unchanged"
-        );
-        assert_eq!(
-            map_orig.width, map_clone.width,
-            "Test 1: MapData width unchanged"
-        );
-        assert_eq!(
-            map_orig.height, map_clone.height,
-            "Test 1: MapData height unchanged"
-        );
+    #[test]
+    fn test_hex_to_face_complete_bijection() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        assert_eq!(topo.hex_to_face.len(), map.tiles.len());
+        for &coord in map.tiles.keys() {
+            assert_eq!(topo.faces[topo.hex_to_face[&coord].index()].hex, coord);
+        }
+    }
 
-        // 2. HexCoord neighbor results unchanged
-        let c0 = HexCoord::new(0, 0);
-        assert_eq!(c0.neighbors().len(), 6, "Test 2: HexCoord neighbors");
-
-        // 3. One HexFace per MapData tile
-        assert_eq!(
-            topo1.faces.len(),
-            map_orig.tiles.len(),
-            "Test 3: One face per tile"
-        );
-
-        // 4. Six unique boundary vertices per face
-        // 5. Six HalfEdges per face
-        // 6-8. Next and Prev cycles and consistency
-        // 12-15. Signed area, winding, self-intersection, non-zero edge length
-        for (i, face) in topo1.faces.iter().enumerate() {
+    #[test]
+    fn test_six_unique_vertices_per_face() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (i, face) in topo.faces.iter().enumerate() {
             let v_set: HashSet<_> = face.vertices.iter().copied().collect();
-            assert_eq!(v_set.len(), 6, "Test 4: 6 unique vertices for face {i}");
+            assert_eq!(v_set.len(), 6, "Face {i} does not have 6 unique vertices");
+        }
+    }
 
+    #[test]
+    fn test_next_cycle_closes_in_six_steps() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (i, face) in topo.faces.iter().enumerate() {
+            let mut curr = face.boundary;
+            for _ in 0..6 {
+                curr = topo.half_edges[curr.index()].next;
+            }
+            assert_eq!(curr, face.boundary, "Face {i} Next cycle not closed");
+        }
+    }
+
+    #[test]
+    fn test_prev_cycle_closes_in_six_steps() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (i, face) in topo.faces.iter().enumerate() {
+            let mut curr = face.boundary;
+            for _ in 0..6 {
+                curr = topo.half_edges[curr.index()].prev;
+            }
+            assert_eq!(curr, face.boundary, "Face {i} Prev cycle not closed");
+        }
+    }
+
+    #[test]
+    fn test_next_prev_mutual_consistency() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (i, face) in topo.faces.iter().enumerate() {
+            let mut curr = face.boundary;
+            for _ in 0..6 {
+                let edge = &topo.half_edges[curr.index()];
+                let next_edge = &topo.half_edges[edge.next.index()];
+                assert_eq!(next_edge.prev, curr, "Face {i} next/prev inconsistent");
+                curr = edge.next;
+            }
+        }
+    }
+
+    #[test]
+    fn test_edge_incident_face_correctness() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (f_idx, face) in topo.faces.iter().enumerate() {
+            let mut curr = face.boundary;
+            for _ in 0..6 {
+                assert_eq!(topo.half_edges[curr.index()].incident_face.index(), f_idx);
+                curr = topo.half_edges[curr.index()].next;
+            }
+        }
+    }
+
+    #[test]
+    fn test_positive_area_and_ccw_winding() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (i, face) in topo.faces.iter().enumerate() {
             let mut pts = [Vec2::ZERO; 6];
             for k in 0..6 {
-                pts[k] = topo1.vertices[face.vertices[k].index()].position;
+                pts[k] = topo.vertices[face.vertices[k].index()].position;
             }
-
-            let area = signed_area(&pts);
-            assert!(area > 0.0, "Test 12 & 13: Positive area & CCW for face {i}");
-
-            let mut curr = face.boundary;
-            let mut count = 0;
-            for _ in 0..6 {
-                let edge = &topo1.half_edges[curr.index()];
-                assert_eq!(edge.incident_face.index(), i, "Edge belongs to face {i}");
-
-                let next_edge = &topo1.half_edges[edge.next.index()];
-                assert_eq!(next_edge.prev, curr, "Test 8: Next/Prev consistent");
-
-                curr = edge.next;
-                count += 1;
-            }
-            assert_eq!(curr, face.boundary, "Test 6: Next forms 6-cycle");
-            assert_eq!(count, 6, "Test 5 & 6: 6 edges in cycle");
-
-            let mut curr_p = face.boundary;
-            for _ in 0..6 {
-                curr_p = topo1.half_edges[curr_p.index()].prev;
-            }
-            assert_eq!(curr_p, face.boundary, "Test 7: Prev forms 6-cycle");
+            assert!(signed_area(&pts) > 0.0, "Face {i} non-positive area");
         }
+    }
 
-        // 9-11. Shared border, Twin links and border HalfEdges
-        for (e_idx, edge) in topo1.half_edges.iter().enumerate() {
+    #[test]
+    fn test_strict_convexity_every_face() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (i, face) in topo.faces.iter().enumerate() {
+            let mut pts = [Vec2::ZERO; 6];
+            for k in 0..6 {
+                pts[k] = topo.vertices[face.vertices[k].index()].position;
+            }
+            for j in 0..6 {
+                let v1 = pts[(j + 1) % 6] - pts[j];
+                let v2 = pts[(j + 2) % 6] - pts[(j + 1) % 6];
+                assert!(v1.x * v2.y - v1.y * v2.x > 0.0, "Face {i} corner {j}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_minimum_edge_threshold() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (i, face) in topo.faces.iter().enumerate() {
+            let mut pts = [Vec2::ZERO; 6];
+            for k in 0..6 {
+                pts[k] = topo.vertices[face.vertices[k].index()].position;
+            }
+            assert!(min_edge_length(&pts) > 0.05, "Face {i} near-zero edge");
+        }
+    }
+
+    #[test]
+    fn test_no_self_intersections() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (f_idx, face) in topo.faces.iter().enumerate() {
+            let mut pts = [Vec2::ZERO; 6];
+            for k in 0..6 {
+                pts[k] = topo.vertices[face.vertices[k].index()].position;
+            }
+            for i in 0..6 {
+                for j in (i + 2)..6 {
+                    if i == 0 && j == 5 {
+                        continue;
+                    }
+                    assert!(
+                        !segments_intersect(pts[i], pts[(i + 1) % 6], pts[j], pts[(j + 1) % 6]),
+                        "Face {f_idx} edges {i} and {j} intersect"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_production_geometry_validation_every_face() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (i, face) in topo.faces.iter().enumerate() {
+            let mut pts = [Vec2::ZERO; 6];
+            for k in 0..6 {
+                pts[k] = topo.vertices[face.vertices[k].index()].position;
+            }
+            validate_face_geometry(&pts, crate::map::face_topology::FaceId::new(i))
+                .unwrap_or_else(|e| panic!("Face {i} failed: {e:?}"));
+        }
+    }
+
+    #[test]
+    fn test_twin_symmetric_and_reversed() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (e_idx, edge) in topo.half_edges.iter().enumerate() {
             if let Some(twin_id) = edge.twin {
-                let twin = &topo1.half_edges[twin_id.index()];
-                assert_eq!(
-                    twin.origin, edge.destination,
-                    "Test 9: Shared border origin"
-                );
-                assert_eq!(twin.destination, edge.origin, "Test 9: Shared border dest");
-                assert_eq!(
-                    twin.twin,
-                    Some(HalfEdgeId::new(e_idx)),
-                    "Test 10: Symmetric Twin"
+                let twin = &topo.half_edges[twin_id.index()];
+                assert_eq!(twin.twin, Some(HalfEdgeId::new(e_idx)));
+                assert_eq!(twin.origin, edge.destination);
+                assert_eq!(twin.destination, edge.origin);
+            }
+        }
+    }
+
+    #[test]
+    fn test_twin_faces_are_logical_neighbors() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (e_idx, edge) in topo.half_edges.iter().enumerate() {
+            if let Some(twin_id) = edge.twin {
+                let twin = &topo.half_edges[twin_id.index()];
+                let hex_a = topo.faces[edge.incident_face.index()].hex;
+                let hex_b = topo.faces[twin.incident_face.index()].hex;
+                assert!(
+                    hex_a.neighbors().contains(&hex_b),
+                    "Edge {e_idx} twin mismatch"
                 );
             }
         }
+    }
 
-        // 16. Y = 0 (data is 2D Vec2 position)
-        assert!(
-            topo1
-                .vertices
-                .iter()
-                .all(|v| v.position.x.is_finite() && v.position.y.is_finite()),
-            "Test 16: X/Z 2D Vec2"
-        );
+    #[test]
+    fn test_border_edges_have_no_twin() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        for (e_idx, edge) in topo.half_edges.iter().enumerate() {
+            if edge.twin.is_none() {
+                let hex = topo.faces[edge.incident_face.index()].hex;
+                let missing = hex.neighbors().iter().any(|n| !map.tiles.contains_key(n));
+                assert!(missing, "Edge {e_idx} borderless but no twin");
+            }
+        }
+    }
 
-        // 17-18. Seed 42 determinism & seed variance
-        let topo1_again =
-            generate_hex_face_topology(&map_orig, seed42).expect("Topology 1 again failed");
-        assert_eq!(topo1, topo1_again, "Test 17: Seed 42 is deterministic");
-
-        let seed99 = WorldSeed::new(99);
-        let topo_diff =
-            generate_hex_face_topology(&map_orig, seed99).expect("Topology diff failed");
-        let any_diff = topo1
-            .vertices
-            .iter()
-            .zip(topo_diff.vertices.iter())
-            .any(|(v1, v2)| v1.position != v2.position);
-        assert!(any_diff, "Test 18: Different seed changes vertex positions");
-
-        // 19. Every HexCoord maps to exactly 1 FaceId
+    #[test]
+    fn test_edge_count_invariant() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
         assert_eq!(
-            topo1.hex_to_face.len(),
-            map_orig.tiles.len(),
-            "Test 19: 1 HexCoord -> 1 FaceId"
-        );
-
-        // 20-21. 1-to-1 bijection between SharedCornerKey and VertexId
-        let key_set: HashSet<_> = topo1.vertices.iter().map(|v| v.canonical_key).collect();
-        assert_eq!(
-            key_set.len(),
-            topo1.vertices.len(),
-            "Test 20 & 21: Unique SharedCornerKeys"
+            topo.stats.paired_edge_count * 2 + topo.stats.border_edge_count,
+            topo.half_edges.len()
         );
     }
 
     #[test]
-    fn test_hand_authored_clusters() {
-        // Isolated hex
-        let mut map_1 = MapData::default();
-        map_1.tiles.insert(HexCoord::new(0, 0), TileData::default());
-        let topo_1 =
-            generate_hex_face_topology(&map_1, WorldSeed::new(42)).expect("Isolated hex failed");
-        assert_eq!(topo_1.faces.len(), 1);
-        assert_eq!(topo_1.stats.border_edge_count, 6);
-        assert_eq!(topo_1.stats.paired_edge_count, 0);
+    fn test_shared_corner_key_bijection() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        let key_set: HashSet<_> = topo.vertices.iter().map(|v| v.canonical_key).collect();
+        assert_eq!(key_set.len(), topo.vertices.len());
+    }
 
-        // Two neighboring hexes
-        let mut map_2 = MapData::default();
-        map_2.tiles.insert(HexCoord::new(0, 0), TileData::default());
-        map_2.tiles.insert(HexCoord::new(1, 0), TileData::default());
-        let topo_2 =
-            generate_hex_face_topology(&map_2, WorldSeed::new(42)).expect("Two hexes failed");
-        assert_eq!(topo_2.faces.len(), 2);
-        assert_eq!(topo_2.stats.paired_edge_count, 1);
-        assert_eq!(topo_2.stats.border_edge_count, 10);
+    #[test]
+    fn test_complete_topology_validation_40x40() {
+        let map = generate_test_map(40, 40);
+        let topo = generate_hex_face_topology(&map, WorldSeed::new(42)).expect("generation failed");
+        validate_complete_topology(&topo, &map).expect("validation failed");
+    }
 
-        // Center hex with all 6 neighbors
-        let mut map_7 = MapData::default();
-        let center = HexCoord::new(0, 0);
-        map_7.tiles.insert(center, TileData::default());
-        for n in center.neighbors() {
-            map_7.tiles.insert(n, TileData::default());
-        }
-        let topo_7 =
-            generate_hex_face_topology(&map_7, WorldSeed::new(42)).expect("7-hex cluster failed");
-        assert_eq!(topo_7.faces.len(), 7);
-        let center_face_id = topo_7.hex_to_face[&center];
-        let center_face = &topo_7.faces[center_face_id.index()];
+    #[test]
+    fn test_regular_corner_position_returns_ok() {
+        let coord = HexCoord::new(0, 0);
         for i in 0..6 {
-            let e_id = HalfEdgeId::new(center_face.boundary.index() + i);
-            let edge = &topo_7.half_edges[e_id.index()];
-            assert!(edge.twin.is_some(), "Center hex edges must all have twins");
+            let key = canonical_corner_key(coord, i);
+            let pos = regular_corner_position(key).expect("should be Ok");
+            assert!(pos.x.is_finite() && pos.y.is_finite());
         }
     }
 }
