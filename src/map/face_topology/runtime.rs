@@ -1,5 +1,5 @@
 //! Authoritative runtime population of the data-only face topology resource.
-use crate::map::face_topology::debug::HexFaceDebugCache;
+use crate::map::face_topology::cache::HexFaceDebugCache;
 use crate::map::face_topology::generate_hex_face_topology;
 use crate::map::face_topology::types::HexFaceTopology;
 use crate::map::{GenerateMapEvent, MapData, RebuildMeshEvent, WorldSeed};
@@ -34,6 +34,8 @@ pub struct HexFaceTopologyGenerationState {
     pub last_successful_inputs: Option<LogicalMapInputs>,
     pub generation_count: u64,
     pub failure_count: u64,
+    pub generation_events_consumed: u64,
+    pub rebuild_events_consumed: u64,
 }
 
 pub struct FaceTopologyRuntimePlugin;
@@ -58,8 +60,11 @@ pub fn regenerate_hex_face_topology(
     mut generation_events: MessageReader<GenerateMapEvent>,
     mut rebuild_events: MessageReader<RebuildMeshEvent>,
 ) {
-    let event_requested =
-        generation_events.read().next().is_some() || rebuild_events.read().next().is_some();
+    let generation_events_consumed = generation_events.read().count();
+    let rebuild_events_consumed = rebuild_events.read().count();
+    generation_state.generation_events_consumed += generation_events_consumed as u64;
+    generation_state.rebuild_events_consumed += rebuild_events_consumed as u64;
+    let event_requested = generation_events_consumed > 0 || rebuild_events_consumed > 0;
     let input_may_have_changed =
         map_data.is_changed() || world_seed.is_changed() || generation_state.last_inputs.is_none();
     if !event_requested && !input_may_have_changed {
@@ -74,9 +79,23 @@ pub fn regenerate_hex_face_topology(
 
     match generate_hex_face_topology(&map_data, *world_seed) {
         Ok(new_topology) => {
-            let unique_edge_count =
-                crate::map::face_topology::debug::extract_unique_undirected_edges(&new_topology)
-                    .len();
+            let mut new_cache = HexFaceDebugCache::default();
+            new_cache.rebuild(&new_topology, &map_data);
+            if !new_cache.is_consistent(&new_topology) {
+                generation_state.failure_count += 1;
+                if generation_state.last_successful_inputs.as_ref() != Some(&inputs) {
+                    *topology = HexFaceTopology::default();
+                    debug_cache.clear();
+                }
+                bevy::log::tracing::event!(
+                    bevy::log::tracing::Level::ERROR,
+                    seed = world_seed.value(),
+                    tiles = map_data.tiles.len(),
+                    "HexFaceTopology debug cache consistency failed"
+                );
+                return;
+            }
+            let unique_edge_count = new_cache.edges.len();
             bevy::log::tracing::event!(
                 bevy::log::tracing::Level::INFO,
                 seed = world_seed.value(),
@@ -89,11 +108,12 @@ pub fn regenerate_hex_face_topology(
                 paired_edges = new_topology.stats.paired_edge_count,
                 border_edges = new_topology.stats.border_edge_count,
                 unique_debug_edges = unique_edge_count,
+                unique_regular_edges = new_cache.regular_edges.len(),
                 reduced_displacements = new_topology.stats.reduced_displacement_fallbacks,
                 regular_fallbacks = new_topology.stats.regular_position_fallbacks,
                 "HexFaceTopology regenerated"
             );
-            debug_cache.rebuild(&new_topology);
+            *debug_cache = new_cache;
             topology.clone_from(&new_topology);
             generation_state.last_successful_inputs = Some(inputs);
             generation_state.generation_count += 1;
@@ -236,5 +256,31 @@ mod tests {
                 .failure_count,
             1
         );
+    }
+
+    #[test]
+    fn event_burst_drains_both_readers_and_regenerates_once() {
+        let mut app = test_app(map_with_tiles(2), 42);
+        for _ in 0..3 {
+            app.world_mut().write_message(GenerateMapEvent {
+                mode: crate::map::GenerationMode::Preserve,
+                auto_fill_phase: None,
+            });
+        }
+        for _ in 0..4 {
+            app.world_mut().write_message(RebuildMeshEvent);
+        }
+
+        app.update();
+        let state = app.world().resource::<HexFaceTopologyGenerationState>();
+        assert_eq!(state.generation_events_consumed, 3);
+        assert_eq!(state.rebuild_events_consumed, 4);
+        assert_eq!(state.generation_count, 1);
+
+        app.update();
+        let state = app.world().resource::<HexFaceTopologyGenerationState>();
+        assert_eq!(state.generation_events_consumed, 3);
+        assert_eq!(state.rebuild_events_consumed, 4);
+        assert_eq!(state.generation_count, 1);
     }
 }

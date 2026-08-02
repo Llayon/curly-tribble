@@ -1,12 +1,14 @@
 //! Optional immediate-mode diagnostics for `HexFaceTopology`.
-use crate::game_state::EditorPhase;
-use crate::map::face_topology::corner_key::{canonical_corner_key, regular_corner_position};
+use crate::game_state::{EditorPhase, GameState};
+pub use crate::map::face_topology::cache::{
+    extract_shared_vertices, extract_unique_regular_edges, extract_unique_undirected_edges,
+    HexFaceDebugCache, UniqueRegularEdge, UniqueUndirectedEdge,
+};
+use crate::map::face_topology::corner_key::regular_corner_position;
 use crate::map::face_topology::runtime::regenerate_hex_face_topology;
 use crate::map::face_topology::types::{HexFaceTopology, VertexId};
-use crate::map::MapData;
 use crate::sets::GameSet;
 use bevy::prelude::*;
-use std::collections::HashSet;
 
 const REGULAR_Y_OFFSET: f32 = 0.025;
 const WARPED_Y_OFFSET: f32 = 0.035;
@@ -36,58 +38,13 @@ impl Default for HexFaceDebugSettings {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UniqueUndirectedEdge {
-    pub min: VertexId,
-    pub max: VertexId,
-}
-
-#[derive(Resource, Debug, Clone, Default, PartialEq, Eq)]
-pub struct HexFaceDebugCache {
-    pub edges: Vec<UniqueUndirectedEdge>,
-    pub shared_vertices: Vec<VertexId>,
-}
-
-impl HexFaceDebugCache {
-    pub fn rebuild(&mut self, topology: &HexFaceTopology) {
-        self.edges = extract_unique_undirected_edges(topology);
-        self.shared_vertices = extract_shared_vertices(topology);
-    }
-
-    pub fn clear(&mut self) {
-        self.edges.clear();
-        self.shared_vertices.clear();
-    }
-}
-
-/// Extracts each topology edge once using `VertexId` identity, never positions.
 #[must_use]
-pub fn extract_unique_undirected_edges(topology: &HexFaceTopology) -> Vec<UniqueUndirectedEdge> {
-    let mut seen = HashSet::new();
-    let mut edges = Vec::new();
-    for edge in &topology.half_edges {
-        let (min, max) = if edge.origin <= edge.destination {
-            (edge.origin, edge.destination)
-        } else {
-            (edge.destination, edge.origin)
-        };
-        let unique_edge = UniqueUndirectedEdge { min, max };
-        if seen.insert(unique_edge) {
-            edges.push(unique_edge);
-        }
-    }
-    edges
-}
-
-/// Returns one marker identity per canonical stored `MapVertex`.
-#[must_use]
-pub fn extract_shared_vertices(topology: &HexFaceTopology) -> Vec<VertexId> {
-    (0..topology.vertices.len()).map(VertexId::new).collect()
-}
-
-#[must_use]
-pub fn debug_overlay_visible(settings: &HexFaceDebugSettings, phase: EditorPhase) -> bool {
-    settings.enabled && phase <= EditorPhase::Balance
+pub fn debug_overlay_visible(
+    game_state: GameState,
+    phase: EditorPhase,
+    settings: &HexFaceDebugSettings,
+) -> bool {
+    game_state == GameState::Editing && settings.enabled && phase <= EditorPhase::Balance
 }
 
 pub struct FaceTopologyDebugPlugin;
@@ -96,11 +53,17 @@ impl Plugin for FaceTopologyDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HexFaceDebugSettings>()
             .init_resource::<HexFaceDebugCache>()
-            .add_systems(Update, toggle_debug_settings.in_set(GameSet::Input))
+            .add_systems(
+                Update,
+                toggle_debug_settings
+                    .run_if(in_state(GameState::Editing))
+                    .in_set(GameSet::Input),
+            )
             .add_systems(
                 Update,
                 draw_face_topology_debug
                     .after(regenerate_hex_face_topology)
+                    .run_if(in_state(GameState::Editing))
                     .in_set(GameSet::Visuals),
             );
     }
@@ -109,7 +72,19 @@ impl Plugin for FaceTopologyDebugPlugin {
 fn toggle_debug_settings(
     keyboard: Res<ButtonInput<KeyCode>>,
     mut settings: ResMut<HexFaceDebugSettings>,
+    game_state: Res<State<GameState>>,
 ) {
+    apply_debug_shortcuts(&mut settings, *game_state.get(), &keyboard);
+}
+
+pub fn apply_debug_shortcuts(
+    settings: &mut HexFaceDebugSettings,
+    game_state: GameState,
+    keyboard: &ButtonInput<KeyCode>,
+) {
+    if game_state != GameState::Editing {
+        return;
+    }
     if keyboard.just_pressed(KeyCode::F7) {
         settings.enabled = !settings.enabled;
     }
@@ -126,17 +101,17 @@ pub fn draw_face_topology_debug(
     settings: Res<HexFaceDebugSettings>,
     cache: Res<HexFaceDebugCache>,
     topology: Res<HexFaceTopology>,
-    map_data: Res<MapData>,
     phase: Res<State<EditorPhase>>,
+    game_state: Res<State<GameState>>,
 ) {
-    if !debug_overlay_visible(&settings, *phase.get()) || topology.faces.is_empty() {
+    if !debug_overlay_visible(*game_state.get(), *phase.get(), &settings)
+        || topology.faces.is_empty()
+    {
         return;
     }
 
     if settings.show_regular_outlines {
-        for &coord in map_data.tiles.keys() {
-            draw_regular_outline(&mut gizmos, coord);
-        }
+        draw_regular_outlines(&mut gizmos, &cache.regular_edges);
     }
     if settings.show_warped_outlines {
         draw_warped_outlines(&mut gizmos, &topology, &cache.edges);
@@ -149,19 +124,17 @@ pub fn draw_face_topology_debug(
     }
 }
 
-fn draw_regular_outline(gizmos: &mut Gizmos, coord: crate::map::HexCoord) {
-    let mut points = [Vec3::ZERO; 6];
-    for (index, point) in points.iter_mut().enumerate() {
-        let key = canonical_corner_key(coord, index);
-        let Ok(position) = regular_corner_position(key) else {
+fn draw_regular_outlines(gizmos: &mut Gizmos, edges: &[UniqueRegularEdge]) {
+    for edge in edges {
+        let (Ok(origin), Ok(destination)) = (
+            regular_corner_position(edge.min),
+            regular_corner_position(edge.max),
+        ) else {
             return;
         };
-        *point = Vec3::new(position.x, REGULAR_Y_OFFSET, position.y);
-    }
-    for index in 0..6 {
         gizmos.line(
-            points[index],
-            points[(index + 1) % 6],
+            Vec3::new(origin.x, REGULAR_Y_OFFSET, origin.y),
+            Vec3::new(destination.x, REGULAR_Y_OFFSET, destination.y),
             Color::srgba(0.2, 0.7, 1.0, 0.7),
         );
     }

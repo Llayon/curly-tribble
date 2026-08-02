@@ -1,21 +1,36 @@
 /// Focused tests for debug-only topology helpers.
 #[cfg(test)]
 mod debug_tests {
-    use crate::game_state::EditorPhase;
+    use crate::game_state::{EditorPhase, GameState};
     use crate::map::data::{MapData, TileData};
     use crate::map::face_topology::debug::{
-        debug_overlay_visible, extract_shared_vertices, extract_unique_undirected_edges,
+        apply_debug_shortcuts, debug_overlay_visible, extract_shared_vertices,
+        extract_unique_regular_edges, extract_unique_undirected_edges, HexFaceDebugCache,
         HexFaceDebugSettings,
     };
     use crate::map::face_topology::generator::generate_hex_face_topology;
     use crate::map::HexCoord;
     use crate::map::WorldSeed;
+    use bevy::input::keyboard::KeyCode;
     use std::collections::HashSet;
 
     fn two_hex_map() -> MapData {
         let mut map = MapData::default();
         map.tiles.insert(HexCoord::new(0, 0), TileData::default());
         map.tiles.insert(HexCoord::new(1, 0), TileData::default());
+        map
+    }
+
+    fn map_40x40() -> MapData {
+        let mut map = MapData::default();
+        for r in 0..40 {
+            let offset = r >> 1;
+            for q in -offset..(40 - offset) {
+                map.tiles.insert(HexCoord::new(q, r), TileData::default());
+            }
+        }
+        map.width = 40;
+        map.height = 40;
         map
     }
 
@@ -35,13 +50,19 @@ mod debug_tests {
         let topology =
             generate_hex_face_topology(&map, WorldSeed::new(42)).expect("two-hex topology");
         let edges = extract_unique_undirected_edges(&topology);
+        let regular_edges = extract_unique_regular_edges(&map);
         let vertices = extract_shared_vertices(&topology);
         assert_eq!(
             edges.len(),
             topology.stats.paired_edge_count + topology.stats.border_edge_count
         );
+        assert_eq!(regular_edges.len(), edges.len());
         assert_eq!(vertices.len(), topology.vertices.len());
         assert_eq!(edges.iter().collect::<HashSet<_>>().len(), edges.len());
+        assert_eq!(
+            regular_edges.iter().collect::<HashSet<_>>().len(),
+            regular_edges.len()
+        );
     }
 
     #[test]
@@ -62,9 +83,56 @@ mod debug_tests {
     #[test]
     fn visibility_is_disabled_or_limited_to_flat_phases() {
         let mut settings = HexFaceDebugSettings::default();
-        assert!(!debug_overlay_visible(&settings, EditorPhase::Shape));
+        assert!(!debug_overlay_visible(
+            GameState::Playing,
+            EditorPhase::Shape,
+            &settings
+        ));
+        assert!(!debug_overlay_visible(
+            GameState::Editing,
+            EditorPhase::Height3D,
+            &settings
+        ));
         settings.enabled = true;
-        assert!(debug_overlay_visible(&settings, EditorPhase::Balance));
-        assert!(!debug_overlay_visible(&settings, EditorPhase::Height3D));
+        assert!(debug_overlay_visible(
+            GameState::Editing,
+            EditorPhase::Balance,
+            &settings
+        ));
+        assert!(!debug_overlay_visible(
+            GameState::Playing,
+            EditorPhase::Balance,
+            &settings
+        ));
+    }
+
+    #[test]
+    fn shortcuts_are_ignored_outside_editing() {
+        let mut keyboard = bevy::input::ButtonInput::default();
+        keyboard.press(KeyCode::F5);
+        keyboard.press(KeyCode::F6);
+        keyboard.press(KeyCode::F7);
+        let defaults = HexFaceDebugSettings::default();
+        let mut settings = defaults.clone();
+        apply_debug_shortcuts(&mut settings, GameState::Playing, &keyboard);
+        assert_eq!(settings, defaults);
+        apply_debug_shortcuts(&mut settings, GameState::Editing, &keyboard);
+        assert!(settings.enabled);
+        assert!(settings.show_shared_vertices);
+        assert!(settings.show_half_edge_directions);
+    }
+
+    #[test]
+    fn forty_by_forty_cache_has_one_regular_and_warped_edge_per_logical_edge() {
+        let map = map_40x40();
+        let topology =
+            generate_hex_face_topology(&map, WorldSeed::new(42)).expect("40x40 topology");
+        let mut cache = HexFaceDebugCache::default();
+        cache.rebuild(&topology, &map);
+        assert_eq!(cache.edges.len(), 4_959);
+        assert_eq!(cache.regular_edges.len(), 4_959);
+        assert_eq!(cache.edges.len(), cache.regular_edges.len());
+        assert_eq!(cache.shared_vertices.len(), topology.vertices.len());
+        assert!(cache.is_consistent(&topology));
     }
 }

@@ -34,11 +34,13 @@ map width, map height, world seed, and sorted `HexCoord` tile membership. Tile
 content such as factions, resources, treasures, and terrain attributes does not
 trigger regeneration when the logical map is unchanged.
 
-The generated value is stored as the authoritative `HexFaceTopology` resource.
-The debug cache is derived from that same value. A failed generation never
-stores partial data. If the failed inputs differ from the last successful map,
-the topology and cache are cleared; a valid topology for the same logical map
-is retained. The failed fingerprint prevents repeated per-frame error logs.
+The generated value is stored as the authoritative resource for the diagnostic
+`HexFaceTopology` path. It is not authoritative for `TerrainTopology`, terrain
+rendering, Height3D, picking, or gameplay. The debug cache is derived from that
+same value. A failed generation never stores partial data. If the failed inputs
+differ from the last successful map, the topology and cache are cleared; a
+valid topology for the same logical map is retained. The failed fingerprint
+prevents repeated per-frame error logs.
 
 ## Debug Controls
 
@@ -51,8 +53,10 @@ The overlay starts disabled:
 | `F5` | Toggle limited HalfEdge direction arrows |
 
 Regular outlines and warped outlines default to enabled when `F7` is turned on.
-The overlay is available only from `EditorPhase::Shape` through
-`EditorPhase::Balance`. It is hidden from `Height3D` and later phases.
+Keyboard handling and drawing are gated by `GameState::Editing`; `F5`, `F6`,
+and `F7` do nothing outside that state. The overlay is available only from
+`EditorPhase::Shape` through `EditorPhase::Balance`. It is hidden from
+`Height3D` and later phases.
 
 ## Geometry Sources
 
@@ -60,8 +64,9 @@ The overlay is available only from `EditorPhase::Shape` through
 - Warped outlines use `VertexId` and `MapVertex.position` from the stored
   `HexFaceTopology`; the drawing system never recomputes displacement.
 - Shared markers are extracted once per canonical `VertexId`.
-- Warped segments use `(min(VertexId), max(VertexId))` and are drawn once, so
-  internal borders are not duplicated.
+- Regular and warped segments are cached with one canonical undirected key per
+  logical map edge. Regular edges use ordered `SharedCornerKey` pairs; warped
+  edges use `(min(VertexId), max(VertexId))`. Internal borders are drawn once.
 - HalfEdge arrows are sampled rather than drawn for all directed edges.
 
 `HexFaceDebugCache` is rebuilt whenever the authoritative topology is replaced.

@@ -1,4 +1,5 @@
 // src/map/face_topology/mod.rs
+pub mod cache;
 pub mod corner_key;
 pub mod debug;
 pub mod generator;
