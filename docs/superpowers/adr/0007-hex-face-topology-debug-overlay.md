@@ -29,6 +29,35 @@ Add a dedicated runtime/debug layer under `src/map/face_topology/`:
    vertices, and `F5` for sampled HalfEdge arrows.
 5. Clear stale data on failed generation for a changed logical map and retain a
    valid result when the failed inputs are unchanged.
+6. Use `F8` (in `GameState::Editing`) to cycle the experimental deformation
+   profile among `Subtle`, `Organic`, and `PagoniaLike`; a profile change
+   regenerates the diagnostic topology once and is logged.
+
+## Эксперимент (Experimental Deformation Profiles)
+
+The diagnostic path also supports an experimental, visually comparative set of
+deterministic deformation profiles. This is diagnostic only and is **not**
+validated, tuned, or integrated into production terrain, Height3D, picking, or
+gameplay.
+
+- `Subtle` (the default, bit-compatible with the pre-existing warped output):
+  a purely local, per-corner fixed-direction displacement.
+- `Organic`: blends the local displacement with a low-frequency correlated
+  field (~65/35 correlated/local weight, macro-cell span of 5 hexes) whose
+  gradient arises from the fixed camera rotation applied to a stable, seeded
+  node vector. Target kept small enough that nearly every face stays a valid
+  convex polygon without backoff.
+- `PagoniaLike`: a stronger correlated variant (~75/25 weight) meant to
+  approximate a larger-cell, more continuous look reminiscent of that title's
+  map aesthetics. This is a **visual experiment only**; it makes no claim to
+  reproduce any actual Pagonia data structure, algorithm, or asset.
+
+All three profiles share the same deterministic top-bottom seed, rely on
+integer derived fields (no runtime `sin`/`cos`, no `StdRng`, no
+`HashMap`-order dependence), and undergo the same simultaneous backoff loop to
+guarantee valid convex geometry. An explicit per-vertex and combined set of
+golden displacement vectors locks the correlated field and displacement to
+exact `f32::to_bits()` references.
 
 ## Обоснование (Rationale)
 

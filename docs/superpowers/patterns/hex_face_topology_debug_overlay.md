@@ -42,6 +42,10 @@ differ from the last successful map, the topology and cache are cleared; a
 valid topology for the same logical map is retained. The failed fingerprint
 prevents repeated per-frame error logs.
 
+`LogicalMapInputs` also includes the selected `HexDeformationProfile`, so a
+profile switch is detected as a fingerprint change and regenerates the
+diagnostic topology exactly once without altering `MapData` or `WorldSeed`.
+
 ## Debug Controls
 
 The overlay starts disabled:
@@ -51,10 +55,11 @@ The overlay starts disabled:
 | `F7` | Enable or disable all topology diagnostics |
 | `F6` | Toggle canonical shared-vertex markers |
 | `F5` | Toggle limited HalfEdge direction arrows |
+| `F8` | Cycle experimental deformation profile (`Subtle` -> `Organic` -> `PagoniaLike`) |
 
-Regular outlines and warped outlines default to enabled when `F7` is turned on.
-Keyboard handling and drawing are gated by `GameState::Editing`; `F5`, `F6`,
-and `F7` do nothing outside that state. The overlay is available only from
+Regular and warped outlines are enabled and disabled together. Keyboard
+handling and drawing are gated by `GameState::Editing`; `F5`, `F6`, `F7`, and
+`F8` do nothing outside that state. The overlay is available only from
 `EditorPhase::Shape` through `EditorPhase::Balance`. It is hidden from
 `Height3D` and later phases.
 
@@ -82,3 +87,29 @@ logical tile membership changes, content-only changes, and failure cleanup.
 Native validation should capture disabled, wide enabled, close shared-border,
 shared-vertex, and HalfEdge-arrow views. The normal UI remains visible in every
 view.
+
+## Experimental Profile Validation
+
+Profiles are validated with unit tests that require:
+
+- `Subtle` is the default and remains bit-compatible with the pre-profile
+  warped output (existing golden displacement vectors unchanged).
+- Per-vertex and combined displacement vectors for `Organic` and `PagoniaLike`
+  match exact `f32::to_bits()` golden references (determinism lock).
+- The correlated field is spatially related, non-constant, and handles negative
+  coordinates deterministically.
+- Topology identity (face/vertex/half-edge/paired/border counts) and map data
+  are preserved across all profiles, and a profile change regenerates exactly
+  once without touching map data.
+
+Run the full 256-seed, three-profile stress suite (4,608 topologies) explicitly:
+
+```text
+cargo test --lib full_hex_deformation_profiles_stress_256_seeds -- --ignored
+```
+
+The fast loop that runs with the normal suite is:
+
+```text
+cargo test --lib fast_profile_stress_covers_all_profiles_and_shapes
+```

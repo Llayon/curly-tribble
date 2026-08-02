@@ -3,16 +3,17 @@ use crate::map::data::{MapData, HEX_SIZE};
 use crate::map::face_topology::corner_key::{
     canonical_corner_key, corner_displacement, regular_corner_position,
 };
+use crate::map::face_topology::metrics::compute_topology_metrics;
+use crate::map::face_topology::profiles::{profile_displacement, HexDeformationProfile};
 use crate::map::face_topology::types::{
     FaceId, HalfEdge, HalfEdgeId, HexFace, HexFaceTopology, HexFaceTopologyError, MapVertex,
     SharedCornerKey, TopologyStats, VertexId,
 };
-use crate::map::face_topology::validation::{min_edge_length, signed_area};
 use crate::map::face_topology::validation_complete::validate_complete_topology;
 use crate::map::HexCoord;
 use crate::map::WorldSeed;
 use bevy::prelude::Vec2;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 /// Generates deterministic `HexFaceTopology` from `MapData` and `WorldSeed`.
 ///
@@ -22,6 +23,19 @@ use std::collections::HashMap;
 pub fn generate_hex_face_topology(
     map_data: &MapData,
     seed: WorldSeed,
+) -> Result<HexFaceTopology, HexFaceTopologyError> {
+    generate_hex_face_topology_with_profile(map_data, seed, HexDeformationProfile::Subtle)
+}
+
+/// Generates deterministic topology using one experimental diagnostic profile.
+///
+/// # Errors
+/// Returns `HexFaceTopologyError` if the map or final profile geometry is invalid.
+#[allow(clippy::too_many_lines, clippy::needless_range_loop)]
+pub fn generate_hex_face_topology_with_profile(
+    map_data: &MapData,
+    seed: WorldSeed,
+    profile: HexDeformationProfile,
 ) -> Result<HexFaceTopology, HexFaceTopologyError> {
     if map_data.tiles.is_empty() {
         return Err(HexFaceTopologyError::EmptyMap);
@@ -56,7 +70,11 @@ pub fn generate_hex_face_topology(
 
     let mut raw_displacements: HashMap<SharedCornerKey, Vec2> = HashMap::new();
     for &key in &sorted_keys {
-        let disp = corner_displacement(seed.value(), key, HEX_SIZE);
+        let disp = if profile == HexDeformationProfile::Subtle {
+            corner_displacement(seed.value(), key, HEX_SIZE)
+        } else {
+            profile_displacement(seed.value(), key, HEX_SIZE, profile)
+        };
         raw_displacements.insert(key, disp);
     }
 
@@ -79,62 +97,55 @@ pub fn generate_hex_face_topology(
     };
 
     let mut active_displacements = raw_displacements.clone();
-    let mut stats = TopologyStats::default();
+    let mut stats = TopologyStats {
+        profile,
+        ..Default::default()
+    };
+    let mut reduced_keys = HashSet::new();
 
-    // 2. Validate geometry per corner and apply displacement reduction fallback
-    for &key in &sorted_keys {
-        let Some(&raw_disp) = raw_displacements.get(&key) else {
-            return Err(HexFaceTopologyError::ValidationFailed(format!(
-                "Missing raw displacement for corner {key:?}"
-            )));
-        };
-        let Some(incident_coords) = corner_incident_faces.get(&key) else {
-            return Err(HexFaceTopologyError::ValidationFailed(format!(
-                "Missing incident face list for corner {key:?}"
-            )));
-        };
-
-        let reduction_factors = [1.0f32, 0.75, 0.5, 0.25, 0.0];
-        let mut chosen_factor = 0.0f32;
-        let mut success = false;
-
-        for &factor in &reduction_factors {
-            active_displacements.insert(key, raw_disp * factor);
-
-            let mut valid_all = true;
-            for &coord in incident_coords {
-                let pts = get_face_pts(coord, &active_displacements)?;
-                if crate::map::face_topology::validation::validate_face_geometry(
-                    &pts,
-                    FaceId::new(0),
-                )
-                .is_err()
-                {
-                    valid_all = false;
-                    break;
+    let reduction_factors = [1.0f32, 0.875, 0.75, 0.625, 0.5, 0.375, 0.25, 0.125, 0.0];
+    let mut reduction_index = 0;
+    loop {
+        let mut invalid_keys = HashSet::new();
+        for (face_index, &coord) in sorted_coords.iter().enumerate() {
+            let pts = get_face_pts(coord, &active_displacements)?;
+            if crate::map::face_topology::validation::validate_face_geometry(
+                &pts,
+                FaceId::new(face_index),
+            )
+            .is_err()
+            {
+                for index in 0..6 {
+                    invalid_keys.insert(canonical_corner_key(coord, index));
                 }
             }
-
-            if valid_all {
-                chosen_factor = factor;
-                success = true;
-                break;
-            }
         }
-
-        if !success {
-            active_displacements.insert(key, Vec2::ZERO);
-            chosen_factor = 0.0;
+        if invalid_keys.is_empty() {
+            break;
         }
-
-        if (chosen_factor - 1.0).abs() > 1e-4 {
-            if chosen_factor > 0.0 {
-                stats.reduced_displacement_fallbacks += 1;
-            } else {
+        let mut sorted_invalid_keys: Vec<_> = invalid_keys.into_iter().collect();
+        sorted_invalid_keys.sort_unstable();
+        if reduction_index + 1 >= reduction_factors.len() {
+            for key in sorted_invalid_keys {
+                active_displacements.insert(key, Vec2::ZERO);
                 stats.regular_position_fallbacks += 1;
             }
+            break;
+        }
+        reduction_index += 1;
+        stats.reduction_rounds += 1;
+        for key in sorted_invalid_keys {
+            let Some(&raw_disp) = raw_displacements.get(&key) else {
+                return Err(HexFaceTopologyError::ValidationFailed(format!(
+                    "Missing raw displacement for corner {key:?}"
+                )));
+            };
+            active_displacements.insert(key, raw_disp * reduction_factors[reduction_index]);
+            reduced_keys.insert(key);
+            stats.reduced_displacement_fallbacks += 1;
         }
     }
+    stats.reduced_vertices = reduced_keys.len();
 
     // 3. Construct MapVertex list
     for &key in &sorted_keys {
@@ -227,32 +238,18 @@ pub fn generate_hex_face_topology(
     stats.border_edge_count = border_count;
     stats.half_edge_count = edge_count;
 
-    // 6. Compute face areas and edge length bounds
-    let mut min_area = f32::INFINITY;
-    let mut max_area = f32::NEG_INFINITY;
-    let mut min_edge = f32::INFINITY;
-
-    for face in &topology.faces {
-        let mut pts = [Vec2::ZERO; 6];
-        for i in 0..6 {
-            pts[i] = topology.vertices[face.vertices[i].index()].position;
-        }
-        let area = signed_area(&pts);
-        if area < min_area {
-            min_area = area;
-        }
-        if area > max_area {
-            max_area = area;
-        }
-        let edge_len = min_edge_length(&pts);
-        if edge_len < min_edge {
-            min_edge = edge_len;
-        }
-    }
-
-    stats.min_face_area = min_area;
-    stats.max_face_area = max_area;
-    stats.min_edge_length = min_edge;
+    // 6. Compute diagnostic shape metrics.
+    let metrics = compute_topology_metrics(&topology);
+    stats.min_face_area = metrics.min_face_area;
+    stats.max_face_area = metrics.max_face_area;
+    stats.min_edge_length = metrics.min_edge_length;
+    stats.max_edge_length = metrics.max_edge_length;
+    stats.min_interior_angle = metrics.min_interior_angle;
+    stats.max_interior_angle = metrics.max_interior_angle;
+    stats.min_aspect_quality = metrics.min_aspect_quality;
+    stats.max_aspect_quality = metrics.max_aspect_quality;
+    stats.max_displacement = metrics.max_displacement;
+    stats.average_displacement = metrics.average_displacement;
 
     topology.stats = stats;
 

@@ -1,6 +1,8 @@
 //! Authoritative runtime population of the data-only face topology resource.
 use crate::map::face_topology::cache::HexFaceDebugCache;
-use crate::map::face_topology::generate_hex_face_topology;
+use crate::map::face_topology::debug::HexFaceDebugSettings;
+use crate::map::face_topology::generate_hex_face_topology_with_profile;
+use crate::map::face_topology::profiles::HexDeformationProfile;
 use crate::map::face_topology::types::HexFaceTopology;
 use crate::map::{GenerateMapEvent, MapData, RebuildMeshEvent, WorldSeed};
 use crate::sets::GameSet;
@@ -12,11 +14,16 @@ pub struct LogicalMapInputs {
     pub height: u32,
     pub seed: u32,
     pub tiles: Vec<crate::map::HexCoord>,
+    pub profile: HexDeformationProfile,
 }
 
 impl LogicalMapInputs {
     #[must_use]
-    pub fn from_map(map_data: &MapData, world_seed: WorldSeed) -> Self {
+    pub fn from_map(
+        map_data: &MapData,
+        world_seed: WorldSeed,
+        profile: HexDeformationProfile,
+    ) -> Self {
         let mut tiles: Vec<_> = map_data.tiles.keys().copied().collect();
         tiles.sort_by_key(|coord| (coord.q, coord.r));
         Self {
@@ -24,6 +31,7 @@ impl LogicalMapInputs {
             height: map_data.height,
             seed: world_seed.value(),
             tiles,
+            profile,
         }
     }
 }
@@ -57,6 +65,7 @@ pub fn regenerate_hex_face_topology(
     mut generation_state: ResMut<HexFaceTopologyGenerationState>,
     map_data: Res<MapData>,
     world_seed: Res<WorldSeed>,
+    debug_settings: Res<HexFaceDebugSettings>,
     mut generation_events: MessageReader<GenerateMapEvent>,
     mut rebuild_events: MessageReader<RebuildMeshEvent>,
 ) {
@@ -65,19 +74,21 @@ pub fn regenerate_hex_face_topology(
     generation_state.generation_events_consumed += generation_events_consumed as u64;
     generation_state.rebuild_events_consumed += rebuild_events_consumed as u64;
     let event_requested = generation_events_consumed > 0 || rebuild_events_consumed > 0;
-    let input_may_have_changed =
-        map_data.is_changed() || world_seed.is_changed() || generation_state.last_inputs.is_none();
+    let input_may_have_changed = map_data.is_changed()
+        || world_seed.is_changed()
+        || debug_settings.is_changed()
+        || generation_state.last_inputs.is_none();
     if !event_requested && !input_may_have_changed {
         return;
     }
 
-    let inputs = LogicalMapInputs::from_map(&map_data, *world_seed);
+    let inputs = LogicalMapInputs::from_map(&map_data, *world_seed, debug_settings.profile);
     if generation_state.last_inputs.as_ref() == Some(&inputs) {
         return;
     }
     generation_state.last_inputs = Some(inputs.clone());
 
-    match generate_hex_face_topology(&map_data, *world_seed) {
+    match generate_hex_face_topology_with_profile(&map_data, *world_seed, debug_settings.profile) {
         Ok(new_topology) => {
             let mut new_cache = HexFaceDebugCache::default();
             new_cache.rebuild(&new_topology, &map_data);
@@ -100,17 +111,13 @@ pub fn regenerate_hex_face_topology(
                 bevy::log::tracing::Level::INFO,
                 seed = world_seed.value(),
                 tiles = map_data.tiles.len(),
-                width = map_data.width,
-                height = map_data.height,
                 faces = new_topology.faces.len(),
                 vertices = new_topology.vertices.len(),
                 half_edges = new_topology.half_edges.len(),
-                paired_edges = new_topology.stats.paired_edge_count,
-                border_edges = new_topology.stats.border_edge_count,
                 unique_debug_edges = unique_edge_count,
                 unique_regular_edges = new_cache.regular_edges.len(),
-                reduced_displacements = new_topology.stats.reduced_displacement_fallbacks,
-                regular_fallbacks = new_topology.stats.regular_position_fallbacks,
+                profile = debug_settings.profile.name(),
+                stats = ?new_topology.stats,
                 "HexFaceTopology regenerated"
             );
             *debug_cache = new_cache;
@@ -160,6 +167,7 @@ mod tests {
         app.insert_resource(map)
             .insert_resource(WorldSeed::new(seed))
             .init_resource::<HexFaceTopology>()
+            .init_resource::<HexFaceDebugSettings>()
             .init_resource::<HexFaceDebugCache>()
             .init_resource::<HexFaceTopologyGenerationState>()
             .add_message::<GenerateMapEvent>()
@@ -168,6 +176,11 @@ mod tests {
         app
     }
 
+    fn count(app: &App) -> u64 {
+        app.world()
+            .resource::<HexFaceTopologyGenerationState>()
+            .generation_count
+    }
     #[test]
     fn valid_map_populates_and_validates_stored_topology() {
         let map = map_with_tiles(2);
@@ -184,29 +197,14 @@ mod tests {
         let mut app = test_app(map_with_tiles(2), 42);
         app.update();
         let first = app.world().resource::<HexFaceTopology>().clone();
-        assert_eq!(
-            app.world()
-                .resource::<HexFaceTopologyGenerationState>()
-                .generation_count,
-            1
-        );
+        assert_eq!(count(&app), 1);
         app.update();
-        assert_eq!(
-            app.world()
-                .resource::<HexFaceTopologyGenerationState>()
-                .generation_count,
-            1
-        );
+        assert_eq!(count(&app), 1);
         app.world_mut().insert_resource(WorldSeed::new(99));
         app.update();
         let second = app.world().resource::<HexFaceTopology>();
         assert_ne!(first.vertices, second.vertices);
-        assert_eq!(
-            app.world()
-                .resource::<HexFaceTopologyGenerationState>()
-                .generation_count,
-            2
-        );
+        assert_eq!(count(&app), 2);
     }
 
     #[test]
@@ -282,5 +280,21 @@ mod tests {
         assert_eq!(state.generation_events_consumed, 3);
         assert_eq!(state.rebuild_events_consumed, 4);
         assert_eq!(state.generation_count, 1);
+    }
+
+    #[test]
+    fn profile_change_regenerates_once_without_changing_map_data() {
+        let mut app = test_app(map_with_tiles(2), 42);
+        app.update();
+        app.world_mut()
+            .resource_mut::<HexFaceDebugSettings>()
+            .profile = HexDeformationProfile::Organic;
+        app.update();
+        let state = app.world().resource::<HexFaceTopologyGenerationState>();
+        assert_eq!(state.generation_count, 2);
+        assert_eq!(
+            app.world().resource::<HexFaceTopology>().stats.profile,
+            HexDeformationProfile::Organic
+        );
     }
 }

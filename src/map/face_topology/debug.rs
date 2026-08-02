@@ -5,6 +5,7 @@ pub use crate::map::face_topology::cache::{
     HexFaceDebugCache, UniqueRegularEdge, UniqueUndirectedEdge,
 };
 use crate::map::face_topology::corner_key::regular_corner_position;
+use crate::map::face_topology::profiles::HexDeformationProfile;
 use crate::map::face_topology::runtime::regenerate_hex_face_topology;
 use crate::map::face_topology::types::{HexFaceTopology, VertexId};
 use crate::sets::GameSet;
@@ -20,6 +21,7 @@ const HALF_EDGE_DRAW_STRIDE: usize = 16;
 #[allow(clippy::struct_excessive_bools)]
 pub struct HexFaceDebugSettings {
     pub enabled: bool,
+    pub profile: HexDeformationProfile,
     pub show_regular_outlines: bool,
     pub show_warped_outlines: bool,
     pub show_shared_vertices: bool,
@@ -30,6 +32,7 @@ impl Default for HexFaceDebugSettings {
     fn default() -> Self {
         Self {
             enabled: false,
+            profile: HexDeformationProfile::Subtle,
             show_regular_outlines: true,
             show_warped_outlines: true,
             show_shared_vertices: false,
@@ -87,6 +90,9 @@ pub fn apply_debug_shortcuts(
     }
     if keyboard.just_pressed(KeyCode::F7) {
         settings.enabled = !settings.enabled;
+    }
+    if keyboard.just_pressed(KeyCode::F8) {
+        settings.profile = settings.profile.next();
     }
     if keyboard.just_pressed(KeyCode::F6) {
         settings.show_shared_vertices = !settings.show_shared_vertices;

@@ -4,6 +4,8 @@ pub mod corner_key;
 pub mod debug;
 pub mod generator;
 pub mod logical_adjacency;
+pub mod metrics;
+pub mod profiles;
 pub mod runtime;
 pub mod types;
 pub mod validation;
@@ -17,12 +19,16 @@ mod tests_debug;
 #[cfg(test)]
 mod tests_mutation;
 #[cfg(test)]
+mod tests_profiles;
+#[cfg(test)]
 mod tests_stress;
 
 pub use corner_key::{
     canonical_corner_key, corner_displacement, regular_corner_position, seed_for_corner,
 };
 pub use generator::generate_hex_face_topology;
+pub use generator::generate_hex_face_topology_with_profile;
+pub use profiles::HexDeformationProfile;
 pub use types::*;
 pub use validation::{min_edge_length, segments_intersect, signed_area, validate_face_geometry};
 pub use validation_complete::validate_complete_topology;

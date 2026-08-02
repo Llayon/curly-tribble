@@ -112,6 +112,7 @@ mod debug_tests {
         keyboard.press(KeyCode::F5);
         keyboard.press(KeyCode::F6);
         keyboard.press(KeyCode::F7);
+        keyboard.press(KeyCode::F8);
         let defaults = HexFaceDebugSettings::default();
         let mut settings = defaults.clone();
         apply_debug_shortcuts(&mut settings, GameState::Playing, &keyboard);
@@ -120,6 +121,10 @@ mod debug_tests {
         assert!(settings.enabled);
         assert!(settings.show_shared_vertices);
         assert!(settings.show_half_edge_directions);
+        assert_eq!(
+            settings.profile,
+            crate::map::face_topology::HexDeformationProfile::Organic
+        );
     }
 
     #[test]

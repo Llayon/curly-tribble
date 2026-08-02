@@ -1,3 +1,4 @@
+use crate::map::face_topology::profiles::HexDeformationProfile;
 /// Data types for the hex face topology sub-module.
 use crate::map::HexCoord;
 use bevy::prelude::{Resource, Vec2};
@@ -92,11 +93,21 @@ pub struct HexFace {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct TopologyStats {
+    pub profile: HexDeformationProfile,
+    pub reduction_rounds: usize,
+    pub reduced_vertices: usize,
     pub reduced_displacement_fallbacks: usize,
     pub regular_position_fallbacks: usize,
     pub min_face_area: f32,
     pub max_face_area: f32,
     pub min_edge_length: f32,
+    pub max_edge_length: f32,
+    pub min_interior_angle: f32,
+    pub max_interior_angle: f32,
+    pub min_aspect_quality: f32,
+    pub max_aspect_quality: f32,
+    pub max_displacement: f32,
+    pub average_displacement: f32,
     pub half_edge_count: usize,
     pub paired_edge_count: usize,
     pub border_edge_count: usize,
