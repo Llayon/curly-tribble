@@ -24,6 +24,8 @@
 - [SOP: Reactive Faction Relocation](docs/superpowers/patterns/reactive_faction_relocation.md): Multi-phase reactive logic for entity positioning and territory preservation.
 - [SOP: A River Routing](docs/superpowers/patterns/a_river_routing.md): Pathfinding-based river generation on terraced terrain.
 - [SOP: Zenith Navigator](docs/superpowers/patterns/zenith_navigator.md): Standards for asynchronous, reactive pathfinding.
+- [SOP: HexFaceTopology Debug Overlay](docs/superpowers/patterns/hex_face_topology_debug_overlay.md): Fingerprint-triggered topology regeneration and optional flat-phase Gizmos diagnostics.
+- [ADR 0007: HexFaceTopology Diagnostic Overlay](docs/superpowers/adr/0007-hex-face-topology-debug-overlay.md): Resource ownership, cache derivation, failure policy, and debug-only rendering boundaries.
 - [Design: Advanced Terrain Generation](docs/superpowers/specs/2026-05-11-advanced-terrain-gen-design.md): Sharp ridges, pass masks, and terraced plateaus logic.
 - [Plan: Advanced Terrain Implementation](docs/superpowers/plans/2026-05-11-advanced-terrain-gen.md): Technical steps for the unified TerrainConfig inspector.
 - [Design: Procedural Rivers](docs/superpowers/specs/2026-05-12-pathfinding-rivers-design.md): Dijkstra-based river routing and mud banks.

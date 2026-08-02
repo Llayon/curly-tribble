@@ -4,6 +4,7 @@ Index of architectural decisions for "Savage Fantasy".
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [0007](0007-hex-face-topology-debug-overlay.md) | HexFaceTopology Diagnostic Overlay | Accepted | 2026-08-02 |
 | [0004](0004-procedural-world-generation.md) | Procedural World Generation (Noise & Scattering) | Accepted | 2026-05-09 |
 | [0003](0003-interaction-radius.md) | Interaction Radius (Remote Interaction) | Accepted | 2026-05-07 |
 | [0002](0002-zenith-navigator.md) | Zenith Navigator (Async Pathfinding) | Accepted | 2026-05-06 |
