@@ -1,7 +1,9 @@
 // src/map/face_topology/mod.rs
 pub mod corner_key;
+pub mod debug;
 pub mod generator;
 pub mod logical_adjacency;
+pub mod runtime;
 pub mod types;
 pub mod validation;
 pub mod validation_complete;
@@ -9,6 +11,8 @@ pub mod validation_twins;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_debug;
 #[cfg(test)]
 mod tests_mutation;
 #[cfg(test)]
@@ -28,6 +32,9 @@ pub struct FaceTopologyPlugin;
 
 impl Plugin for FaceTopologyPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<HexFaceTopology>();
+        app.init_resource::<HexFaceTopology>().add_plugins((
+            runtime::FaceTopologyRuntimePlugin,
+            debug::FaceTopologyDebugPlugin,
+        ));
     }
 }
