@@ -88,6 +88,38 @@ Native validation should capture disabled, wide enabled, close shared-border,
 shared-vertex, and HalfEdge-arrow views. The normal UI remains visible in every
 view.
 
+## Compatibility and Determinism Lock
+
+Golden connectivity and geometry fingerprints are literal constants in
+`tests_compat.rs`, extracted by running the identical fingerprint
+implementation in a detached worktree at commit `158e5f2` (the pre-profile
+Subtle output). The canonical fixtures are:
+
+| Fixture | Connectivity | Geometry |
+|---------|--------------|----------|
+| 40x40 seed 42 | `ced2a6625361af97` | `2c69358d1bde2489` |
+| 40x40 seed 99 | `4204f1084ab83e7c` | `3222156361ed2849` |
+| L-shape seed 42 | `9ed9d5c5d7b6c2ab` | `5575c4b2e0910e73` |
+| Diagonal seed 7 | `c6f10fe0442b2820` | `bb217bd74b1b3c45` |
+| Seven-hex seed 42 | `91c095c7e82cee27` | `2531f9b9a3b17f8f` |
+
+The stable hash is project-owned FNV-1a 64-bit over big-endian fields: map
+dimensions, `WorldSeed`, ascending `VertexId`s with `f32::to_bits()` positions,
+sorted face cycles, and half-edge endpoints/twins/ownership. It has no
+`usize`-width dependence, no `HashMap` iteration order, and excludes diagnostic
+`acos`-based metrics. A seed scan at `158e5f2` found no reduction/fallback case,
+so backoff compatibility is documented as untested, not asserted.
+
+## Acceptance Criteria
+
+`ProfileAcceptanceCriteria` (in `acceptance.rs`) centralizes measured-output
+thresholds, distinct from the generator's input config (component magnitude
+ranges are an input range, not a final displacement guarantee). Generation
+fails hard if the measured final displacement exceeds the profile's absolute
+cap (ratio of `HEX_SIZE`, 1e-3 tolerance). Visual misses emit a single WARN at
+regeneration time and fail the canonical 40x40 fixture tests; they never affect
+production terrain.
+
 ## Experimental Profile Validation
 
 Profiles are validated with unit tests that require:

@@ -251,6 +251,18 @@ pub fn generate_hex_face_topology_with_profile(
     stats.max_displacement = metrics.max_displacement;
     stats.average_displacement = metrics.average_displacement;
 
+    // 6b. Hard safety cap: measured final displacement after backoff must stay
+    // within the profile's absolute displacement cap. This is a generation
+    // failure, not a visual warning.
+    let cap_radius = profile.config().absolute_displacement_cap_ratio() * HEX_SIZE;
+    if metrics.max_displacement > cap_radius * (1.0 + 1e-3) {
+        return Err(HexFaceTopologyError::ProfileDisplacementCapExceeded {
+            profile,
+            max_displacement: metrics.max_displacement,
+            cap_radius,
+        });
+    }
+
     topology.stats = stats;
 
     // 7. Final complete topology validation

@@ -130,9 +130,21 @@ pub enum HexFaceTopologyError {
     NonConvexFace(FaceId),
     SelfIntersectingFace(FaceId),
     InvalidWinding(FaceId),
-    NearZeroEdge { face: FaceId, edge: HalfEdgeId },
+    NearZeroEdge {
+        face: FaceId,
+        edge: HalfEdgeId,
+    },
     NonPositiveArea(FaceId),
-    InconsistentTwin { edge: HalfEdgeId, twin: HalfEdgeId },
+    InconsistentTwin {
+        edge: HalfEdgeId,
+        twin: HalfEdgeId,
+    },
     DisplacementFailed(FaceId),
+    /// A measured final displacement exceeded the profile's absolute cap.
+    ProfileDisplacementCapExceeded {
+        profile: crate::map::face_topology::profiles::HexDeformationProfile,
+        max_displacement: f32,
+        cap_radius: f32,
+    },
     ValidationFailed(String),
 }

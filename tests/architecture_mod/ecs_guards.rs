@@ -4,18 +4,22 @@ use std::path::Path;
 
 // These are the current pure data/algorithm files. Keep this list explicit so
 // a future runtime system, plugin, bundle, or query is still scanned normally.
-const FACE_TOPOLOGY_DATA_FILES: [&str; 15] = [
+const FACE_TOPOLOGY_DATA_FILES: [&str; 19] = [
     "src/map/face_topology/corner_key.rs",
     "src/map/face_topology/cache.rs",
+    "src/map/face_topology/fingerprint.rs",
     "src/map/face_topology/generator.rs",
     "src/map/face_topology/logical_adjacency.rs",
     "src/map/face_topology/metrics.rs",
     "src/map/face_topology/profiles.rs",
+    "src/map/face_topology/acceptance.rs",
     "src/map/face_topology/tests.rs",
     "src/map/face_topology/tests_mutation.rs",
     "src/map/face_topology/tests_stress.rs",
     "src/map/face_topology/tests_debug.rs",
     "src/map/face_topology/tests_profiles.rs",
+    "src/map/face_topology/tests_compat.rs",
+    "src/map/face_topology/tests_acceptance.rs",
     "src/map/face_topology/types.rs",
     "src/map/face_topology/validation.rs",
     "src/map/face_topology/validation_complete.rs",

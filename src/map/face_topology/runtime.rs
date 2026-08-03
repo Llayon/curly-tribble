@@ -1,4 +1,5 @@
 //! Authoritative runtime population of the data-only face topology resource.
+use crate::map::face_topology::acceptance::warn_on_acceptance_misses;
 use crate::map::face_topology::cache::HexFaceDebugCache;
 use crate::map::face_topology::debug::HexFaceDebugSettings;
 use crate::map::face_topology::generate_hex_face_topology_with_profile;
@@ -122,6 +123,7 @@ pub fn regenerate_hex_face_topology(
             );
             *debug_cache = new_cache;
             topology.clone_from(&new_topology);
+            warn_on_acceptance_misses(&topology, debug_settings.profile);
             generation_state.last_successful_inputs = Some(inputs);
             generation_state.generation_count += 1;
         }
@@ -181,6 +183,12 @@ mod tests {
             .resource::<HexFaceTopologyGenerationState>()
             .generation_count
     }
+
+    fn fail_count(app: &App) -> u64 {
+        app.world()
+            .resource::<HexFaceTopologyGenerationState>()
+            .failure_count
+    }
     #[test]
     fn valid_map_populates_and_validates_stored_topology() {
         let map = map_with_tiles(2);
@@ -217,23 +225,13 @@ mod tests {
             .get_mut(&crate::map::HexCoord::new(0, 0))
             .map(|tile| tile.faction_id = Some(7));
         app.update();
-        assert_eq!(
-            app.world()
-                .resource::<HexFaceTopologyGenerationState>()
-                .generation_count,
-            1
-        );
+        assert_eq!(count(&app), 1);
         app.world_mut().resource_mut::<MapData>().tiles.insert(
             crate::map::HexCoord::new(2, 0),
             crate::map::TileData::default(),
         );
         app.update();
-        assert_eq!(
-            app.world()
-                .resource::<HexFaceTopologyGenerationState>()
-                .generation_count,
-            2
-        );
+        assert_eq!(count(&app), 2);
     }
 
     #[test]
@@ -241,19 +239,9 @@ mod tests {
         let mut app = test_app(MapData::default(), 42);
         app.update();
         assert!(app.world().resource::<HexFaceTopology>().faces.is_empty());
-        assert_eq!(
-            app.world()
-                .resource::<HexFaceTopologyGenerationState>()
-                .failure_count,
-            1
-        );
+        assert_eq!(fail_count(&app), 1);
         app.update();
-        assert_eq!(
-            app.world()
-                .resource::<HexFaceTopologyGenerationState>()
-                .failure_count,
-            1
-        );
+        assert_eq!(fail_count(&app), 1);
     }
 
     #[test]

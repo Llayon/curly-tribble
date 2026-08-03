@@ -42,27 +42,27 @@ impl HexDeformationProfile {
     pub const fn config(self) -> HexDeformationConfig {
         match self {
             Self::Subtle => HexDeformationConfig {
-                target_min_q16: 5_243,
-                target_max_q16: 7_864,
-                absolute_max_q16: 10_486,
+                component_magnitude_min_q16: 5_243,
+                component_magnitude_max_q16: 7_864,
+                absolute_displacement_cap_q16: 10_486,
                 correlated_weight_q16: 0,
                 local_weight_q16: 65_536,
                 macro_span_hexes: 0,
                 discriminator: 0x5355_4254,
             },
             Self::Organic => HexDeformationConfig {
-                target_min_q16: 7_864,
-                target_max_q16: 11_796,
-                absolute_max_q16: 14_418,
+                component_magnitude_min_q16: 7_864,
+                component_magnitude_max_q16: 11_796,
+                absolute_displacement_cap_q16: 14_418,
                 correlated_weight_q16: 42_598,
                 local_weight_q16: 22_938,
                 macro_span_hexes: 5,
                 discriminator: 0x4f52_4741,
             },
             Self::PagoniaLike => HexDeformationConfig {
-                target_min_q16: 10_486,
-                target_max_q16: 15_729,
-                absolute_max_q16: 18_350,
+                component_magnitude_min_q16: 10_486,
+                component_magnitude_max_q16: 15_729,
+                absolute_displacement_cap_q16: 18_350,
                 correlated_weight_q16: 49_152,
                 local_weight_q16: 16_384,
                 macro_span_hexes: 5,
@@ -74,13 +74,37 @@ impl HexDeformationProfile {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct HexDeformationConfig {
-    pub target_min_q16: u16,
-    pub target_max_q16: u16,
-    pub absolute_max_q16: u16,
+    /// Magnitude range used to build local and correlated components (Q16).
+    /// This is an *input* range, not a final displacement guarantee.
+    pub component_magnitude_min_q16: u16,
+    /// Magnitude range used to build local and correlated components (Q16).
+    pub component_magnitude_max_q16: u16,
+    /// Absolute final-displacement cap as a Q16 ratio of the hex radius.
+    pub absolute_displacement_cap_q16: u16,
     pub correlated_weight_q16: u32,
     pub local_weight_q16: u32,
     pub macro_span_hexes: i32,
     pub discriminator: u32,
+}
+
+impl HexDeformationConfig {
+    /// Ratio (toward hex radius) that the final displacement is capped at.
+    #[must_use]
+    pub const fn absolute_displacement_cap_ratio(self) -> f32 {
+        self.absolute_displacement_cap_q16 as f32 / Q16 as f32
+    }
+
+    /// Correlated component magnitude range ratio (input range, not guarantee).
+    #[must_use]
+    pub fn component_magnitude_min_ratio(self) -> f32 {
+        f32::from(self.component_magnitude_min_q16) / Q16 as f32
+    }
+
+    /// Correlated component magnitude max ratio (input range, not guarantee).
+    #[must_use]
+    pub fn component_magnitude_max_ratio(self) -> f32 {
+        f32::from(self.component_magnitude_max_q16) / Q16 as f32
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,9 +134,10 @@ fn field_node_hash(seed: u32, profile: HexDeformationProfile, q: i64, r: i64) ->
 
 fn quantized_magnitude(hash: u64, config: HexDeformationConfig) -> i64 {
     let sample = u16::from(((hash >> FIELD_STRENGTH_SHIFT) & FIELD_STRENGTH_MASK) as u8);
-    let span = u32::from(config.target_max_q16 - config.target_min_q16);
+    let span = u32::from(config.component_magnitude_max_q16 - config.component_magnitude_min_q16);
     let delta = u16::try_from(u32::from(sample) * span / u32::from(u8::MAX)).unwrap_or_default();
-    i64::from(config.target_min_q16 + delta).min(i64::from(config.absolute_max_q16))
+    i64::from(config.component_magnitude_min_q16 + delta)
+        .min(i64::from(config.absolute_displacement_cap_q16))
 }
 
 fn vector_from_hash(hash: u64, config: HexDeformationConfig) -> FixedVectorQ16 {

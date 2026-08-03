@@ -1,7 +1,9 @@
 // src/map/face_topology/mod.rs
+pub mod acceptance;
 pub mod cache;
 pub mod corner_key;
 pub mod debug;
+pub mod fingerprint;
 pub mod generator;
 pub mod logical_adjacency;
 pub mod metrics;
@@ -14,6 +16,10 @@ pub mod validation_twins;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_acceptance;
+#[cfg(test)]
+mod tests_compat;
 #[cfg(test)]
 mod tests_debug;
 #[cfg(test)]
