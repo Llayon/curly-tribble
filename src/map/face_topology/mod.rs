@@ -1,6 +1,7 @@
 // src/map/face_topology/mod.rs
 pub mod acceptance;
 pub mod acceptance_issues;
+pub mod blend;
 pub mod cache;
 pub mod corner_key;
 pub mod debug;

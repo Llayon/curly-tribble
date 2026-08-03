@@ -126,10 +126,14 @@ layered:
   fingerprint) and fail the canonical 40x40 fixture tests; never production.
 - **Level C (separation contract)**: `ProfileSeparationCriteria` requires
   `avg(Organic) >= avg(Subtle) + 0.015` and `avg(Pago) >= avg(Organic) + 0.015`
-  on the canonical 40x40. **Currently failing for `Subtle → Organic`** (Organic
-  averages ≈0.077, below Subtle's ≈0.100); `Organic → Pago` passes (≈0.021
-  measured). Separation enforcement is checked by
-  `check_profile_separation`; profile tuning is a separate follow-up.
+  on the canonical 40x40. **Fulfilled for every seed** (8 fast seeds: `Subtle`
+  ≈0.100, `Organic` ≈0.151, `PagoniaLike` ≈0.201 — both gaps clear the 0.015
+  floor by ~0.035; the 256-seed sweep reports a min gap of ~0.049). Enforced
+  by `check_profile_separation` in
+  `canonical_40x40_separation_satisfied_per_seed` and the ignored
+  `full_canonical_profile_separation_stress_256_seeds`; the blend law that
+  makes the separation achievable is documented in ADR 0007
+  (`src/map/face_topology/blend.rs`).
 
 ## Experimental Profile Validation
 

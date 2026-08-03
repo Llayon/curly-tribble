@@ -1,9 +1,12 @@
 //! Experimental deterministic deformation profiles for diagnostic topology.
+use crate::map::face_topology::blend::blend_to_displacement_q16;
 use crate::map::face_topology::corner_key::{
     corner_displacement, seed_for_corner, DISPLACEMENT_DIRECTIONS_Q15,
 };
 use crate::map::face_topology::types::SharedCornerKey;
 use bevy::prelude::Vec2;
+
+pub use crate::map::face_topology::blend::FixedVectorQ16;
 
 const Q16: i64 = 65_536;
 const Q15: i64 = 32_767;
@@ -105,12 +108,6 @@ impl HexDeformationConfig {
     pub fn component_magnitude_max_ratio(self) -> f32 {
         f32::from(self.component_magnitude_max_q16) / Q16 as f32
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct FixedVectorQ16 {
-    pub x: i64,
-    pub y: i64,
 }
 
 #[allow(clippy::cast_sign_loss)]
@@ -234,6 +231,11 @@ pub fn local_component_q16(
 }
 
 /// Combines the correlated and local components, preserving Subtle exactly.
+///
+/// `Subtle` keeps the legacy `corner_displacement` path bit-for-bit. `Organic`
+/// and `PagoniaLike` use the deterministic magnitude-preserving blend from
+/// `blend`: weighted direction at the stronger component magnitude, so
+/// anti-parallel components cannot cancel the result.
 #[must_use]
 pub fn profile_displacement(
     seed: u32,
@@ -247,14 +249,14 @@ pub fn profile_displacement(
     let config = profile.config();
     let correlated = interpolated_correlated_field(seed, key, profile);
     let local = local_component_q16(seed, key, profile);
-    let x = (correlated.x * i64::from(config.correlated_weight_q16)
-        + local.x * i64::from(config.local_weight_q16))
-        / Q16;
-    let y = (correlated.y * i64::from(config.correlated_weight_q16)
-        + local.y * i64::from(config.local_weight_q16))
-        / Q16;
+    let blended = blend_to_displacement_q16(
+        correlated,
+        local,
+        config.correlated_weight_q16,
+        config.local_weight_q16,
+    );
     Vec2::new(
-        radius * x as f32 / Q16 as f32,
-        radius * y as f32 / Q16 as f32,
+        radius * blended.x as f32 / Q16 as f32,
+        radius * blended.y as f32 / Q16 as f32,
     )
 }

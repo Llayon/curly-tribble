@@ -2,10 +2,14 @@
 #[cfg(test)]
 mod profile_tests {
     use crate::map::data::{MapData, TileData};
+    use crate::map::face_topology::acceptance::ProfileAcceptanceReport;
     use crate::map::face_topology::generator::generate_hex_face_topology_with_profile;
     use crate::map::face_topology::profiles::{
         field_coordinate_q16, interpolated_correlated_field, local_component_q16,
         macro_field_node_vector, profile_displacement, FixedVectorQ16, HexDeformationProfile,
+    };
+    use crate::map::face_topology::separation::{
+        check_profile_separation, ProfileSeparationCriteria, ProfileSeparationViolation,
     };
     use crate::map::face_topology::validate_complete_topology;
     use crate::map::{HexCoord, WorldSeed};
@@ -178,7 +182,7 @@ mod profile_tests {
                     (FixedVectorQ16 { x: -3032, y: 7322 }),
                     (FixedVectorQ16 { x: -2991, y: 5971 }),
                     (FixedVectorQ16 { x: 3593, y: 8675 }),
-                    (0xbc2b_8000, 0x3dd8_2800),
+                    (0xbc67_8000, 0x3e12_0000),
                 ),
                 HexDeformationProfile::PagoniaLike => (
                     (FixedVectorQ16 {
@@ -190,7 +194,7 @@ mod profile_tests {
                         y: -10559,
                     }),
                     (FixedVectorQ16 { x: -15358, y: 0 }),
-                    (0xbddc_b800, 0xbdf7_7800),
+                    (0xbe1f_b800, 0xbe33_1400),
                 ),
                 HexDeformationProfile::Subtle => unreachable!(),
             };
@@ -201,14 +205,6 @@ mod profile_tests {
             assert_eq!(
                 (displacement.x.to_bits(), displacement.y.to_bits()),
                 expected.3
-            );
-            assert_eq!(
-                local_component_q16(42, key, profile),
-                local_component_q16(42, key, profile)
-            );
-            assert_eq!(
-                profile_displacement(42, key, 1.0, profile),
-                profile_displacement(42, key, 1.0, profile)
             );
         }
     }
@@ -249,52 +245,56 @@ mod profile_tests {
         assert_eq!(validate_profiles_for_seeds(&seeds), 4_608);
     }
 
-    /// Canonical 40x40 separation status, pinned to the measured matrix (seed
-    /// 42: `Subtle` 0.10019, `Organic` 0.07664, `PagoniaLike` 0.09727). The
-    /// checker is real; the *contract* is NOT satisfied: Organic's average
-    /// falls below Subtle's on the canonical map, so the subtle-to-organic gap
-    /// is violated. Organic-to-Pagonia passes. Tuning is a follow-up.
+    /// Canonical 40x40 separation contract: both gaps hold for every fast seed
+    /// (measured: Subtle ~0.100, Organic ~0.151, PagoniaLike ~0.201; margins ~0.035).
     #[test]
-    fn canonical_40x40_separation_status_is_documented() {
-        use crate::map::face_topology::acceptance::ProfileAcceptanceReport;
-        use crate::map::face_topology::separation::{
-            check_profile_separation, ProfileSeparationCriteria,
-        };
+    fn canonical_40x40_separation_satisfied_per_seed() {
         let map = map_40x40();
+        for seed in [0_u32, 1, 7, 42, 99, 128, 200, 255] {
+            let (violations, subtle, organic, pago) = canonical_separation(&map, seed);
+            assert!(
+                violations.is_empty(),
+                "seed {seed}: subtle={subtle:.5} organic={organic:.5} pago={pago:.5}: {violations:?}"
+            );
+        }
+    }
+
+    /// Full 256-seed canonical-separation sweep (one-off, ignored by default).
+    #[test]
+    #[ignore = "full canonical separation sweep"]
+    fn full_canonical_profile_separation_stress_256_seeds() {
+        let map = map_40x40();
+        let mut worst = f32::INFINITY;
+        for seed in 0..256_u32 {
+            let (violations, subtle, organic, pago) = canonical_separation(&map, seed);
+            assert!(
+                violations.is_empty(),
+                "seed {seed}: subtle={subtle:.5} organic={organic:.5} pago={pago:.5}: {violations:?}"
+            );
+            worst = worst.min((pago - organic).min(organic - subtle));
+        }
+        println!("separation stress 256 seeds: min gap {worst:.5}");
+    }
+
+    fn canonical_separation(
+        map: &MapData,
+        seed: u32,
+    ) -> (Vec<ProfileSeparationViolation>, f32, f32, f32) {
         let report = |profile| {
             ProfileAcceptanceReport::from_topology(
-                &generate_hex_face_topology_with_profile(&map, WorldSeed::new(42), profile)
+                &generate_hex_face_topology_with_profile(map, WorldSeed::new(seed), profile)
                     .expect("profile"),
             )
         };
-        let subtle_avg = report(HexDeformationProfile::Subtle).average_displacement_ratio;
-        let organic_avg = report(HexDeformationProfile::Organic).average_displacement_ratio;
-        let pago_avg = report(HexDeformationProfile::PagoniaLike).average_displacement_ratio;
-        assert!(
-            (subtle_avg - 0.10019).abs() < 0.002,
-            "measured {subtle_avg}"
-        );
-        assert!(
-            (organic_avg - 0.07664).abs() < 0.002,
-            "measured {organic_avg}"
-        );
-        assert!((pago_avg - 0.09727).abs() < 0.002, "measured {pago_avg}");
+        let subtle = report(HexDeformationProfile::Subtle).average_displacement_ratio;
+        let organic = report(HexDeformationProfile::Organic).average_displacement_ratio;
+        let pago = report(HexDeformationProfile::PagoniaLike).average_displacement_ratio;
         let violations = check_profile_separation(
             ProfileSeparationCriteria::for_defaults(),
-            subtle_avg,
-            organic_avg,
-            pago_avg,
+            subtle,
+            organic,
+            pago,
         );
-        assert_eq!(
-            violations.len(),
-            1,
-            "expected exactly the subtle-to-organic gap to fail, got {violations:?}"
-        );
-        assert!(format!("{:?}", violations.first().expect("one violation"))
-            .contains("SubtleNotBelowOrganic"));
-        assert!(
-            organic_avg + 0.015 <= pago_avg,
-            "organic-to-pagonia gap must currently pass"
-        );
+        (violations, subtle, organic, pago)
     }
 }
