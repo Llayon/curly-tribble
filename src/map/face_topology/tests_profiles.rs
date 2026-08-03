@@ -248,4 +248,53 @@ mod profile_tests {
         let seeds: Vec<u32> = (0..256).collect();
         assert_eq!(validate_profiles_for_seeds(&seeds), 4_608);
     }
+
+    /// Canonical 40x40 separation status, pinned to the measured matrix (seed
+    /// 42: `Subtle` 0.10019, `Organic` 0.07664, `PagoniaLike` 0.09727). The
+    /// checker is real; the *contract* is NOT satisfied: Organic's average
+    /// falls below Subtle's on the canonical map, so the subtle-to-organic gap
+    /// is violated. Organic-to-Pagonia passes. Tuning is a follow-up.
+    #[test]
+    fn canonical_40x40_separation_status_is_documented() {
+        use crate::map::face_topology::acceptance::ProfileAcceptanceReport;
+        use crate::map::face_topology::separation::{
+            check_profile_separation, ProfileSeparationCriteria,
+        };
+        let map = map_40x40();
+        let report = |profile| {
+            ProfileAcceptanceReport::from_topology(
+                &generate_hex_face_topology_with_profile(&map, WorldSeed::new(42), profile)
+                    .expect("profile"),
+            )
+        };
+        let subtle_avg = report(HexDeformationProfile::Subtle).average_displacement_ratio;
+        let organic_avg = report(HexDeformationProfile::Organic).average_displacement_ratio;
+        let pago_avg = report(HexDeformationProfile::PagoniaLike).average_displacement_ratio;
+        assert!(
+            (subtle_avg - 0.10019).abs() < 0.002,
+            "measured {subtle_avg}"
+        );
+        assert!(
+            (organic_avg - 0.07664).abs() < 0.002,
+            "measured {organic_avg}"
+        );
+        assert!((pago_avg - 0.09727).abs() < 0.002, "measured {pago_avg}");
+        let violations = check_profile_separation(
+            ProfileSeparationCriteria::for_defaults(),
+            subtle_avg,
+            organic_avg,
+            pago_avg,
+        );
+        assert_eq!(
+            violations.len(),
+            1,
+            "expected exactly the subtle-to-organic gap to fail, got {violations:?}"
+        );
+        assert!(format!("{:?}", violations.first().expect("one violation"))
+            .contains("SubtleNotBelowOrganic"));
+        assert!(
+            organic_avg + 0.015 <= pago_avg,
+            "organic-to-pagonia gap must currently pass"
+        );
+    }
 }

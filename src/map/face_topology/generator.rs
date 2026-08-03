@@ -1,5 +1,6 @@
 /// Generator for deterministic hex face topology.
 use crate::map::data::{MapData, HEX_SIZE};
+use crate::map::face_topology::acceptance::validate_profile_displacement_cap;
 use crate::map::face_topology::corner_key::{
     canonical_corner_key, corner_displacement, regular_corner_position,
 };
@@ -253,15 +254,9 @@ pub fn generate_hex_face_topology_with_profile(
 
     // 6b. Hard safety cap: measured final displacement after backoff must stay
     // within the profile's absolute displacement cap. This is a generation
-    // failure, not a visual warning.
-    let cap_radius = profile.config().absolute_displacement_cap_ratio() * HEX_SIZE;
-    if metrics.max_displacement > cap_radius * (1.0 + 1e-3) {
-        return Err(HexFaceTopologyError::ProfileDisplacementCapExceeded {
-            profile,
-            max_displacement: metrics.max_displacement,
-            cap_radius,
-        });
-    }
+    // failure, not a visual warning. The cap authority is centralized in
+    // acceptance.rs.
+    validate_profile_displacement_cap(profile, metrics.max_displacement / HEX_SIZE)?;
 
     topology.stats = stats;
 

@@ -1,5 +1,6 @@
 // src/map/face_topology/mod.rs
 pub mod acceptance;
+pub mod acceptance_issues;
 pub mod cache;
 pub mod corner_key;
 pub mod debug;
@@ -9,6 +10,7 @@ pub mod logical_adjacency;
 pub mod metrics;
 pub mod profiles;
 pub mod runtime;
+pub mod separation;
 pub mod types;
 pub mod validation;
 pub mod validation_complete;

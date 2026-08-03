@@ -146,5 +146,9 @@ pub enum HexFaceTopologyError {
         max_displacement: f32,
         cap_radius: f32,
     },
+    /// A measured final displacement was not finite (NaN or infinite).
+    ProfileDisplacementNotFinite {
+        max_displacement_ratio: f32,
+    },
     ValidationFailed(String),
 }

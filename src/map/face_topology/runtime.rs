@@ -2,6 +2,7 @@
 use crate::map::face_topology::acceptance::warn_on_acceptance_misses;
 use crate::map::face_topology::cache::HexFaceDebugCache;
 use crate::map::face_topology::debug::HexFaceDebugSettings;
+use crate::map::face_topology::fingerprint::topology_fingerprints;
 use crate::map::face_topology::generate_hex_face_topology_with_profile;
 use crate::map::face_topology::profiles::HexDeformationProfile;
 use crate::map::face_topology::types::HexFaceTopology;
@@ -123,7 +124,8 @@ pub fn regenerate_hex_face_topology(
             );
             *debug_cache = new_cache;
             topology.clone_from(&new_topology);
-            warn_on_acceptance_misses(&topology, debug_settings.profile);
+            let fingerprint = topology_fingerprints(&map_data, *world_seed, &new_topology);
+            warn_on_acceptance_misses(&topology, debug_settings.profile, fingerprint.geometry);
             generation_state.last_successful_inputs = Some(inputs);
             generation_state.generation_count += 1;
         }

@@ -114,18 +114,31 @@ so backoff compatibility is documented as untested, not asserted.
 
 `ProfileAcceptanceCriteria` (in `acceptance.rs`) centralizes measured-output
 thresholds, distinct from the generator's input config (component magnitude
-ranges are an input range, not a final displacement guarantee). Generation
-fails hard if the measured final displacement exceeds the profile's absolute
-cap (ratio of `HEX_SIZE`, 1e-3 tolerance). Visual misses emit a single WARN at
-regeneration time and fail the canonical 40x40 fixture tests; they never affect
-production terrain.
+ranges are an input range, not a final displacement guarantee). Acceptance is
+layered:
+
+- **Level A (hard)**: all measured metrics finite; measured final displacement
+  must not exceed the profile's absolute cap (single source: the profile config
+  Q16 cap; `validate_profile_displacement_cap` allows the cap plus one
+  `DISPLACEMENT_CAP_EPSILON`, rejects non-finite values; generation failure).
+- **Level B (canonical bands)**: visual misses emit one combined WARN at
+  regeneration time (stable issue ordering, profile name + geometry
+  fingerprint) and fail the canonical 40x40 fixture tests; never production.
+- **Level C (separation contract)**: `ProfileSeparationCriteria` requires
+  `avg(Organic) >= avg(Subtle) + 0.015` and `avg(Pago) >= avg(Organic) + 0.015`
+  on the canonical 40x40. **Currently failing for `Subtle → Organic`** (Organic
+  averages ≈0.077, below Subtle's ≈0.100); `Organic → Pago` passes (≈0.021
+  measured). Separation enforcement is checked by
+  `check_profile_separation`; profile tuning is a separate follow-up.
 
 ## Experimental Profile Validation
 
 Profiles are validated with unit tests that require:
 
-- `Subtle` is the default and remains bit-compatible with the pre-profile
-  warped output (existing golden displacement vectors unchanged).
+- `Subtle` is the default and preserves the legacy candidate corner-displacement
+  function; its geometry and connectivity are bit-compatible with `158e5f2` for
+  the recorded golden fixtures only (universal legacy compatibility not claimed).
+  The pre-profile golden displacement vectors remain unchanged.
 - Per-vertex and combined displacement vectors for `Organic` and `PagoniaLike`
   match exact `f32::to_bits()` golden references (determinism lock).
 - The correlated field is spatially related, non-constant, and handles negative

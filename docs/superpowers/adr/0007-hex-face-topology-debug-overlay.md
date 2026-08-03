@@ -40,8 +40,11 @@ deterministic deformation profiles. This is diagnostic only and is **not**
 validated, tuned, or integrated into production terrain, Height3D, picking, or
 gameplay.
 
-- `Subtle` (the default, bit-compatible with the pre-existing warped output):
-  a purely local, per-corner fixed-direction displacement.
+- `Subtle` (the default): preserves the legacy candidate corner-displacement
+  function. Its geometry and connectivity are bit-compatible with `158e5f2` for
+  the recorded golden fixtures only; universal legacy safety-reduction
+  compatibility is **not** claimed (the legacy scan found no reduction case).
+  It is a purely local, per-corner fixed-direction displacement.
 - `Organic`: blends the local displacement with a low-frequency correlated
   field (~65/35 correlated/local weight, macro-cell span of 5 hexes). Each
   macro vector comes from a stable seeded node hash combined with the immutable
@@ -75,26 +78,46 @@ to exact `f32::to_bits()` references.
 ## Контракт приёмки (Acceptance Contract)
 
 Measured final output is checked against centralized criteria in
-`src/map/face_topology/acceptance.rs` (`ProfileAcceptanceCriteria`), which are
-deliberately distinct from the generator *inputs* (component magnitude ranges,
-weights, macro span, and the Q16 absolute cap in the profile config). The
-component magnitude fields are an **input range, not a final displacement
-guarantee**; acceptance is judged on observed statistics only.
+`src/map/face_topology/acceptance.rs`, deliberately distinct from the generator
+*inputs* (component magnitude ranges, weights, macro span, and the Q16 absolute
+cap in the profile config). The component magnitude fields are an **input
+range, not a final displacement guarantee**; acceptance is judged on observed
+statistics only. Acceptance is layered into three documented levels:
 
-- **Hard cap (generation failure)**: the measured `max_displacement` after the
-  backoff loop must not exceed `absolute_displacement_cap_ratio * HEX_SIZE`
-  (plus a 1e-3 relative tolerance). Violation returns
-  `HexFaceTopologyError::ProfileDisplacementCapExceeded`.
-- **Visual targets (warning + canonical-fixture test)**: average displacement
-  ratio band, minimum edge length ratio, interior-angle range, minimum aspect
-  quality, reduced-vertex ratio, and regular-fallback ratio. A miss emits one
-  `WARN` event at regeneration time and fails the canonical 40x40 fixture test,
-  but never affects production terrain.
-- Per-profile targets: `Subtle` {avg 0.070–0.120, max 0.160, edge ≥0.550,
+- **Level A — hard correctness (generation failure or test-failure)**: all
+  measured metrics must be finite (typed `NonFiniteMetric` issues); the
+  measured `max_displacement` after the backoff loop must not exceed the
+  profile's absolute cap. The cap lives **once** in the profile config
+  (`absolute_displacement_cap_ratio`, derived from each profile's Q16 value);
+  `validate_profile_displacement_cap` accepts the cap itself plus one
+  `DISPLACEMENT_CAP_EPSILON` (1e-3) of slack and rejects anything above — and
+  every non-finite value. Violations return
+  `HexFaceTopologyError::ProfileDisplacementCapExceeded` /
+  `ProfileDisplacementNotFinite`.
+- **Level B (canonical visual bands, warning + fixture test)**: average
+  displacement ratio band, minimum edge length ratio, interior-angle range,
+  minimum aspect quality, reduced-vertex ratio, and regular-fallback ratio. A
+  miss emits **one combined `WARN` at regeneration time** (stable issue
+  ordering: non-finite metric issues first, then the fixed band order, with the
+  profile name and geometry fingerprint for reproduction) and fails the
+  canonical 40x40 fixture test, but never affects production terrain.
+- **Level C (profile separation contract)**: documented minimum average
+  displacement gaps between consecutive profiles
+  (`ProfileSeparationCriteria`, both gaps 0.015 of `HEX_SIZE`). `Organic` must
+  average at least 0.015 above `Subtle`, and `PagoniaLike` at least 0.015 above
+  `Organic`. **Status: failing with current parameters on the canonical 40x40 —
+  `Organic`'s average (≈0.077) is **below** `Subtle`'s (≈0.100)**, so the
+  subtle-to-organic gap is reported as violated by `check_profile_separation`.
+  The infrastructure and tests are real; achieving the targets (esp.
+  `Subtle → Organic`) is a separate profile-tuning follow-up and is **not**
+  claimed as satisfied here.
+
+- Per-profile visual targets: `Subtle` {avg 0.070–0.120, edge ≥0.550,
   angles 80–155°, aspect ≥0.550, reduced ≤0.150, fallback ≤0.150};
-  `Organic` {avg 0.050–0.140, max 0.220, edge ≥0.500, aspect ≥0.500};
-  `PagoniaLike` {avg 0.050–0.200, max 0.280, edge ≥0.500, aspect ≥0.500,
-  reduced ≤0.200}. Ratios are relative to `HEX_SIZE`.
+  `Organic` {avg 0.050–0.140, edge ≥0.500, aspect ≥0.500};
+  `PagoniaLike` {avg 0.050–0.200, edge ≥0.500, aspect ≥0.500, reduced ≤0.200}.
+  Hard caps: `Subtle` 0.160, `Organic` 0.220, `PagoniaLike` 0.280.
+  Ratios are relative to `HEX_SIZE`.
 
 Compatibility is claimed only where it was measured: the five golden fixtures
 above were extracted by running the identical fingerprint implementation in a
