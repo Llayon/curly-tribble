@@ -11,6 +11,7 @@ mod profile_tests {
     use crate::map::face_topology::separation::{
         check_profile_separation, ProfileSeparationCriteria, ProfileSeparationViolation,
     };
+    use crate::map::face_topology::tests_quality_shared::shared::core_failures;
     use crate::map::face_topology::validate_complete_topology;
     use crate::map::{HexCoord, WorldSeed};
 
@@ -212,17 +213,14 @@ mod profile_tests {
     fn validate_profiles_for_seeds(seeds: &[u32]) -> usize {
         let mut count = 0;
         for seed in seeds {
-            for (_, map) in all_shapes() {
+            for (shape, map) in all_shapes() {
                 for profile in all_profiles() {
-                    let topology = generate_hex_face_topology_with_profile(
-                        &map,
-                        WorldSeed::new(*seed),
-                        profile,
-                    )
-                    .unwrap_or_else(|error| panic!("seed={seed} profile={profile:?}: {error:?}"));
-                    validate_complete_topology(&topology, &map).unwrap_or_else(|error| {
-                        panic!("seed={seed} profile={profile:?}: {error:?}")
-                    });
+                    let failures = core_failures(&map, shape, *seed, profile);
+                    assert!(
+                        failures.is_empty(),
+                        "hardened checks failed:\n{}",
+                        failures.join("\n")
+                    );
                     count += 1;
                 }
             }
@@ -245,8 +243,6 @@ mod profile_tests {
         assert_eq!(validate_profiles_for_seeds(&seeds), 4_608);
     }
 
-    /// Canonical 40x40 separation contract: both gaps hold for every fast seed
-    /// (measured: Subtle ~0.100, Organic ~0.151, PagoniaLike ~0.201; margins ~0.035).
     #[test]
     fn canonical_40x40_separation_satisfied_per_seed() {
         let map = map_40x40();
@@ -259,21 +255,25 @@ mod profile_tests {
         }
     }
 
-    /// Full 256-seed canonical-separation sweep (one-off, ignored by default).
     #[test]
     #[ignore = "full canonical separation sweep"]
     fn full_canonical_profile_separation_stress_256_seeds() {
         let map = map_40x40();
-        let mut worst = f32::INFINITY;
+        let mut worst_gap = f32::INFINITY;
+        let mut worst_seed = 0_u32;
         for seed in 0..256_u32 {
             let (violations, subtle, organic, pago) = canonical_separation(&map, seed);
             assert!(
                 violations.is_empty(),
                 "seed {seed}: subtle={subtle:.5} organic={organic:.5} pago={pago:.5}: {violations:?}"
             );
-            worst = worst.min((pago - organic).min(organic - subtle));
+            let gap = (pago - organic).min(organic - subtle);
+            if gap < worst_gap {
+                worst_gap = gap;
+                worst_seed = seed;
+            }
         }
-        println!("separation stress 256 seeds: min gap {worst:.5}");
+        println!("separation stress 256 seeds: min gap {worst_gap:.5} at seed {worst_seed}");
     }
 
     fn canonical_separation(

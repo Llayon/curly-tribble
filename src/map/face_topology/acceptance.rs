@@ -1,8 +1,6 @@
 //! Central profile acceptance criteria and measured-output reporting.
-//!
-//! Thresholds are centralized here, never scattered through tests or runtime.
-//! Generation-config inputs live in `profiles`; typed output issues in
-//! `acceptance_issues`; the separation contract in `separation`.
+//! Thresholds live here, never scattered through tests or runtime; generation
+//! inputs live in `profiles`, typed issues in `acceptance_issues`.
 use crate::map::data::HEX_SIZE;
 use crate::map::face_topology::acceptance_issues::{
     format_issue, ProfileAcceptanceIssue, ProfileMetric,
@@ -30,8 +28,11 @@ pub struct ProfileAcceptanceCriteria {
     pub maximum_regular_fallback_ratio: f32,
 }
 
-/// Broad, non-brittle measured values chosen from the profile matrix
-/// measurement pass (all six shapes x the eight fast deterministic seeds).
+/// Broad, non-brittle measured values from the full 256-seed x six-shape
+/// matrix, pinned by canonical 40x40 worst cases: `Organic` 161.11° max angle
+/// (seed 203) / 0.4937 aspect (seed 74), `PagoniaLike` 175.195° (seed 58) /
+/// 0.3783 (seed 169). Bands keep a small margin over those extrema and are the
+/// minimum relaxation supported by the data.
 impl ProfileAcceptanceCriteria {
     #[must_use]
     pub const fn for_profile(profile: HexDeformationProfile) -> Self {
@@ -51,8 +52,8 @@ impl ProfileAcceptanceCriteria {
                 average_displacement_max_ratio: 0.175,
                 minimum_edge_length_ratio: 0.500,
                 minimum_interior_angle_degrees: 80.0,
-                maximum_interior_angle_degrees: 165.0,
-                minimum_aspect_quality: 0.470,
+                maximum_interior_angle_degrees: 162.0,
+                minimum_aspect_quality: 0.490,
                 maximum_reduced_vertex_ratio: 0.150,
                 maximum_regular_fallback_ratio: 0.150,
             },
@@ -61,8 +62,8 @@ impl ProfileAcceptanceCriteria {
                 average_displacement_max_ratio: 0.235,
                 minimum_edge_length_ratio: 0.500,
                 minimum_interior_angle_degrees: 75.0,
-                maximum_interior_angle_degrees: 175.0,
-                minimum_aspect_quality: 0.380,
+                maximum_interior_angle_degrees: 176.0,
+                minimum_aspect_quality: 0.370,
                 maximum_reduced_vertex_ratio: 0.200,
                 maximum_regular_fallback_ratio: 0.150,
             },

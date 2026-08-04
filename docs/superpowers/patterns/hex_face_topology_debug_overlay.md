@@ -124,6 +124,14 @@ layered:
 - **Level B (canonical bands)**: visual misses emit one combined WARN at
   regeneration time (stable issue ordering, profile name + geometry
   fingerprint) and fail the canonical 40x40 fixture tests; never production.
+  The `Organic`/`PagoniaLike` bands are the minimum relaxation supported by the
+  full 256-seed x six-shape matrix (4,608 topologies); every worst case occurs
+  on the canonical 40x40 map and is locked as a fixture in `tests_quality.rs`
+  (`Organic` seed 203: 161.11° max angle, seed 74: 0.4937 aspect;
+  `PagoniaLike` seed 58: 175.195° max angle, seed 169: 0.3783 aspect). Bands
+  hold a small margin beyond these: `Organic` 162°/0.490, `PagoniaLike`
+  176°/0.370. The bands intentionally permit the measured near-flat/slender
+  extremes and are not a production-readiness claim.
 - **Level C (separation contract)**: `ProfileSeparationCriteria` requires
   `avg(Organic) >= avg(Subtle) + 0.015` and `avg(Pago) >= avg(Organic) + 0.015`
   on the canonical 40x40. **Fulfilled for every seed** (8 fast seeds: `Subtle`
@@ -157,8 +165,16 @@ Run the full 256-seed, three-profile stress suite (4,608 topologies) explicitly:
 cargo test --lib full_hex_deformation_profiles_stress_256_seeds -- --ignored
 ```
 
-The fast loop that runs with the normal suite is:
+Run the full 4,608 acceptance scan (asserts the corrected Level B bands and
+zero backoff across the whole matrix) explicitly:
+
+```text
+cargo test --lib full_4608_quality_extrema_scan -- --ignored
+```
+
+The fast loops that run with the normal suite are:
 
 ```text
 cargo test --lib fast_profile_stress_covers_all_profiles_and_shapes
+cargo test --lib fast_144_topology_matrix_is_fully_hardened
 ```

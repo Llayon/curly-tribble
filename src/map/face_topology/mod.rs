@@ -30,6 +30,14 @@ mod tests_mutation;
 #[cfg(test)]
 mod tests_profiles;
 #[cfg(test)]
+mod tests_quality;
+#[cfg(test)]
+mod tests_quality_blend;
+#[cfg(test)]
+mod tests_quality_shared;
+#[cfg(test)]
+mod tests_quality_stress;
+#[cfg(test)]
 mod tests_stress;
 
 pub use corner_key::{
