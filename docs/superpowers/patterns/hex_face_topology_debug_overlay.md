@@ -77,6 +77,47 @@ handling and drawing are gated by `GameState::Editing`; `F5`, `F6`, `F7`, and
 `HexFaceDebugCache` is rebuilt whenever the authoritative topology is replaced.
 It contains only derived debug data and does not mutate `MapData` or topology.
 
+## Blend Reliability Floor (near-zero direction stabilization)
+
+`blend.rs`/`blend_diagnostics.rs` combine the correlated and local components:
+the weight decides the direction, the stronger component decides the magnitude
+(see ADR 0007). The weighted *sum* can still near-cancel even when its
+anti-parallel components both have mass; those corners are oriented only by
+integer rounding noise. The reliability floor corrects **only** them:
+
+- `MIN_RELIABLE_DIRECTION_RATIO_Q16 = 1/64`: corners above the ratio keep the
+  raw integer normalization bit for bit (locked by
+  `reliable_directions_are_bit_identical_to_the_raw_law`); unreliable corners
+  are projected onto the *reference* component until the projection reaches the
+  floor, then normalized as before.
+- `blend_reference` picks the larger **weighted** component, resolving
+  near-ties toward the coherent correlated field via
+  `CORRELATED_PREFERENCE_MARGIN_Q16` (1/8). At a 1/64 floor every stabilized
+  corner on the canonical 256-seed matrix picks `Correlated` (`local_ref = 0`).
+- Invariants enforced on the fast seeds:
+  `stabilized_directions_keep_a_minimum_projection_onto_the_reference` (target
+  magnitude preserved, corrected length at the floor) and
+  `adjacent_displacement_direction_audit_on_canonical_map` (worst
+  both-stabilized adjacent dot `>= -0.1`; the pre-existing global `-1.0`
+  extremes are non-near-zero local flips and must never regress).
+- `near_zero_blend_direction_fixtures_lock_the_weakest_measured_cases` freezes
+  the weakest measured corners (Pago seed 194 weighted length 1, magnitude
+  5/65536; Organic seed 64 length 8). Their raw weighted values must never
+  change; their stabilized resolution is deterministic and exact.
+
+Threshold maintenance — re-measure candidate floors 1/64, 1/32, 1/16 whenever
+weights or component magnitude ranges change:
+
+```text
+cargo test --lib full_canonical_blend_direction_stability_256_seeds -- --ignored
+```
+
+Baseline on the canonical 40x40 across 256 seeds: 1/64 stabilizes 618
+(`Organic`) / 500 (`PagoniaLike`) corners (~0.07%), worst both-stabilized
+adjacent dot `-0.041`; 1/32 degrades that dot to `-0.986` and 1/16 to `-1.0`
+(with `local_ref` appearing at 830/1307), so 1/64 is the smallest sufficient
+floor.
+
 ## Validation
 
 The debug helpers are pure and covered by unit tests for defaults, unique edge

@@ -68,6 +68,38 @@ Closing that gap with input-magnitude/weight tuning alone would push aligned
 vertices toward the hard cap, so the blend law was changed instead; parameter
 tuning was measured and rejected (Option A), see the rationale below.
 
+### Near-zero direction stabilization (the blend reliability floor)
+
+Because magnitude is immune to anti-parallel cancellation, the weighted *sum*
+can still almost cancel even when its direction is real — and when it does the
+residual is dominated by integer rounding noise, so the normalized direction
+flips arbitrarily between adjacent corners. The 256-seed canonical scan found
+adjacent dot products of exactly `-1.0` on `Organic`/`PagoniaLike` (e.g. seed 42
+Pago edge 7744 at ratio ≈19193/18967, seed 64 Organic edge 7296 at ~40527/6224)
+even though the nearest-stabilizable corners are at ratios as low as 59; those
+extreme flips are non-near-zero local noise and cannot be removed without
+changing profile weights. The fix (`blend.rs` + `blend_diagnostics.rs`):
+
+- A corner is *unreliable* when its weighted length is below
+  `MIN_RELIABLE_DIRECTION_RATIO_Q16` (1/64) of the target magnitude. Only
+  those corners change direction; all reliable corners keep the exact previous
+  integer arithmetic, bit for bit (so `Subtle`, whose geometry never
+  near-cancels, is byte-identical).
+- Unreliable corners are projected onto a continuous *reference* component —
+  the larger **weighted** magnitude, with near-ties resolved toward the
+  coherent correlated field via `CORRELATED_PREFERENCE_MARGIN_Q16` (1/8 band,
+  which routes every stabilized corner to `Correlated`; `local_ref = 0` at
+  1/64) — extending the weighted vector along the reference until its
+  projection reaches the floor, then normalizing as before.
+- Measured across 256 canonical seeds: 1/64 stabilizes only 618 (`Organic`) and
+  500 (`PagoniaLike`) corners (~0.07%), all to ≥0.995 of the target magnitude,
+  and the worst *both-stabilized* adjacent dot is `-0.041`, safely above the
+  `-0.1` anti-parallel band. Raising the floor to 1/32 degrades that worst dot
+  to `-0.986` and 1/16 to `-1.0` (with 830/1307 Local references), which is why
+  1/64 is the smallest sufficient threshold. Both lines above are also flips
+  below a 1/16 floor and into measurable stabilization totals (2338/1993 and
+  9224/7702 respectively).
+
 The deformation field is **independent of the camera**:
 
 - Field geometry does not read the active camera entity or any camera resource.

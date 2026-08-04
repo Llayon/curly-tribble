@@ -2,6 +2,7 @@
 pub mod acceptance;
 pub mod acceptance_issues;
 pub mod blend;
+pub mod blend_diagnostics;
 pub mod cache;
 pub mod corner_key;
 pub mod debug;
@@ -33,6 +34,8 @@ mod tests_profiles;
 mod tests_quality;
 #[cfg(test)]
 mod tests_quality_blend;
+#[cfg(test)]
+mod tests_quality_blend_direction;
 #[cfg(test)]
 mod tests_quality_shared;
 #[cfg(test)]
