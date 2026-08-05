@@ -255,27 +255,6 @@ mod profile_tests {
         }
     }
 
-    #[test]
-    #[ignore = "full canonical separation sweep"]
-    fn full_canonical_profile_separation_stress_256_seeds() {
-        let map = map_40x40();
-        let mut worst_gap = f32::INFINITY;
-        let mut worst_seed = 0_u32;
-        for seed in 0..256_u32 {
-            let (violations, subtle, organic, pago) = canonical_separation(&map, seed);
-            assert!(
-                violations.is_empty(),
-                "seed {seed}: subtle={subtle:.5} organic={organic:.5} pago={pago:.5}: {violations:?}"
-            );
-            let gap = (pago - organic).min(organic - subtle);
-            if gap < worst_gap {
-                worst_gap = gap;
-                worst_seed = seed;
-            }
-        }
-        println!("separation stress 256 seeds: min gap {worst_gap:.5} at seed {worst_seed}");
-    }
-
     fn canonical_separation(
         map: &MapData,
         seed: u32,

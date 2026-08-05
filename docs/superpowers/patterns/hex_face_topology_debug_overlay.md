@@ -79,21 +79,31 @@ It contains only derived debug data and does not mutate `MapData` or topology.
 
 ## Blend Reliability Floor (near-zero direction stabilization)
 
-`blend.rs`/`blend_diagnostics.rs` combine the correlated and local components:
-the weight decides the direction, the stronger component decides the magnitude
-(see ADR 0007). The weighted *sum* can still near-cancel even when its
-anti-parallel components both have mass; those corners are oriented only by
-integer rounding noise. The reliability floor corrects **only** them:
+The law lives in `blend_policy.rs` (a dependency leaf: activation mode,
+threshold ratio, preference margin; comparison cross-multiplied in `i128` so
+the boundary is never rounded); the shared arithmetic lives in
+`blend_diagnostics.rs`; `blend.rs` combines them. The weight decides the
+direction, the stronger component decides the magnitude (see ADR 0007). The
+weighted *sum* can still near-cancel even when its anti-parallel components
+both have mass; those corners are oriented only by integer rounding noise. The
+reliability floor corrects **only** them:
 
 - `MIN_RELIABLE_DIRECTION_RATIO_Q16 = 1/64`: corners above the ratio keep the
   raw integer normalization bit for bit (locked by
   `reliable_directions_are_bit_identical_to_the_raw_law`); unreliable corners
   are projected onto the *reference* component until the projection reaches the
-  floor, then normalized as before.
+  floor, then normalized as before. The floor is an **open** upper bound:
+  exactly `floor`, `floor+1`, `floor+2` stay raw, only `floor-1`/`floor-2`
+  correct (`tests_blend_boundary.rs`).
 - `blend_reference` picks the larger **weighted** component, resolving
   near-ties toward the coherent correlated field via
   `CORRELATED_PREFERENCE_MARGIN_Q16` (1/8). At a 1/64 floor every stabilized
   corner on the canonical 256-seed matrix picks `Correlated` (`local_ref = 0`).
+- The production surface is locked by a two-level baseline contract
+  (`tests_blend_candidate_geometry.rs`): public entry points == explicit
+  production-policy pipeline (fast matrix), which in turn matches the literal
+  `9ad12ae` geometry/connectivity fingerprints for `Organic`/`PagoniaLike` at
+  seeds 42 and 194.
 - Invariants enforced on the fast seeds:
   `stabilized_directions_keep_a_minimum_projection_onto_the_reference` (target
   magnitude preserved, corrected length at the floor) and
@@ -105,18 +115,28 @@ integer rounding noise. The reliability floor corrects **only** them:
   5/65536; Organic seed 64 length 8). Their raw weighted values must never
   change; their stabilized resolution is deterministic and exact.
 
-Threshold maintenance — re-measure candidate floors 1/64, 1/32, 1/16 whenever
-weights or component magnitude ranges change:
+Threshold maintenance — re-measure candidate floors 1/64, 1/32, 1/16 in both
+activation modes (raw, length, projection) whenever weights or component
+magnitude ranges change. Every candidate is generated through its own pipeline
+(`generate_hex_face_topology_with_profile_and_policy`), so the table is an
+honest generator comparison, never a re-classification:
 
 ```text
-cargo test --lib full_canonical_blend_direction_stability_256_seeds -- --ignored
+cargo test --lib full_blend_reliability_candidate_geometry_256_seeds -- --ignored
+cargo test --lib full_candidate_adjacency_256_seeds -- --ignored
 ```
 
-Baseline on the canonical 40x40 across 256 seeds: 1/64 stabilizes 618
-(`Organic`) / 500 (`PagoniaLike`) corners (~0.07%), worst both-stabilized
-adjacent dot `-0.041`; 1/32 degrades that dot to `-0.986` and 1/16 to `-1.0`
-(with `local_ref` appearing at 830/1307), so 1/64 is the smallest sufficient
-floor.
+Baseline on the canonical 40x40 across 256 seeds (860,160 corners per row):
+production 1/64-length stabilizes 618 (`Organic`) / 500 (`PagoniaLike`)
+corners (~0.07%) with worst both-stabilized adjacent dot `−0.041` (Pago
+`+0.738`), min stabilized ratio 995/1004; 1/32-length stabilizes 2,338/1,993
+with no both-stabilized anti-parallel pair (`+0.45`); 1/16-length and every
+projection-mode floor produce both-stabilized dots down to `−1.0` and are
+rejected. The documented near-antiparallel tolerance band is
+`NEAR_ANTIPARALLEL_DOT_THRESHOLD = −0.9995`; an exact `-1.0` is separately
+detectable via `to_bits()`. The old 1/32 dot of `−0.986` was a re-classification
+artifact; the honest value is `+0.45`. Production stays on 1/64-length
+(report-only decision).
 
 ## Validation
 

@@ -1,11 +1,14 @@
 /// Generator for deterministic hex face topology.
 use crate::map::data::{MapData, HEX_SIZE};
 use crate::map::face_topology::acceptance::validate_profile_displacement_cap;
-use crate::map::face_topology::corner_key::{
-    canonical_corner_key, corner_displacement, regular_corner_position,
+use crate::map::face_topology::blend::{
+    BlendReliabilityPolicy, PRODUCTION_BLEND_RELIABILITY_POLICY,
 };
+use crate::map::face_topology::corner_key::{canonical_corner_key, regular_corner_position};
 use crate::map::face_topology::metrics::compute_topology_metrics;
-use crate::map::face_topology::profiles::{profile_displacement, HexDeformationProfile};
+use crate::map::face_topology::profiles::{
+    profile_displacement_with_policy, HexDeformationProfile,
+};
 use crate::map::face_topology::types::{
     FaceId, HalfEdge, HalfEdgeId, HexFace, HexFaceTopology, HexFaceTopologyError, MapVertex,
     SharedCornerKey, TopologyStats, VertexId,
@@ -37,6 +40,27 @@ pub fn generate_hex_face_topology_with_profile(
     map_data: &MapData,
     seed: WorldSeed,
     profile: HexDeformationProfile,
+) -> Result<HexFaceTopology, HexFaceTopologyError> {
+    generate_hex_face_topology_with_profile_and_policy(
+        map_data,
+        seed,
+        profile,
+        PRODUCTION_BLEND_RELIABILITY_POLICY,
+    )
+}
+
+/// Generates deterministic topology under an explicit blend policy; the single
+/// full pipeline behind every profile entry point, so candidate scans and the
+/// production path can never drift apart in structure.
+///
+/// # Errors
+/// Returns `HexFaceTopologyError` if the map or final profile geometry is invalid.
+#[allow(clippy::too_many_lines, clippy::needless_range_loop)]
+pub(crate) fn generate_hex_face_topology_with_profile_and_policy(
+    map_data: &MapData,
+    seed: WorldSeed,
+    profile: HexDeformationProfile,
+    policy: BlendReliabilityPolicy,
 ) -> Result<HexFaceTopology, HexFaceTopologyError> {
     if map_data.tiles.is_empty() {
         return Err(HexFaceTopologyError::EmptyMap);
@@ -71,11 +95,7 @@ pub fn generate_hex_face_topology_with_profile(
 
     let mut raw_displacements: HashMap<SharedCornerKey, Vec2> = HashMap::new();
     for &key in &sorted_keys {
-        let disp = if profile == HexDeformationProfile::Subtle {
-            corner_displacement(seed.value(), key, HEX_SIZE)
-        } else {
-            profile_displacement(seed.value(), key, HEX_SIZE, profile)
-        };
+        let disp = profile_displacement_with_policy(seed.value(), key, HEX_SIZE, profile, policy);
         raw_displacements.insert(key, disp);
     }
 

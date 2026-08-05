@@ -4,10 +4,11 @@ use std::path::Path;
 
 // These are the current pure data/algorithm files. Keep this list explicit so
 // a future runtime system, plugin, bundle, or query is still scanned normally.
-const FACE_TOPOLOGY_DATA_FILES: [&str; 28] = [
+const FACE_TOPOLOGY_DATA_FILES: [&str; 35] = [
     "src/map/face_topology/corner_key.rs",
     "src/map/face_topology/blend.rs",
     "src/map/face_topology/blend_diagnostics.rs",
+    "src/map/face_topology/blend_policy.rs",
     "src/map/face_topology/cache.rs",
     "src/map/face_topology/fingerprint.rs",
     "src/map/face_topology/generator.rs",
@@ -29,6 +30,12 @@ const FACE_TOPOLOGY_DATA_FILES: [&str; 28] = [
     "src/map/face_topology/tests_quality_blend_direction.rs",
     "src/map/face_topology/tests_quality_shared.rs",
     "src/map/face_topology/tests_quality_stress.rs",
+    "src/map/face_topology/tests_blend_candidate_shared.rs",
+    "src/map/face_topology/tests_blend_candidate_geometry.rs",
+    "src/map/face_topology/tests_blend_candidate_adjacency.rs",
+    "src/map/face_topology/tests_blend_boundary.rs",
+    "src/map/face_topology/tests_blend_stress.rs",
+    "src/map/face_topology/tests_blend_separation.rs",
     "src/map/face_topology/types.rs",
     "src/map/face_topology/validation.rs",
     "src/map/face_topology/validation_complete.rs",

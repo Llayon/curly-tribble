@@ -6,9 +6,8 @@
 mod quality_blend_direction_tests {
     use crate::map::face_topology::blend::{
         blend_to_displacement_q16, component_length_q16, weighted_blend_diagnostics,
-        BlendReference, FixedVectorQ16, WeightedBlendDiagnostics, MIN_RELIABLE_DIRECTION_RATIO_Q16,
+        FixedVectorQ16, WeightedBlendDiagnostics, MIN_RELIABLE_DIRECTION_RATIO_Q16,
     };
-    use crate::map::face_topology::blend_diagnostics::stabilize_blend_direction;
     use crate::map::face_topology::corner_key::regular_corner_position;
     use crate::map::face_topology::profiles::{
         interpolated_correlated_field, local_component_q16, HexDeformationProfile,
@@ -16,7 +15,6 @@ mod quality_blend_direction_tests {
     use crate::map::face_topology::tests_quality_shared::shared as q;
     use crate::map::face_topology::types::{HexFaceTopology, MapVertex, SharedCornerKey};
     const Q16: i64 = 65_536;
-    const CANDIDATE_RATIOS: [i64; 3] = [1_024, 2_048, 4_096];
     fn observations(
         seed: u32,
         key: SharedCornerKey,
@@ -134,7 +132,8 @@ mod quality_blend_direction_tests {
                         "corrected length stays within truncation of the floor"
                     );
                     assert!(
-                        diagnostics.stabilized_ratio_q16 >= MIN_RELIABLE_DIRECTION_RATIO_Q16 - 16,
+                        diagnostics.stabilized_length_ratio_q16
+                            >= MIN_RELIABLE_DIRECTION_RATIO_Q16 - 16,
                         "corrected length reaches the reliability floor"
                     );
                     stabilized_samples += 1;
@@ -200,99 +199,5 @@ mod quality_blend_direction_tests {
             both >= -0.1,
             "near-zero-linked pairs must stay far from anti-parallel: both={both}"
         );
-    }
-
-    /// Full 256-seed stability scan over the candidate reliability floors
-    /// (ignored): stabilized total, strongest per-seed, weakest corrected
-    /// projection, Local-reference count, worst both-stabilized adjacent dot.
-    #[test]
-    #[ignore = "full blend direction stability scan"]
-    fn full_canonical_blend_direction_stability_256_seeds() {
-        let map = q::map_40x40();
-        for &ratio in &CANDIDATE_RATIOS {
-            for profile in [
-                HexDeformationProfile::Organic,
-                HexDeformationProfile::PagoniaLike,
-            ] {
-                let config = profile.config();
-                let mut stabilized_total = 0_usize;
-                let mut max_per_seed = 0_usize;
-                let mut stabilized_local_ref = 0_usize;
-                let mut min_stabilized_ratio = i64::MAX;
-                let mut min_ratio_key: Option<SharedCornerKey> = None;
-                let mut min_ratio_seed = 0_u32;
-                let mut worst_adjacent_pair = 1.0_f32;
-                for seed in 0..256_u32 {
-                    let topology = q::generate(&map, seed, profile);
-                    let mut per_seed = 0_usize;
-                    let mut stabilized_by_key = std::collections::HashMap::new();
-                    for vertex in &topology.vertices {
-                        let correlated =
-                            interpolated_correlated_field(seed, vertex.canonical_key, profile);
-                        let local = local_component_q16(seed, vertex.canonical_key, profile);
-                        let diagnostics = weighted_blend_diagnostics(
-                            correlated,
-                            local,
-                            config.correlated_weight_q16,
-                            config.local_weight_q16,
-                        );
-                        let weighted = FixedVectorQ16 {
-                            x: diagnostics.weighted_x_q16,
-                            y: diagnostics.weighted_y_q16,
-                        };
-                        let stabilized = stabilize_blend_direction(
-                            weighted,
-                            diagnostics.weighted_length_q16,
-                            diagnostics.target_magnitude_q16,
-                            correlated,
-                            local,
-                            diagnostics.correlated_length_q16,
-                            diagnostics.local_length_q16,
-                            diagnostics.reference,
-                            ratio,
-                        );
-                        if !stabilized.applied {
-                            continue;
-                        }
-                        per_seed += 1;
-                        stabilized_by_key.insert(vertex.canonical_key, true);
-                        if diagnostics.reference == BlendReference::Local {
-                            stabilized_local_ref += 1;
-                        }
-                        let stabilized_ratio = stabilized.stabilized_length_q16 * Q16
-                            / diagnostics.target_magnitude_q16;
-                        if stabilized_ratio < min_stabilized_ratio {
-                            min_stabilized_ratio = stabilized_ratio;
-                            min_ratio_seed = seed;
-                            min_ratio_key = Some(vertex.canonical_key);
-                        }
-                    }
-                    stabilized_total += per_seed;
-                    max_per_seed = max_per_seed.max(per_seed);
-                    for (origin, destination) in unique_edge_pairs(&topology) {
-                        let (Ok(origin_regular), Ok(destination_regular)) = (
-                            regular_corner_position(origin.canonical_key),
-                            regular_corner_position(destination.canonical_key),
-                        ) else {
-                            continue;
-                        };
-                        if !stabilized_by_key.contains_key(&origin.canonical_key)
-                            || !stabilized_by_key.contains_key(&destination.canonical_key)
-                        {
-                            continue;
-                        }
-                        let dot = (origin.position - origin_regular)
-                            .normalize_or_zero()
-                            .dot((destination.position - destination_regular).normalize_or_zero());
-                        worst_adjacent_pair = worst_adjacent_pair.min(dot);
-                    }
-                }
-                println!(
-                    "{profile:?} ratio={ratio}: stabilized_total={stabilized_total} max_per_seed={max_per_seed} \
-                     local_ref={stabilized_local_ref} min_stabilized_ratio={min_stabilized_ratio} \
-                     worst_both_adjacent={worst_adjacent_pair:.5} (seed={min_ratio_seed} key={min_ratio_key:?})"
-                );
-            }
-        }
     }
 }

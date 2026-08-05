@@ -1,5 +1,8 @@
 //! Experimental deterministic deformation profiles for diagnostic topology.
-use crate::map::face_topology::blend::blend_to_displacement_q16;
+use crate::map::face_topology::blend::{
+    blend_to_displacement_q16_with_policy, BlendReliabilityPolicy,
+    PRODUCTION_BLEND_RELIABILITY_POLICY,
+};
 use crate::map::face_topology::corner_key::{
     corner_displacement, seed_for_corner, DISPLACEMENT_DIRECTIONS_Q15,
 };
@@ -243,17 +246,39 @@ pub fn profile_displacement(
     radius: f32,
     profile: HexDeformationProfile,
 ) -> Vec2 {
+    profile_displacement_with_policy(
+        seed,
+        key,
+        radius,
+        profile,
+        PRODUCTION_BLEND_RELIABILITY_POLICY,
+    )
+}
+
+/// Like [`profile_displacement`], but under an explicit blend policy.
+///
+/// `Subtle` has no blend and keeps the legacy `corner_displacement` path
+/// regardless of the policy; the policy only shapes `Organic`/`PagoniaLike`.
+#[must_use]
+pub fn profile_displacement_with_policy(
+    seed: u32,
+    key: SharedCornerKey,
+    radius: f32,
+    profile: HexDeformationProfile,
+    policy: BlendReliabilityPolicy,
+) -> Vec2 {
     if profile == HexDeformationProfile::Subtle {
         return corner_displacement(seed, key, radius);
     }
     let config = profile.config();
     let correlated = interpolated_correlated_field(seed, key, profile);
     let local = local_component_q16(seed, key, profile);
-    let blended = blend_to_displacement_q16(
+    let blended = blend_to_displacement_q16_with_policy(
         correlated,
         local,
         config.correlated_weight_q16,
         config.local_weight_q16,
+        policy,
     );
     Vec2::new(
         radius * blended.x as f32 / Q16 as f32,

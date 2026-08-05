@@ -3,6 +3,7 @@ pub mod acceptance;
 pub mod acceptance_issues;
 pub mod blend;
 pub mod blend_diagnostics;
+pub mod blend_policy;
 pub mod cache;
 pub mod corner_key;
 pub mod debug;
@@ -42,6 +43,19 @@ mod tests_quality_shared;
 mod tests_quality_stress;
 #[cfg(test)]
 mod tests_stress;
+
+#[cfg(test)]
+mod tests_blend_boundary;
+#[cfg(test)]
+mod tests_blend_candidate_adjacency;
+#[cfg(test)]
+mod tests_blend_candidate_geometry;
+#[cfg(test)]
+mod tests_blend_candidate_shared;
+#[cfg(test)]
+mod tests_blend_separation;
+#[cfg(test)]
+mod tests_blend_stress;
 
 pub use corner_key::{
     canonical_corner_key, corner_displacement, regular_corner_position, seed_for_corner,

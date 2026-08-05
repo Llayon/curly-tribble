@@ -78,9 +78,18 @@ adjacent dot products of exactly `-1.0` on `Organic`/`PagoniaLike` (e.g. seed 42
 Pago edge 7744 at ratio ≈19193/18967, seed 64 Organic edge 7296 at ~40527/6224)
 even though the nearest-stabilizable corners are at ratios as low as 59; those
 extreme flips are non-near-zero local noise and cannot be removed without
-changing profile weights. The fix (`blend.rs` + `blend_diagnostics.rs`):
+changing profile weights. The fix (`blend_policy.rs` + `blend_diagnostics.rs` +
+`blend.rs`):
 
-- A corner is *unreliable* when its weighted length is below
+- The **law** lives in `src/map/face_topology/blend_policy.rs`, a dependency
+  leaf that imports nothing from the blend implementation: the activation mode
+  (`WeightedLength` or `ReferenceProjection`), the threshold ratio, and the
+  correlated-preference margin. The boundary comparison is cross-multiplied in
+  `i128`, so no intermediate division can round it: exactly `floor`,
+  `floor+1`, and `floor+2` keep the raw law, and only `floor-1`/`floor-2`
+  correct (permanent assertions in `tests_blend_boundary.rs`).
+- A corner is *unreliable* when its measured quantity (the raw weighted length,
+  or for the projection mode its projection onto the reference) is below
   `MIN_RELIABLE_DIRECTION_RATIO_Q16` (1/64) of the target magnitude. Only
   those corners change direction; all reliable corners keep the exact previous
   integer arithmetic, bit for bit (so `Subtle`, whose geometry never
@@ -91,14 +100,48 @@ changing profile weights. The fix (`blend.rs` + `blend_diagnostics.rs`):
   which routes every stabilized corner to `Correlated`; `local_ref = 0` at
   1/64) — extending the weighted vector along the reference until its
   projection reaches the floor, then normalizing as before.
-- Measured across 256 canonical seeds: 1/64 stabilizes only 618 (`Organic`) and
-  500 (`PagoniaLike`) corners (~0.07%), all to ≥0.995 of the target magnitude,
-  and the worst *both-stabilized* adjacent dot is `-0.041`, safely above the
-  `-0.1` anti-parallel band. Raising the floor to 1/32 degrades that worst dot
-  to `-0.986` and 1/16 to `-1.0` (with 830/1307 Local references), which is why
-  1/64 is the smallest sufficient threshold. Both lines above are also flips
-  below a 1/16 floor and into measurable stabilization totals (2338/1993 and
-  9224/7702 respectively).
+- The production surface is bit-identical to `9ad12ae` (two-level baseline
+  contract in `tests_blend_candidate_geometry.rs`): the public entry points
+  equal the explicit production-policy pipeline over the fast matrix, and the
+  literal geometry/connectivity fingerprints for `Organic`/`PagoniaLike` at
+  seeds 42 and 194 match exactly.
+
+**Candidate matrix** — measured honestly: every candidate is generated through
+its own complete pipeline, so no row is a re-classification of another's
+topology (all rows valid and backoff-free; non-raw candidates change real
+geometry, verified by fingerprints). Authoritative scan:
+`full_blend_reliability_candidate_geometry_256_seeds` (256 canonical seeds ×
+3,360 corners = 860,160 samples per row; adjacency extremes from
+`full_candidate_adjacency_256_seeds`):
+
+| policy | stab. Organic | stab. Pago | worst both-stab. dot (Org/Pago) | min stabilized ratio (Org/Pago) |
+|---|---|---|---|---|
+| raw (no floor) | 0 | 0 | — | — |
+| **1/64 length (production)** | **618 (0.07%)** | **500 (0.06%)** | **−0.041 / +0.738** | **995 / 1004** |
+| 1/32 length | 2,338 | 1,993 | +0.447 / +0.456 | 2024 / 2032 |
+| 1/16 length | 9,224 | 7,702 | −1.0 / −1.0 | 4073 / 4076 |
+| 1/64 projection | 11,588 | 5,804 | −1.0 / −0.99980 | 995 / 1004 |
+| 1/32 projection | 16,710 | 9,179 | −1.0 / −0.99980 | 2024 / 2032 |
+| 1/16 projection | 31,095 | 20,744 | −1.0 / −1.0 | 4073 / 4076 |
+
+The earlier documented 1/32 dot of `−0.986` was an artifact of re-classifying
+corners on the production topology; honest per-candidate geometry at 1/32
+length has **no** both-stabilized anti-parallel pair (`+0.45`). The `−1.0`
+values at 1/16 length and across the projection mode are real: when both
+endpoints of an edge stabilize, they project onto the same reference, and at
+those floors the projected directions become anti-parallel. The tolerance band
+for this is documented as `NEAR_ANTIPARALLEL_DOT_THRESHOLD = −0.9995`, with an
+exact `-1.0` separately detectable via `to_bits()`.
+
+**Decision (report-only, no production change)**: production keeps the 1/64
+`WeightedLength` law. It is the smallest floor whose worst both-stabilized
+adjacent dot stays far above the `−0.1` anti-parallel band (`−0.041`), corrects
+only ~0.07% of corners, and changes nothing measurable outside those corners
+(acceptance metrics identical to raw). 1/32 length also avoids anti-parallel
+pairs but quadruples the stabilized population with no measured benefit; 1/16
+length and every projection-mode floor create both-stabilized anti-parallel
+pairs and are rejected. The matrix is retained as an ignored scan for future
+tuning decisions.
 
 The deformation field is **independent of the camera**:
 

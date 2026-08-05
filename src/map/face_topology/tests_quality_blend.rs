@@ -1,4 +1,4 @@
-﻿//! Blend-law diagnostics and synthetic near-cancellation coverage.
+//! Blend-law diagnostics and synthetic near-cancellation coverage.
 //!
 //! Measures the weighted-blend law on real maps and locks the near-zero
 //! fixtures picked by the full 256-seed scan. Stabilized-direction invariants
@@ -28,7 +28,7 @@ mod quality_blend_tests {
         count_below_64th: usize,
         count_below_32nd: usize,
         count_below_16th: usize,
-        exact_zero_fallbacks: usize,
+        weighted_sum_zero_fallbacks: usize,
         anti_aligned_count: usize,
         stabilized_count: usize,
         samples: usize,
@@ -56,7 +56,7 @@ mod quality_blend_tests {
             self.count_below_64th += usize::from(ratio < 1_024);
             self.count_below_32nd += usize::from(ratio < 2_048);
             self.count_below_16th += usize::from(ratio < 4_096);
-            self.exact_zero_fallbacks +=
+            self.weighted_sum_zero_fallbacks +=
                 usize::from(diagnostics.weighted_x_q16 == 0 && diagnostics.weighted_y_q16 == 0);
             self.anti_aligned_count += usize::from(diagnostics.anti_aligned);
             self.stabilized_count += usize::from(diagnostics.stabilization_applied);
@@ -80,7 +80,7 @@ mod quality_blend_tests {
                 count_below_64th: 0,
                 count_below_32nd: 0,
                 count_below_16th: 0,
-                exact_zero_fallbacks: 0,
+                weighted_sum_zero_fallbacks: 0,
                 anti_aligned_count: 0,
                 stabilized_count: 0,
                 samples: 0,
@@ -104,7 +104,7 @@ mod quality_blend_tests {
             assert!(report.samples > 0);
             assert!(report.stabilized_count <= report.samples);
             assert_eq!(
-                report.exact_zero_fallbacks, 0,
+                report.weighted_sum_zero_fallbacks, 0,
                 "no silent zero-direction fallback"
             );
         }
@@ -165,14 +165,14 @@ mod quality_blend_tests {
         assert_eq!(pago.weighted_over_target_q16, 5);
         assert!(pago.stabilization_applied);
         assert_eq!(pago.reference, BlendReference::Correlated);
-        assert_eq!(pago.projection_q16, 0);
+        assert_eq!(pago.raw_projection_q16, 0);
         assert_eq!(pago.minimum_projection_q16, 197);
         assert_eq!(pago.correction_q16, 197);
         assert_eq!(pago.stabilized_x_q16, 180);
         assert_eq!(pago.stabilized_y_q16, -76);
         assert_eq!(pago.stabilized_length_q16, 195);
-        assert_eq!(pago.stabilized_ratio_q16, 1_012);
-        assert!(!pago.exact_zero);
+        assert_eq!(pago.stabilized_length_ratio_q16, 1_012);
+        assert!(!pago.components_are_zero);
         assert_eq!(pago_disp.x, 11_651);
         assert_eq!(pago_disp.y, -4_919);
 
@@ -182,14 +182,14 @@ mod quality_blend_tests {
         assert_eq!(organic.weighted_over_target_q16, 59);
         assert!(organic.stabilization_applied);
         assert_eq!(organic.reference, BlendReference::Correlated);
-        assert_eq!(organic.projection_q16, 7);
+        assert_eq!(organic.raw_projection_q16, 7);
         assert_eq!(organic.minimum_projection_q16, 138);
         assert_eq!(organic.correction_q16, 131);
         assert_eq!(organic.stabilized_x_q16, 100);
         assert_eq!(organic.stabilized_y_q16, 95);
         assert_eq!(organic.stabilized_length_q16, 137);
-        assert_eq!(organic.stabilized_ratio_q16, 1_011);
-        assert!(!organic.exact_zero);
+        assert_eq!(organic.stabilized_length_ratio_q16, 1_011);
+        assert!(!organic.components_are_zero);
         assert_eq!(organic_disp.x, 6_481);
         assert_eq!(organic_disp.y, 6_156);
     }
@@ -248,14 +248,14 @@ mod quality_blend_tests {
         );
         assert!(near_diag.stabilization_applied, "near-cancel is corrected");
         assert_eq!(near_diag.reference, BlendReference::Correlated);
-        assert_eq!(near_diag.projection_q16, 64);
+        assert_eq!(near_diag.raw_projection_q16, 64);
         assert_eq!(near_diag.correction_q16, 601);
         assert_eq!(near_diag.minimum_projection_q16, 665);
         assert_eq!(near_diag.stabilized_x_q16, 665);
         assert_eq!(near_diag.stabilized_y_q16, 0);
         assert_eq!(near_diag.stabilized_length_q16, 665);
         assert!(
-            near_diag.stabilized_ratio_q16 >= MIN_RELIABLE_DIRECTION_RATIO_Q16 - 1,
+            near_diag.stabilized_length_ratio_q16 >= MIN_RELIABLE_DIRECTION_RATIO_Q16 - 1,
             "stabilized length reaches the reliability floor"
         );
 

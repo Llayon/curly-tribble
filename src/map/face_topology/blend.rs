@@ -3,42 +3,18 @@
 //! [`blend.rs`]: weights decide the *direction* (Q24 normalized) while the
 //! magnitude comes from the stronger component. When the weighted sum nearly
 //! cancels, its direction is dominated by rounding noise and flips between
-//! adjacent corners; such *unreliable* corners (weighted length below
-//! [`MIN_RELIABLE_DIRECTION_RATIO_Q16`]) are projected onto a continuous
-//! *reference* (the stronger component, near-ties to the smooth correlated
-//! field via [`CORRELATED_PREFERENCE_MARGIN_Q16`]). Reliable corners keep the
-//! exact previous arithmetic, bit for bit. The shared arithmetic lives in
-//! [`blend_diagnostics`].
-
-/// Weighted-length ratio below which a blend direction is unreliable
-/// (Q16 units: `1_024` == `1/64`).
-pub const MIN_RELIABLE_DIRECTION_RATIO_Q16: i64 = 1_024;
-
-/// Reference tie-break band as a ratio of the larger weighted length
-/// (Q16 units: `8_192` == `1/8`).
-///
-/// A corner below the ratio floor has weighted sum `<= ratio * target` while
-/// its larger weighted component is `>= min(wc, wl) * target`; the resulting
-/// gap (6.25% here) routes every stabilized corner to the coherent correlated
-/// field instead of per-corner local noise.
-pub const CORRELATED_PREFERENCE_MARGIN_Q16: i64 = 8_192;
+//! adjacent corners; such *unreliable* corners (weighted length below the
+//! policy floor) are projected onto a continuous *reference* (the stronger
+//! component, near-ties to the smooth correlated field via the correlated
+//! preference margin). Reliable corners keep the exact previous arithmetic,
+//! bit for bit. The shared arithmetic lives in [`blend_diagnostics`]; the law
+//! (thresholds, activation mode, margin) lives in [`blend_policy`].
 
 /// A 2D fixed-point vector (1.0 == `65_536`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct FixedVectorQ16 {
     pub x: i64,
     pub y: i64,
-}
-
-/// The component a stabilized blend direction is projected onto.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum BlendReference {
-    /// The correlated component (near-ties prefer this smooth field).
-    Correlated,
-    /// The local component.
-    Local,
-    /// No component has mass (both are exactly zero); use +X.
-    FixedPositiveX,
 }
 
 /// Outcome of the reliability-floor correction (all Q16 fixed-point).
@@ -51,12 +27,73 @@ pub(crate) struct BlendStabilization {
     pub(crate) stabilized_x_q16: i64,
     pub(crate) stabilized_y_q16: i64,
     pub(crate) stabilized_length_q16: i64,
+    pub(crate) stabilized_projection_q16: i64,
 }
 
 pub use super::blend_diagnostics::{
-    blend_reference, component_length_q16, integer_sqrt, target_magnitude_q16,
-    weighted_blend_diagnostics, WeightedBlendDiagnostics,
+    component_length_q16, integer_sqrt, projection_onto_reference_q16, resolve_reference,
+    target_magnitude_q16, weighted_blend_diagnostics, weighted_blend_diagnostics_with_policy,
+    BlendReference, ResolvedBlendReference, WeightedBlendDiagnostics,
 };
+pub use super::blend_policy::{
+    BlendActivation, BlendReliabilityPolicy, CORRELATED_PREFERENCE_MARGIN_Q16,
+    MIN_RELIABLE_DIRECTION_RATIO_Q16, PRODUCTION_BLEND_RELIABILITY_POLICY,
+};
+
+const Q16: i64 = 65_536;
+
+/// The stabilization reference for the default production margin.
+#[must_use]
+pub fn blend_reference(
+    correlated: FixedVectorQ16,
+    local: FixedVectorQ16,
+    correlated_weight_q16: u32,
+    local_weight_q16: u32,
+) -> BlendReference {
+    blend_reference_with_margin(
+        correlated,
+        local,
+        correlated_weight_q16,
+        local_weight_q16,
+        CORRELATED_PREFERENCE_MARGIN_Q16,
+    )
+}
+
+/// The stabilization reference: the component with the larger weighted
+/// magnitude, near-ties resolved toward the correlated (smooth, coherent)
+/// component over the per-corner local noise.
+#[must_use]
+pub(crate) fn blend_reference_with_margin(
+    correlated: FixedVectorQ16,
+    local: FixedVectorQ16,
+    correlated_weight_q16: u32,
+    local_weight_q16: u32,
+    correlated_preference_margin_q16: i64,
+) -> BlendReference {
+    let wc = i64::from(correlated_weight_q16);
+    let wl = i64::from(local_weight_q16);
+    let correlated_weighted_length = component_length_q16(correlated) * wc;
+    let local_weighted_length = component_length_q16(local) * wl;
+    if correlated_weighted_length == 0 && local_weighted_length == 0 {
+        return BlendReference::FixedPositiveX;
+    }
+    if correlated_weighted_length == 0 {
+        return BlendReference::Local;
+    }
+    if local_weighted_length == 0 {
+        return BlendReference::Correlated;
+    }
+    let gap = (local_weighted_length - correlated_weighted_length).abs();
+    let larger = local_weighted_length.max(correlated_weighted_length);
+    if gap * Q16 < larger * correlated_preference_margin_q16 {
+        return BlendReference::Correlated;
+    }
+    if correlated_weighted_length > local_weighted_length {
+        BlendReference::Correlated
+    } else {
+        BlendReference::Local
+    }
+}
 
 /// Blends two components into a Q16 displacement vector.
 ///
@@ -71,9 +108,34 @@ pub fn blend_to_displacement_q16(
     correlated_weight_q16: u32,
     local_weight_q16: u32,
 ) -> FixedVectorQ16 {
+    blend_to_displacement_q16_with_policy(
+        correlated,
+        local,
+        correlated_weight_q16,
+        local_weight_q16,
+        PRODUCTION_BLEND_RELIABILITY_POLICY,
+    )
+}
+
+/// Like [`blend_to_displacement_q16`], but under an explicit policy, so the
+/// candidate generator can build genuinely different geometry for each
+/// threshold instead of re-classifying a single topology.
+#[must_use]
+pub fn blend_to_displacement_q16_with_policy(
+    correlated: FixedVectorQ16,
+    local: FixedVectorQ16,
+    correlated_weight_q16: u32,
+    local_weight_q16: u32,
+    policy: BlendReliabilityPolicy,
+) -> FixedVectorQ16 {
     const DIRECTION_SHIFT: i64 = 1 << 24;
-    let diagnostics =
-        weighted_blend_diagnostics(correlated, local, correlated_weight_q16, local_weight_q16);
+    let diagnostics = weighted_blend_diagnostics_with_policy(
+        correlated,
+        local,
+        correlated_weight_q16,
+        local_weight_q16,
+        policy,
+    );
     let (dir_x, dir_y) = if diagnostics.stabilization_applied {
         let length = diagnostics.stabilized_length_q16;
         if length == 0 {
