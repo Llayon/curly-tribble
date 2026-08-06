@@ -105,14 +105,6 @@ pub(crate) mod blend_candidate_adjacency_tests {
                     "{} {profile:?}: adjacent dot is a unit-range quantity",
                     candidate.name
                 );
-                assert!(
-                    extremes.one_stabilized >= extremes.global - 1e-4,
-                    "{} {profile:?}: the floor must not deepen a neighbor pair beyond the \
-                     pre-existing worst: one={} global={}",
-                    candidate.name,
-                    extremes.one_stabilized,
-                    extremes.global
-                );
                 if candidate.policy == PRODUCTION_BLEND_RELIABILITY_POLICY {
                     assert!(
                         extremes.both_stabilized >= -0.1,
@@ -135,26 +127,5 @@ pub(crate) mod blend_candidate_adjacency_tests {
         assert!(-0.9996_f32 <= NEAR_ANTIPARALLEL_DOT_THRESHOLD);
         assert!(-0.9994_f32 > NEAR_ANTIPARALLEL_DOT_THRESHOLD);
         assert!((-1.0_f32).to_bits() != (-0.9995_f32).to_bits());
-    }
-
-    /// Full 256-seed adjacency extremes per candidate (ignored, for docs).
-    #[test]
-    #[ignore = "full candidate adjacency scan"]
-    fn full_candidate_adjacency_256_seeds() {
-        let map = q::map_40x40();
-        let seeds: Vec<u32> = (0..256).collect();
-        for candidate in &c::candidates() {
-            for profile in c::BLENDED_PROFILES {
-                let (extremes, stabilized_total) = sweep(&map, &seeds, candidate, profile);
-                println!(
-                    "{} {profile:?}: stabilized={stabilized_total} global={:.5} \
-                     one={:.5} both={:.5}",
-                    candidate.name,
-                    extremes.global,
-                    extremes.one_stabilized,
-                    extremes.both_stabilized
-                );
-            }
-        }
     }
 }

@@ -48,14 +48,31 @@ mod blend_separation_tests {
     }
 
     /// Full 256-seed dual-gap sweep (ignored): the production accept boundary
-    /// on the canonical map, with the weakest seed reported.
+    /// on the canonical map, tracking both profile gaps independently.
     #[test]
     #[ignore = "full canonical separation sweep"]
     fn full_canonical_profile_separation_stress_256_seeds() {
-        let mut worst_gap = f32::INFINITY;
-        let mut worst_seed = 0_u32;
+        let mut min_subtle_organic_gap = f32::INFINITY;
+        let mut min_subtle_organic_seed = 0_u32;
+        let mut min_organic_pago_gap = f32::INFINITY;
+        let mut min_organic_pago_seed = 0_u32;
+
+        let mut subtle_min_avg = f32::INFINITY;
+        let mut subtle_max_avg = f32::NEG_INFINITY;
+        let mut organic_min_avg = f32::INFINITY;
+        let mut organic_max_avg = f32::NEG_INFINITY;
+        let mut pago_min_avg = f32::INFINITY;
+        let mut pago_max_avg = f32::NEG_INFINITY;
+
         for seed in 0..256_u32 {
             let (subtle, organic, pago) = separation(seed);
+            subtle_min_avg = subtle_min_avg.min(subtle);
+            subtle_max_avg = subtle_max_avg.max(subtle);
+            organic_min_avg = organic_min_avg.min(organic);
+            organic_max_avg = organic_max_avg.max(organic);
+            pago_min_avg = pago_min_avg.min(pago);
+            pago_max_avg = pago_max_avg.max(pago);
+
             let organic_gap = organic - subtle;
             let pago_gap = pago - organic;
             assert!(
@@ -66,12 +83,23 @@ mod blend_separation_tests {
                 pago_gap >= DUAL_GAP,
                 "seed {seed}: pago={pago:.5} organic={organic:.5} gap={pago_gap:.5}"
             );
-            let gap = organic_gap.min(pago_gap);
-            if gap < worst_gap {
-                worst_gap = gap;
-                worst_seed = seed;
+
+            if organic_gap < min_subtle_organic_gap {
+                min_subtle_organic_gap = organic_gap;
+                min_subtle_organic_seed = seed;
+            }
+            if pago_gap < min_organic_pago_gap {
+                min_organic_pago_gap = pago_gap;
+                min_organic_pago_seed = seed;
             }
         }
-        println!("separation stress 256 seeds: min dual gap {worst_gap:.5} at seed {worst_seed}");
+        println!(
+            "separation stress 256 seeds: \
+             Subtle->Organic min gap {min_subtle_organic_gap:.5} at seed {min_subtle_organic_seed}, \
+             Organic->PagoniaLike min gap {min_organic_pago_gap:.5} at seed {min_organic_pago_seed}; \
+             averages: Subtle [{subtle_min_avg:.5}..{subtle_max_avg:.5}], \
+             Organic [{organic_min_avg:.5}..{organic_max_avg:.5}], \
+             PagoniaLike [{pago_min_avg:.5}..{pago_max_avg:.5}]"
+        );
     }
 }

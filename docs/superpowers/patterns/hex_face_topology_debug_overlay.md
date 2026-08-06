@@ -178,31 +178,33 @@ thresholds, distinct from the generator's input config (component magnitude
 ranges are an input range, not a final displacement guarantee). Acceptance is
 layered:
 
-- **Level A (hard)**: all measured metrics finite; measured final displacement
-  must not exceed the profile's absolute cap (single source: the profile config
-  Q16 cap; `validate_profile_displacement_cap` allows the cap plus one
-  `DISPLACEMENT_CAP_EPSILON`, rejects non-finite values; generation failure).
-- **Level B (canonical bands)**: visual misses emit one combined WARN at
-  regeneration time (stable issue ordering, profile name + geometry
-  fingerprint) and fail the canonical 40x40 fixture tests; never production.
-  The `Organic`/`PagoniaLike` bands are the minimum relaxation supported by the
-  full 256-seed x six-shape matrix (4,608 topologies); every worst case occurs
-  on the canonical 40x40 map and is locked as a fixture in `tests_quality.rs`
-  (`Organic` seed 203: 161.11° max angle, seed 74: 0.4937 aspect;
-  `PagoniaLike` seed 58: 175.195° max angle, seed 169: 0.3783 aspect). Bands
-  hold a small margin beyond these: `Organic` 162°/0.490, `PagoniaLike`
-  176°/0.370. The bands intentionally permit the measured near-flat/slender
-  extremes and are not a production-readiness claim.
+- **Level A (hard correctness)**: structural topology invalidity, non-finite max
+  displacement, or max displacement exceeding the profile's absolute cap (single
+  source: the profile config Q16 cap; `validate_profile_displacement_cap` allows
+  the cap plus one `DISPLACEMENT_CAP_EPSILON`, rejects non-finite values;
+  generation failure).
+- **Level B (canonical bands)**: all other non-finite diagnostic metrics (max
+  angle, min aspect ratio, min edge length, average displacement, etc.), average
+  displacement bands, edge-length bands, interior-angle bands, aspect-quality
+  bands, reduced-vertex ratio, and regular-fallback ratio. Visual misses emit one
+  combined WARN at regeneration time (stable issue ordering, profile name +
+  geometry fingerprint) and fail the canonical 40x40 fixture tests, but never
+  affect production terrain. The `Organic`/`PagoniaLike` bands are the minimum
+  relaxation supported by the full 256-seed x six-shape matrix (4,608
+  topologies); `full_4608_quality_extrema_scan` is a reporting-only quality scan,
+  and `full_hex_deformation_profiles_stress_256_seeds` is the authoritative
+  enforcement stress test. Every worst case occurs on the canonical 40x40 map and
+  is locked as a fixture in `tests_quality.rs` (`Organic` seed 203: 161.11° max
+  angle, seed 74: 0.4937 aspect; `PagoniaLike` seed 58: 175.20° max angle,
+  seed 169: 0.3783 aspect). Bands hold a small margin beyond these: `Organic`
+  162°/0.490, `PagoniaLike` 176°/0.370.
 - **Level C (separation contract)**: `ProfileSeparationCriteria` requires
   `avg(Organic) >= avg(Subtle) + 0.015` and `avg(Pago) >= avg(Organic) + 0.015`
-  on the canonical 40x40. **Fulfilled for every seed** (8 fast seeds: `Subtle`
-  ≈0.100, `Organic` ≈0.151, `PagoniaLike` ≈0.201 — both gaps clear the 0.015
-  floor by ~0.035; the 256-seed sweep reports a min gap of ~0.049). Enforced
-  by `check_profile_separation` in
-  `canonical_40x40_separation_satisfied_per_seed` and the ignored
-  `full_canonical_profile_separation_stress_256_seeds`; the blend law that
-  makes the separation achievable is documented in ADR 0007
-  (`src/map/face_topology/blend.rs`).
+  on the canonical 40x40. Fulfilled for every seed: `full_canonical_profile_separation_stress_256_seeds`
+  tracks the `Subtle`→`Organic` gap (min `0.04978` at seed 206) and
+  `Organic`→`PagoniaLike` gap (min `0.04887` at seed 17) independently. Profile
+  average ranges are `Subtle` `[0.09926..0.10055]`, `Organic` `[0.14978..0.15179]`,
+  and `PagoniaLike` `[0.19973..0.20250]`.
 
 ## Experimental Profile Validation
 
@@ -226,11 +228,16 @@ Run the full 256-seed, three-profile stress suite (4,608 topologies) explicitly:
 cargo test --lib full_hex_deformation_profiles_stress_256_seeds -- --ignored
 ```
 
-Run the full 4,608 acceptance scan (asserts the corrected Level B bands and
-zero backoff across the whole matrix) explicitly:
+Run the reporting-only 4,608 quality extrema scan explicitly:
 
 ```text
 cargo test --lib full_4608_quality_extrema_scan -- --ignored
+```
+
+Run the unified candidate validation scan (7 candidates x 2 profiles x 256 seeds, 3,584 topologies) explicitly:
+
+```text
+cargo test --lib full_blend_reliability_candidate_validation_256_seeds -- --nocapture --ignored
 ```
 
 The fast loops that run with the normal suite are:
@@ -239,3 +246,26 @@ The fast loops that run with the normal suite are:
 cargo test --lib fast_profile_stress_covers_all_profiles_and_shapes
 cargo test --lib fast_144_topology_matrix_is_fully_hardened
 ```
+
+## Candidate Validation Output (3,584 Topologies)
+
+Candidate validation measured on canonical 40x40 map across 256 seeds per candidate/profile:
+
+| Candidate Policy | Profile | Stabilized | Min Len Ratio | Min Proj Ratio | Worst Both-Stab Dot | New Near-Anti (Stab) | Status |
+|---|---|---|---|---|---|---|---|
+| Raw Baseline | Organic | 0 (0.00%) | N/A | N/A | 1.0000 | 0 | Baseline |
+| Raw Baseline | PagoniaLike | 0 (0.00%) | N/A | N/A | 1.0000 | 0 | Baseline |
+| `1/64_len` | Organic | 618 (0.07%) | 995 (s189) | 1015 (s13) | -0.04107 | 1 (1) | **ACCEPTED (PRODUCTION)** |
+| `1/64_len` | PagoniaLike | 500 (0.06%) | 1004 (s112) | 1018 (s18) | 0.73786 | 3 (3) | **ACCEPTED (PRODUCTION)** |
+| `1/32_len` | Organic | 2338 (0.27%) | 2024 (s89) | 2040 (s13) | 0.44656 | 10 (10) | Research Only |
+| `1/32_len` | PagoniaLike | 1993 (0.23%) | 2032 (s84) | 2042 (s2) | 0.45552 | 8 (8) | Research Only |
+| `1/16_len` | Organic | 9224 (1.07%) | 4073 (s242) | 4088 (s1) | -1.00000 | 66 (66) | Research Only |
+| `1/16_len` | PagoniaLike | 7702 (0.90%) | 4076 (s112) | 4090 (s2) | -1.00000 | 78 (78) | Research Only |
+| `1/64_proj` | Organic | 11588 (1.35%) | 995 (s189) | 1015 (s1) | -0.99999 | 127 (127) | Research Only |
+| `1/64_proj` | PagoniaLike | 5804 (0.67%) | 1004 (s112) | 1018 (s1) | -0.99980 | 54 (54) | Research Only |
+| `1/32_proj` | Organic | 16710 (1.94%) | 2024 (s89) | 2040 (s1) | -0.99998 | 103 (103) | Research Only |
+| `1/32_proj` | PagoniaLike | 9179 (1.07%) | 2032 (s84) | 2041 (s20) | -0.99980 | 63 (63) | Research Only |
+| `1/16_proj` | Organic | 31095 (3.62%) | 4073 (s242) | 4088 (s0) | -1.00000 | 200 (200) | Research Only |
+| `1/16_proj` | PagoniaLike | 20744 (2.41%) | 4076 (s112) | 4090 (s0) | -1.00000 | 173 (173) | Research Only |
+
+*Note*: Production selection (`1/64_len`) remains unchanged. Production minimum stabilized length ratios are Organic `995` (seed 189) and PagoniaLike `1004` (seed 112).
