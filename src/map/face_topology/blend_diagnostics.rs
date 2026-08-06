@@ -141,6 +141,19 @@ fn ratio_q16(value: i64, target: i64) -> i64 {
     }
 }
 
+/// Ceiling division away from zero for integer fixed-point scaling.
+#[must_use]
+pub fn ceil_div_q16(numerator: i64, denominator: i64) -> i64 {
+    if denominator == 0 {
+        return 0;
+    }
+    if numerator >= 0 {
+        (numerator + denominator - 1) / denominator
+    } else {
+        -((-numerator + denominator - 1) / denominator)
+    }
+}
+
 /// Applies the reliability-floor correction under an explicit policy.
 #[must_use]
 pub(crate) fn stabilize_blend_direction(
@@ -167,18 +180,26 @@ pub(crate) fn stabilize_blend_direction(
             stabilized_projection_q16: raw_projection,
         };
     }
-    let correction = minimum_projection - raw_projection;
-    let (stabilized_x, stabilized_y) = match reference {
-        BlendReference::FixedPositiveX => (weighted.x + correction, weighted.y),
-        BlendReference::Correlated | BlendReference::Local => (
-            weighted.x + resolved.vector.x * correction / resolved.length_q16,
-            weighted.y + resolved.vector.y * correction / resolved.length_q16,
-        ),
+    let (stabilized_x, stabilized_y) = if weighted_length_q16 == 0 {
+        match reference {
+            BlendReference::FixedPositiveX => (minimum_projection, 0),
+            BlendReference::Correlated | BlendReference::Local => (
+                ceil_div_q16(resolved.vector.x * minimum_projection, resolved.length_q16),
+                ceil_div_q16(resolved.vector.y * minimum_projection, resolved.length_q16),
+            ),
+        }
+    } else {
+        (
+            ceil_div_q16(weighted.x * minimum_projection, weighted_length_q16),
+            ceil_div_q16(weighted.y * minimum_projection, weighted_length_q16),
+        )
     };
     let stabilized = FixedVectorQ16 {
         x: stabilized_x,
         y: stabilized_y,
     };
+    let stabilized_len = length_q16(stabilized_x, stabilized_y);
+    let correction = stabilized_len - weighted_length_q16;
     BlendStabilization {
         applied: true,
         projection_q16: raw_projection,
@@ -186,7 +207,7 @@ pub(crate) fn stabilize_blend_direction(
         minimum_projection_q16: minimum_projection,
         stabilized_x_q16: stabilized_x,
         stabilized_y_q16: stabilized_y,
-        stabilized_length_q16: length_q16(stabilized_x, stabilized_y),
+        stabilized_length_q16: stabilized_len,
         stabilized_projection_q16: projection_onto_reference_q16(stabilized, resolved),
     }
 }

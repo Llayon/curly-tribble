@@ -167,14 +167,14 @@ mod quality_blend_tests {
         assert_eq!(pago.reference, BlendReference::Correlated);
         assert_eq!(pago.raw_projection_q16, 0);
         assert_eq!(pago.minimum_projection_q16, 197);
-        assert_eq!(pago.correction_q16, 197);
-        assert_eq!(pago.stabilized_x_q16, 180);
-        assert_eq!(pago.stabilized_y_q16, -76);
-        assert_eq!(pago.stabilized_length_q16, 195);
-        assert_eq!(pago.stabilized_length_ratio_q16, 1_012);
+        assert_eq!(pago.correction_q16, 277);
+        assert_eq!(pago.stabilized_x_q16, -197);
+        assert_eq!(pago.stabilized_y_q16, -197);
+        assert_eq!(pago.stabilized_length_q16, 278);
+        assert_eq!(pago.stabilized_length_ratio_q16, 1_443);
         assert!(!pago.components_are_zero);
-        assert_eq!(pago_disp.x, 11_651);
-        assert_eq!(pago_disp.y, -4_919);
+        assert_eq!(pago_disp.x, -8_945);
+        assert_eq!(pago_disp.y, -8_945);
 
         let (organic, organic_disp) =
             fixture(&map, 64, HexDeformationProfile::Organic, WORST_KEYS[1]);
@@ -184,14 +184,14 @@ mod quality_blend_tests {
         assert_eq!(organic.reference, BlendReference::Correlated);
         assert_eq!(organic.raw_projection_q16, 7);
         assert_eq!(organic.minimum_projection_q16, 138);
-        assert_eq!(organic.correction_q16, 131);
-        assert_eq!(organic.stabilized_x_q16, 100);
-        assert_eq!(organic.stabilized_y_q16, 95);
-        assert_eq!(organic.stabilized_length_q16, 137);
-        assert_eq!(organic.stabilized_length_ratio_q16, 1_011);
+        assert_eq!(organic.correction_q16, 139);
+        assert_eq!(organic.stabilized_x_q16, 138);
+        assert_eq!(organic.stabilized_y_q16, 52);
+        assert_eq!(organic.stabilized_length_q16, 147);
+        assert_eq!(organic.stabilized_length_ratio_q16, 1_085);
         assert!(!organic.components_are_zero);
-        assert_eq!(organic_disp.x, 6_481);
-        assert_eq!(organic_disp.y, 6_156);
+        assert_eq!(organic_disp.x, 8_335);
+        assert_eq!(organic_disp.y, 3_140);
     }
 
     /// The documented blend law on selected deterministic inputs: magnitude is

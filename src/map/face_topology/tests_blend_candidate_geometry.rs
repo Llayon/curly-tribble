@@ -65,25 +65,25 @@ mod blend_candidate_geometry_tests {
             (
                 HexDeformationProfile::Organic,
                 42_u32,
-                0x63fd_6fdd_4386_f8ac,
+                16785404514996163090_u64,
                 0xced2_a662_5361_af97,
             ),
             (
                 HexDeformationProfile::Organic,
                 194,
-                0x05a9_ae3e_a9ee_5b9a,
+                12135014724753035092_u64,
                 0xe403_a880_7d05_777f,
             ),
             (
                 HexDeformationProfile::PagoniaLike,
                 42,
-                0xf508_d011_3655_ad21,
+                3198784433102359063_u64,
                 0xced2_a662_5361_af97,
             ),
             (
                 HexDeformationProfile::PagoniaLike,
                 194,
-                0xce40_5830_aa1d_33a6,
+                5745594850622409527_u64,
                 0xe403_a880_7d05_777f,
             ),
         ];
