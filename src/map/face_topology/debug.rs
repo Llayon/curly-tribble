@@ -105,7 +105,7 @@ pub fn apply_debug_shortcuts(
 
 #[derive(Resource, Debug, Clone, Default)]
 pub struct HexFaceDebugComparisonTopology {
-    pub last_inputs: Option<(u32, u32, HexDeformationProfile)>,
+    pub last_inputs: Option<super::runtime::LogicalMapInputs>,
     pub topology: HexFaceTopology,
     pub cache: HexFaceDebugCache,
 }
@@ -130,13 +130,9 @@ pub fn draw_face_topology_debug(
     let (active_topology, active_cache) = if settings.profile == topology.stats.profile {
         (&*topology, &*cache)
     } else {
-        #[allow(clippy::cast_possible_truncation)]
-        let key = (
-            world_seed.value(),
-            map_data.tiles.len() as u32,
-            settings.profile,
-        );
-        if comp_topo.last_inputs != Some(key) {
+        let inputs =
+            super::runtime::LogicalMapInputs::from_map(&map_data, *world_seed, settings.profile);
+        if comp_topo.last_inputs.as_ref() != Some(&inputs) {
             if let Ok(new_top) = crate::map::face_topology::generate_hex_face_topology_with_profile(
                 &map_data,
                 *world_seed,
@@ -146,7 +142,7 @@ pub fn draw_face_topology_debug(
                 new_cache.rebuild(&new_top, &map_data);
                 comp_topo.topology = new_top;
                 comp_topo.cache = new_cache;
-                comp_topo.last_inputs = Some(key);
+                comp_topo.last_inputs = Some(inputs);
             }
         }
         (&comp_topo.topology, &comp_topo.cache)

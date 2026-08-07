@@ -147,13 +147,16 @@ pub fn handle_rebuild_mesh(
 pub fn monitor_inspector_triggers(
     mut config: ResMut<TerrainConfig>,
     mut ev_gen: MessageWriter<GenerateMapEvent>,
+    mut ev_rebuild: MessageWriter<RebuildMeshEvent>,
 ) {
     let request = std::mem::take(&mut config.generation_request);
     if request == GenerationRequest::RandomizeSeed {
         config.seed = rand::thread_rng().gen_range(0..999_999);
     }
 
-    if request != GenerationRequest::None {
+    if request == GenerationRequest::None {
+        ev_rebuild.write(RebuildMeshEvent);
+    } else {
         ev_gen.write(GenerateMapEvent {
             mode: GenerationMode::Reset,
             auto_fill_phase: None,
