@@ -128,6 +128,7 @@ pub fn handle_rebuild_mesh(
             }
             commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
                 topology: derived_topology,
+                face_topology: (*face_topology).clone(),
                 map_data: map_data.clone(),
                 phase: *phase.get(),
                 faction_manager: faction_manager.clone(),

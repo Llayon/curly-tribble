@@ -51,6 +51,7 @@ impl Plugin for MeshGenPlugin {
 
 pub struct SpawnGlobalTerrainCommand {
     pub topology: crate::map::topology::TerrainTopology,
+    pub face_topology: crate::map::face_topology::types::HexFaceTopology,
     pub map_data: MapData,
     pub phase: EditorPhase,
     pub faction_manager: crate::game_state::FactionManager,
@@ -89,6 +90,7 @@ impl Command for SpawnGlobalTerrainCommand {
         let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(
             &self.map_data,
             &self.topology,
+            &self.face_topology,
             self.phase,
             &self.faction_manager,
             &self.config,

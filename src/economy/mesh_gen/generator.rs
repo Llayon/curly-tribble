@@ -1,7 +1,7 @@
 use crate::game_state::{EditorPhase, FactionManager};
 use crate::map::data::{OceanState, RoofState};
 use crate::map::terrain_gen::TerrainConfig;
-use crate::map::{LandscapeFeature, MapData, TerrainType, HEX_SIZE};
+use crate::map::{LandscapeFeature, MapData, TerrainType};
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::Indices;
 use bevy::prelude::*;
@@ -13,11 +13,64 @@ impl Plugin for MeshGeneratorPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum OverlayGeometryError {
+    MissingFaceForTile(crate::map::HexCoord),
+    InvalidSourceFace(crate::map::face_topology::FaceId),
+    InvalidSourceVertex(crate::map::face_topology::VertexId),
+}
+
+fn extract_warped_face_corners(
+    coord: crate::map::HexCoord,
+    face_topology: &crate::map::face_topology::types::HexFaceTopology,
+) -> Result<[Vec2; 6], OverlayGeometryError> {
+    let &face_id = face_topology
+        .hex_to_face
+        .get(&coord)
+        .ok_or(OverlayGeometryError::MissingFaceForTile(coord))?;
+    let face = face_topology
+        .faces
+        .get(face_id.index())
+        .ok_or(OverlayGeometryError::InvalidSourceFace(face_id))?;
+    let mut corners = [Vec2::ZERO; 6];
+    for (i, corner) in corners.iter_mut().enumerate() {
+        let v_id = face.vertices[i];
+        let v_idx = v_id.index();
+        if v_idx >= face_topology.vertices.len() {
+            return Err(OverlayGeometryError::InvalidSourceVertex(v_id));
+        }
+        *corner = face_topology.vertices[v_idx].position;
+    }
+    Ok(corners)
+}
+
+fn append_overlay_face(
+    vertices: &mut Vec<[f32; 3]>,
+    indices: &mut Vec<u32>,
+    corners: &[Vec2; 6],
+    y: f32,
+    vertex_count: &mut u32,
+) {
+    let center_xz =
+        (corners[0] + corners[1] + corners[2] + corners[3] + corners[4] + corners[5]) / 6.0;
+    vertices.push([center_xz.x, y, center_xz.y]);
+    for corner in corners {
+        vertices.push([corner.x, y, corner.y]);
+    }
+    let base = *vertex_count;
+    for i in 1..=6 {
+        let next = if i == 6 { 1 } else { i + 1 };
+        indices.extend_from_slice(&[base, base + next, base + i]);
+    }
+    *vertex_count += 7;
+}
+
 #[must_use]
-#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
 pub fn create_global_map_meshes(
     map: &MapData,
     topology: &crate::map::topology::TerrainTopology,
+    face_topology: &crate::map::face_topology::types::HexFaceTopology,
     phase: EditorPhase,
     faction_manager: &FactionManager,
     config: &TerrainConfig,
@@ -78,12 +131,14 @@ pub fn create_global_map_meshes(
     let mut roof_vertices = Vec::new();
     let mut roof_indices = Vec::new();
 
-    let size = HEX_SIZE;
     let mut water_vertex_count = 0;
     let mut roof_vertex_count = 0;
 
-    for (&coord, tile_data) in &map.tiles {
-        let center_world = coord.to_world(size);
+    let mut sorted_coords: Vec<crate::map::HexCoord> = map.tiles.keys().copied().collect();
+    sorted_coords.sort_by_key(|c| (c.q, c.r));
+
+    for coord in sorted_coords {
+        let tile_data = &map.tiles[&coord];
         let center_y = if is_flat || tile_data.ocean_state == OceanState::Ocean {
             0.0
         } else {
@@ -94,38 +149,28 @@ pub fn create_global_map_meshes(
             || tile_data.landscape_feature == LandscapeFeature::Lake)
             && tile_data.ocean_state == OceanState::Land
         {
-            water_vertices.push([center_world.x, center_y, center_world.z]);
-            for i in 0..6 {
-                let angle_deg = 60.0 * i as f32 + 30.0;
-                let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
-                let vx = center_world.x + size * angle_rad.cos();
-                let vz = center_world.z + size * angle_rad.sin();
-                water_vertices.push([vx, center_y, vz]);
-            }
-            let base_w = water_vertex_count;
-            for i in 1..=6 {
-                let next = if i == 6 { 1 } else { i + 1 };
-                water_indices.extend_from_slice(&[base_w, base_w + next, base_w + i]);
-            }
-            water_vertex_count += 7;
+            let corners = extract_warped_face_corners(coord, face_topology)
+                .expect("validated HexFaceTopology missing face/vertex for tile");
+            append_overlay_face(
+                &mut water_vertices,
+                &mut water_indices,
+                &corners,
+                center_y,
+                &mut water_vertex_count,
+            );
         }
 
         if tile_data.roof_state == RoofState::Roofed {
             let roof_y = center_y + 2.5;
-            roof_vertices.push([center_world.x, roof_y, center_world.z]);
-            for i in 0..6 {
-                let angle_deg = 60.0 * i as f32 + 30.0;
-                let angle_rad = std::f32::consts::PI / 180.0 * angle_deg;
-                let vx = center_world.x + size * angle_rad.cos();
-                let vz = center_world.z + size * angle_rad.sin();
-                roof_vertices.push([vx, roof_y, vz]);
-            }
-            let base_r = roof_vertex_count;
-            for i in 1..=6 {
-                let next = if i == 6 { 1 } else { i + 1 };
-                roof_indices.extend_from_slice(&[base_r, base_r + next, base_r + i]);
-            }
-            roof_vertex_count += 7;
+            let corners = extract_warped_face_corners(coord, face_topology)
+                .expect("validated HexFaceTopology missing face/vertex for tile");
+            append_overlay_face(
+                &mut roof_vertices,
+                &mut roof_indices,
+                &corners,
+                roof_y,
+                &mut roof_vertex_count,
+            );
         }
     }
 
@@ -226,17 +271,27 @@ fn create_optional_mesh(vertices: Vec<[f32; 3]>, indices: Vec<u32>) -> Option<Me
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::map::{HexCoord, TileData};
+    use crate::map::face_topology::generate_hex_face_topology_with_profile;
+    use crate::map::face_topology::profiles::HexDeformationProfile;
+    use crate::map::topology::derive_terrain_topology;
+    use crate::map::{HexCoord, TileData, WorldSeed};
 
     #[test]
     fn omits_empty_overlay_meshes() {
         let mut map = MapData::default();
         map.tiles.insert(HexCoord::new(0, 0), TileData::default());
-        let topology = crate::map::topology::generate_legacy_topology_from_map_data(&map);
+        let face_topology = generate_hex_face_topology_with_profile(
+            &map,
+            WorldSeed::new(42),
+            HexDeformationProfile::Subtle,
+        )
+        .unwrap();
+        let topology = derive_terrain_topology(&map, &face_topology).unwrap();
 
         let (_terrain, water, roof) = create_global_map_meshes(
             &map,
             &topology,
+            &face_topology,
             EditorPhase::Shape,
             &FactionManager::default(),
             &TerrainConfig::default(),
