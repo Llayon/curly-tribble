@@ -137,30 +137,58 @@ fn ratio_q16(value: i64, target: i64) -> i64 {
     }
 }
 
-/// Division away from zero for integer fixed-point radial scaling.
+/// Scaling of a vector component to the reliability floor (Option B: Production Domain).
 ///
-/// Computes `ceil(|numerator| / denominator) * sign(numerator)` using `i128`
-/// arithmetic to prevent overflow. Returns `None` if `denominator <= 0`
-/// or if the quotient overflows `i64`.
+/// Computes `ceil(|component| * target_floor / denominator) * sign(component)` using `u128`
+/// intermediate arithmetic. Mathematically total for all production inputs (`denominator >= 1`).
+#[must_use]
+#[allow(clippy::cast_possible_truncation)]
+pub(crate) fn scale_radial_component_q16(
+    component: i64,
+    target_floor: i64,
+    denominator: i64,
+) -> i64 {
+    if denominator <= 0 {
+        return 0;
+    }
+    let den = u128::from(denominator.unsigned_abs());
+    let (abs_comp, is_neg) = if component < 0 {
+        (u128::from(component.unsigned_abs()), true)
+    } else {
+        (u128::from(component.unsigned_abs()), false)
+    };
+    let num = abs_comp * u128::from(target_floor.unsigned_abs());
+    let quotient = num.div_ceil(den);
+    let signed = quotient as i64;
+    if is_neg {
+        -signed
+    } else {
+        signed
+    }
+}
+
+/// Division away from zero for integer fixed-point radial scaling (Option C: Generic Checked Helper).
+///
+/// Computes `ceil(|numerator| / denominator) * sign(numerator)` using `u128`
+/// magnitude arithmetic. Returns `None` if `denominator <= 0` or if the quotient overflows `i64`.
 #[must_use]
 #[allow(clippy::cast_possible_truncation)]
 pub fn div_away_from_zero(numerator: i128, denominator: i64) -> Option<i64> {
     if denominator <= 0 {
         return None;
     }
-    let den = i128::from(denominator);
-    let (abs_num, is_negative) = if numerator < 0 {
-        (numerator.checked_abs()?, true)
+    let den = u128::from(denominator.unsigned_abs());
+    let (abs_num, is_neg) = if numerator < 0 {
+        (numerator.unsigned_abs(), true)
     } else {
-        (numerator, false)
+        (numerator.unsigned_abs(), false)
     };
-    let quotient = abs_num.checked_add(den - 1)? / den;
-    let signed_quotient = if is_negative { -quotient } else { quotient };
-    if signed_quotient < i128::from(i64::MIN) || signed_quotient > i128::from(i64::MAX) {
-        None
-    } else {
-        Some(signed_quotient as i64)
+    let quotient = abs_num.div_ceil(den);
+    if quotient > i64::MAX as u128 {
+        return None;
     }
+    let signed = quotient as i64;
+    Some(if is_neg { -signed } else { signed })
 }
 
 /// Applies the reliability-floor correction under an explicit policy.
@@ -174,7 +202,7 @@ pub(crate) fn stabilize_blend_direction(
     let raw_projection = projection_onto_reference_q16(weighted, resolved);
     let minimum_reliable_length = target_magnitude_q16 * policy.minimum_direction_ratio_q16() / Q16;
     let (applied, stabilized_x, stabilized_y) = if policy.is_below_floor(weighted_length_q16, raw_projection, target_magnitude_q16) {
-        let scale = |v: i64, d: i64| div_away_from_zero(i128::from(v) * i128::from(minimum_reliable_length), d).unwrap_or(0);
+        let scale = |v: i64, d: i64| scale_radial_component_q16(v, minimum_reliable_length, d);
         let (sx, sy) = if weighted_length_q16 == 0 {
             match reference {
                 BlendReference::FixedPositiveX => (minimum_reliable_length, 0),
@@ -220,6 +248,7 @@ pub fn weighted_blend_diagnostics(
 
 /// Like [`weighted_blend_diagnostics`], but under an arbitrary policy.
 #[must_use]
+#[rustfmt::skip]
 pub fn weighted_blend_diagnostics_with_policy(
     correlated: FixedVectorQ16,
     local: FixedVectorQ16,
@@ -249,38 +278,18 @@ pub fn weighted_blend_diagnostics_with_policy(
         policy.correlated_preference_margin_q16(),
     );
     let stabilization = stabilize_blend_direction(
-        FixedVectorQ16 {
-            x: weighted_x,
-            y: weighted_y,
-        },
-        weighted_length,
-        target,
-        correlated,
-        local,
-        reference,
-        policy,
+        FixedVectorQ16 { x: weighted_x, y: weighted_y },
+        weighted_length, target, correlated, local, reference, policy,
     );
     WeightedBlendDiagnostics {
-        weighted_x_q16: weighted_x,
-        weighted_y_q16: weighted_y,
-        weighted_length_q16: weighted_length,
-        correlated_length_q16: correlated_length,
-        local_length_q16: local_length,
-        target_magnitude_q16: target,
-        weighted_over_target_q16: weighted_over_target,
-        component_dot_q32: dot,
-        anti_aligned: dot < 0,
-        reference,
-        components_are_zero: correlated_length == 0 && local_length == 0,
-        weighted_sum_zero: weighted_x == 0 && weighted_y == 0,
-        stabilization_applied: stabilization.applied,
-        raw_projection_q16: stabilization.raw_projection_q16,
-        radial_length_increase_q16: stabilization.radial_length_increase_q16,
-        minimum_reliable_length_q16: stabilization.minimum_reliable_length_q16,
-        stabilized_x_q16: stabilization.stabilized_x_q16,
-        stabilized_y_q16: stabilization.stabilized_y_q16,
-        stabilized_length_q16: stabilization.stabilized_length_q16,
-        stabilized_projection_q16: stabilization.stabilized_projection_q16,
+        weighted_x_q16: weighted_x, weighted_y_q16: weighted_y, weighted_length_q16: weighted_length,
+        correlated_length_q16: correlated_length, local_length_q16: local_length, target_magnitude_q16: target,
+        weighted_over_target_q16: weighted_over_target, component_dot_q32: dot, anti_aligned: dot < 0, reference,
+        components_are_zero: correlated_length == 0 && local_length == 0, weighted_sum_zero: weighted_x == 0 && weighted_y == 0,
+        stabilization_applied: stabilization.applied, raw_projection_q16: stabilization.raw_projection_q16,
+        radial_length_increase_q16: stabilization.radial_length_increase_q16, minimum_reliable_length_q16: stabilization.minimum_reliable_length_q16,
+        stabilized_x_q16: stabilization.stabilized_x_q16, stabilized_y_q16: stabilization.stabilized_y_q16,
+        stabilized_length_q16: stabilization.stabilized_length_q16, stabilized_projection_q16: stabilization.stabilized_projection_q16,
         stabilized_length_ratio_q16: ratio_q16(stabilization.stabilized_length_q16, target),
         stabilized_projection_ratio_q16: ratio_q16(stabilization.stabilized_projection_q16, target),
     }

@@ -283,4 +283,16 @@ mod quality_blend_tests {
         assert_eq!(blend_reference(vector(30_000, 0), vector(20_000, 0), 22_938, 65_536), BlendReference::Local, "weights overturn a raw-magnitude lead");
         assert_eq!(blend_reference(vector(20_000, 0), vector(30_000, 0), 65_536, 22_938), BlendReference::Correlated, "weights confirm a raw-magnitude lead");
     }
+
+    /// Permanent invariant test: correlated_weight + local_weight == Q16 == 65_536 for all profiles.
+    #[test]
+    #[rustfmt::skip]
+    fn profile_weight_sum_invariant_holds() {
+        use crate::map::face_topology::profiles::HexDeformationProfile as P;
+        for profile in [P::Subtle, P::Organic, P::PagoniaLike] {
+            let config = profile.config();
+            let sum = u64::from(config.correlated_weight_q16) + u64::from(config.local_weight_q16);
+            assert_eq!(sum, 65_536, "profile {profile:?} weight sum must equal Q16");
+        }
+    }
 }
