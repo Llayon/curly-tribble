@@ -164,13 +164,11 @@ mod radial_proof_matrix_tests {
                                 let key = (vertex.canonical_key.min(u.canonical_key), vertex.canonical_key.max(u.canonical_key));
 
                                 if let Some(&raw_dot) = raw_edge_map.get(&key) {
-                                    if raw_dot > -0.98 {
-                                        assert_ne!(p_edge_dot.to_bits(), exact_m1_bits, "raw_dot > -0.98 must not become exact -1.0 under perturbation");
-                                        assert!(p_edge_dot > -0.9995, "raw_dot > -0.98 must stay > -0.9995 under perturbation");
+                                    if raw_dot.to_bits() != exact_m1_bits && raw_dot > -0.98 {
+                                        assert_ne!(p_edge_dot.to_bits(), exact_m1_bits);
+                                        assert!(p_edge_dot > -0.9995);
                                     }
-                                    if raw_dot > 0.0 {
-                                        assert!(p_edge_dot > -0.9995, "positive raw_dot must stay > -0.9995 under perturbation");
-                                    }
+                                    if raw_dot > 0.0 { assert!(p_edge_dot > -0.9995); }
                                 }
                             }
 
@@ -183,7 +181,8 @@ mod radial_proof_matrix_tests {
             }
         }
         assert_eq!(corrected_corners_count, 1_118, "total corrected corners");
-        assert_eq!(executed + skipped, 1_118 * 12, "reconciliation equality: executed + skipped == total_corrected * 12");
+        assert_eq!(skipped, 0, "all 13,416 perturbations must be executed");
+        assert_eq!(executed, 13_416, "executed count must equal 13,416");
     }
 
     /// Stage 2 exact-zero inventory across ALL 3,072 topologies (6 shapes x 2 profiles x 256 seeds).
