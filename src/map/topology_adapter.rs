@@ -15,6 +15,10 @@ impl Plugin for TopologyAdapterPlugin {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TerrainTopologyError {
     MissingFaceForTile(HexCoord),
+    InvalidSourceFace {
+        hex: HexCoord,
+        face: crate::map::face_topology::FaceId,
+    },
     InvalidSourceVertex {
         face: HexCoord,
         vertex: VertexId,
@@ -63,7 +67,12 @@ pub fn derive_terrain_topology(
             .hex_to_face
             .get(&coord)
             .ok_or(TerrainTopologyError::MissingFaceForTile(coord))?;
-        let face = &face_topology.faces[face_id.index()];
+        let face = face_topology.faces.get(face_id.index()).ok_or(
+            TerrainTopologyError::InvalidSourceFace {
+                hex: coord,
+                face: face_id,
+            },
+        )?;
         if face.hex != coord {
             return Err(TerrainTopologyError::FaceHexMismatch {
                 expected: coord,
@@ -165,7 +174,7 @@ pub fn derive_terrain_topology(
                 let p1 = topology.vertices_xz[tri[1] as usize];
                 let p2 = topology.vertices_xz[tri[2] as usize];
                 let area = triangle_signed_area(p0, p1, p2);
-                if !area.is_finite() || area.abs() <= 1e-6 {
+                if !area.is_finite() || area <= 1e-6 {
                     return Err(TerrainTopologyError::DegenerateDerivedTriangle {
                         hex: coord,
                         sector: i as u8,
