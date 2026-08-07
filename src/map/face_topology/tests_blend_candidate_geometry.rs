@@ -56,10 +56,12 @@ mod blend_candidate_geometry_tests {
     }
 
     /// Level 2 of the baseline contract: the explicit production policy must
-    /// reproduce the literal geometry/connectivity fingerprints of `9ad12ae`
-    /// on the canonical 40x40 map (seed 42 and the weakest fixture seed 194).
+    /// reproduce the literal geometry/connectivity fingerprints of the hardened
+    /// radial stabilization baseline (commit `6454046`) on the canonical 40x40 map
+    /// (seed 42 and the weakest fixture seed 194). Historical pre-fix baseline
+    /// `9ad12ae` is documented in ADR 0007.
     #[test]
-    fn production_pipeline_matches_literal_9ad12ae_fingerprints() {
+    fn production_pipeline_matches_radial_stabilization_baseline() {
         let map = q::map_40x40();
         let expected = [
             (
@@ -99,7 +101,7 @@ mod blend_candidate_geometry_tests {
             assert_eq!(
                 (fingerprints.geometry, fingerprints.connectivity),
                 (geometry, connectivity),
-                "seed={seed} {profile:?} must match the literal 9ad12ae baseline"
+                "seed={seed} {profile:?} must match the literal 6454046 radial stabilization baseline"
             );
         }
     }

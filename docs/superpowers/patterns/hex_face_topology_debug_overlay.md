@@ -92,17 +92,17 @@ reliability floor corrects **only** them:
   raw integer normalization bit for bit (locked by
   `reliable_directions_are_bit_identical_to_the_raw_law`); unreliable corners
   are projected onto the *reference* component until the projection reaches the
-  floor, then normalized as before. The floor is an **open** upper bound:
-  exactly `floor`, `floor+1`, `floor+2` stay raw, only `floor-1`/`floor-2`
-  correct (`tests_blend_boundary.rs`).
+  `minimum_reliable_length_q16` are stabilized via sign-aware ceiling radial scaling
+  (`div_away_from_zero`), preserving raw vector hemisphere direction while scaling length
+  to the floor.
 - `blend_reference` picks the larger **weighted** component, resolving
   near-ties toward the coherent correlated field via
-  `CORRELATED_PREFERENCE_MARGIN_Q16` (1/8). At a 1/64 floor every stabilized
-  corner on the canonical 256-seed matrix picks `Correlated` (`local_ref = 0`).
+  `CORRELATED_PREFERENCE_MARGIN_Q16` (1/8). Reference selection defines the activation
+  condition (`is_below_floor`) and exact-zero fallback vector.
 - The production surface is locked by a two-level baseline contract
   (`tests_blend_candidate_geometry.rs`): public entry points == explicit
-  production-policy pipeline (fast matrix), which in turn matches the literal
-  `9ad12ae` geometry/connectivity fingerprints for `Organic`/`PagoniaLike` at
+  production-policy pipeline (fast matrix), which matches the literal
+  `6454046` radial baseline geometry/connectivity fingerprints for `Organic`/`PagoniaLike` at
   seeds 42 and 194.
 - Invariants enforced on the fast seeds:
   `stabilized_directions_keep_a_minimum_projection_onto_the_reference` (target

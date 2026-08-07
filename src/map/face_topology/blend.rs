@@ -1,14 +1,14 @@
 //! Deterministic fixed-point blend of deformation components.
 //!
-//! [`blend.rs`]: weights decide the *direction* (Q24 normalized) while the
-//! magnitude comes from the stronger component. When the weighted sum nearly
-//! cancels, its direction is dominated by rounding noise and flips between
-//! adjacent corners; such *unreliable* corners (weighted length below the
-//! policy floor) are projected onto a continuous *reference* (the stronger
-//! component, near-ties to the smooth correlated field via the correlated
-//! preference margin). Reliable corners keep the exact previous arithmetic,
-//! bit for bit. The shared arithmetic lives in [`blend_diagnostics`]; the law
-//! (thresholds, activation mode, margin) lives in [`blend_policy`].
+//! [`blend.rs`]: weights decide the *direction* while magnitude is driven by the
+//! stronger component. When the weighted sum nearly cancels, its raw length is
+//! below the reliability floor (`minimum_reliable_length_q16`). Such *unreliable*
+//! corners are stabilized via sign-aware ceiling radial scaling (`div_away_from_zero`),
+//! raising the vector magnitude to the floor while preserving the raw vector's
+//! hemisphere orientation. Reference selection (`BlendReference`) determines the
+//! activation gate (`is_below_floor`) and exact-zero fallback vector.
+//! Reliable corners keep the exact previous arithmetic, bit for bit.
+//! The shared arithmetic lives in [`blend_diagnostics`]; the law lives in [`blend_policy`].
 
 /// A 2D fixed-point vector (1.0 == `65_536`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -21,9 +21,9 @@ pub struct FixedVectorQ16 {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BlendStabilization {
     pub(crate) applied: bool,
-    pub(crate) projection_q16: i64,
-    pub(crate) correction_q16: i64,
-    pub(crate) minimum_projection_q16: i64,
+    pub(crate) raw_projection_q16: i64,
+    pub(crate) radial_length_increase_q16: i64,
+    pub(crate) minimum_reliable_length_q16: i64,
     pub(crate) stabilized_x_q16: i64,
     pub(crate) stabilized_y_q16: i64,
     pub(crate) stabilized_length_q16: i64,

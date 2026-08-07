@@ -128,7 +128,8 @@ mod quality_blend_direction_tests {
                         "stabilization must not shrink the magnitude"
                     );
                     assert!(
-                        diagnostics.stabilized_length_q16 >= diagnostics.minimum_projection_q16 - 2,
+                        diagnostics.stabilized_length_q16
+                            >= diagnostics.minimum_reliable_length_q16 - 2,
                         "corrected length stays within truncation of the floor"
                     );
                     assert!(
@@ -199,5 +200,96 @@ mod quality_blend_direction_tests {
             both >= -0.1,
             "near-zero-linked pairs must stay far from anti-parallel: both={both}"
         );
+    }
+
+    /// Boundary and overflow tests for the `div_away_from_zero` radial integer helper.
+    #[test]
+    #[rustfmt::skip]
+    fn test_div_away_from_zero_boundary_conditions() {
+        use crate::map::face_topology::blend_diagnostics::div_away_from_zero;
+        assert_eq!(div_away_from_zero(10, 3), Some(4));
+        assert_eq!(div_away_from_zero(-10, 3), Some(-4));
+        assert_eq!(div_away_from_zero(9, 3), Some(3));
+        assert_eq!(div_away_from_zero(-9, 3), Some(-3));
+        assert_eq!(div_away_from_zero(0, 5), Some(0));
+        assert_eq!(div_away_from_zero(10, 0), None);
+        assert_eq!(div_away_from_zero(10, -5), None);
+        assert_eq!(div_away_from_zero(i128::from(i64::MAX), 1), Some(i64::MAX));
+        assert_eq!(div_away_from_zero(i128::MAX, 1), None);
+        assert_eq!(div_away_from_zero(i128::MIN, 1), None);
+    }
+
+    /// Permanent regression test locking the four key diagnostic fixtures:
+    /// Organic seed 173 and PagoniaLike seed 126 must preserve positive edge alignment,
+    /// PagoniaLike seed 162 must not create exact -1.0, and PagoniaLike seed 191 must not regress.
+    #[test]
+    #[rustfmt::skip]
+    fn four_material_fixtures_preserve_direction_and_avoid_regressions() {
+        use crate::map::face_topology::blend_policy::{DISABLED_BLEND_RELIABILITY_POLICY, PRODUCTION_BLEND_RELIABILITY_POLICY};
+        use crate::map::face_topology::tests_blend_candidate_shared::shared as c;
+        use std::collections::HashMap;
+
+        let (map, exact_m1_bits) = (q::map_40x40(), (-1.0_f32).to_bits());
+        for (profile, seed, expected_raw_positive) in [
+            (HexDeformationProfile::Organic, 173_u32, true), (HexDeformationProfile::PagoniaLike, 126_u32, true),
+            (HexDeformationProfile::PagoniaLike, 162_u32, false), (HexDeformationProfile::PagoniaLike, 191_u32, false),
+        ] {
+            let raw_topo = c::generate(&map, seed, profile, DISABLED_BLEND_RELIABILITY_POLICY);
+            let prod_topo = c::generate(&map, seed, profile, PRODUCTION_BLEND_RELIABILITY_POLICY);
+            let mut raw_edge_map = HashMap::new();
+            for (origin, destination) in unique_edge_pairs(&raw_topo) {
+                let (Ok(o_reg), Ok(d_reg)) = (regular_corner_position(origin.canonical_key), regular_corner_position(destination.canonical_key)) else { continue; };
+                let (o_dir, d_dir) = ((origin.position - o_reg).normalize_or_zero(), (destination.position - d_reg).normalize_or_zero());
+                let (k1, k2) = (origin.canonical_key, destination.canonical_key);
+                raw_edge_map.insert((k1.min(k2), k1.max(k2)), o_dir.dot(d_dir));
+            }
+
+            for (origin, destination) in unique_edge_pairs(&prod_topo) {
+                let (Ok(o_reg), Ok(d_reg)) = (regular_corner_position(origin.canonical_key), regular_corner_position(destination.canonical_key)) else { continue; };
+                let (o_dir, d_dir) = ((origin.position - o_reg).normalize_or_zero(), (destination.position - d_reg).normalize_or_zero());
+                let cand_dot = o_dir.dot(d_dir);
+                let (k1, k2) = (origin.canonical_key, destination.canonical_key);
+
+                if let Some(&raw_dot) = raw_edge_map.get(&(k1.min(k2), k1.max(k2))) {
+                    if expected_raw_positive && raw_dot > 0.0 {
+                        assert!(cand_dot > 0.0, "{profile:?} seed={seed}: raw dot {raw_dot} must stay positive after radial stabilization, got {cand_dot}");
+                    }
+                    assert!(cand_dot.to_bits() != exact_m1_bits || raw_dot.to_bits() == exact_m1_bits, "{profile:?} seed={seed}: radial stabilization must not create newly exact -1.0 edges");
+                }
+            }
+        }
+    }
+
+    /// Permanent invariants for radial scaling across fast seeds:
+    /// length >= floor, component signs preserved, zero-vector fallback safe,
+    /// and zero new near-antiparallel edge transitions.
+    #[test]
+    #[rustfmt::skip]
+    fn radial_scaling_invariants_hold_for_all_fast_seeds() {
+        let map = q::map_40x40();
+        let exact_m1_bits = (-1.0_f32).to_bits();
+
+        for seed in q::FAST_SEEDS {
+            for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
+                let topology = q::generate(&map, seed, profile);
+                for vertex in &topology.vertices {
+                    let (diagnostics, produced) = observations(seed, vertex.canonical_key, profile);
+                    if !diagnostics.stabilization_applied { continue; }
+                    assert!(diagnostics.stabilized_length_q16 >= diagnostics.minimum_reliable_length_q16 - 2, "{profile:?} seed={seed}: stabilized length must reach floor");
+                    if diagnostics.weighted_x_q16 != 0 { assert_eq!(diagnostics.stabilized_x_q16.signum(), diagnostics.weighted_x_q16.signum()); }
+                    if diagnostics.weighted_y_q16 != 0 { assert_eq!(diagnostics.stabilized_y_q16.signum(), diagnostics.weighted_y_q16.signum()); }
+                    assert!(component_length_q16(produced) > 0, "{profile:?} seed={seed}: produced displacement must be non-zero");
+                }
+                for (origin, destination) in unique_edge_pairs(&topology) {
+                    let (Ok(o_reg), Ok(d_reg)) = (regular_corner_position(origin.canonical_key), regular_corner_position(destination.canonical_key)) else { continue; };
+                    let (o_dir, d_dir) = ((origin.position - o_reg).normalize_or_zero(), (destination.position - d_reg).normalize_or_zero());
+                    if o_dir.dot(d_dir).to_bits() == exact_m1_bits {
+                        let o_stab = observations(seed, origin.canonical_key, profile).0.stabilization_applied;
+                        let d_stab = observations(seed, destination.canonical_key, profile).0.stabilization_applied;
+                        assert!(!o_stab && !d_stab, "{profile:?} seed={seed}: exact -1.0 edge must not involve a stabilized corner");
+                    }
+                }
+            }
+        }
     }
 }

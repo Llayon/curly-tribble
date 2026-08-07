@@ -166,8 +166,8 @@ mod quality_blend_tests {
         assert!(pago.stabilization_applied);
         assert_eq!(pago.reference, BlendReference::Correlated);
         assert_eq!(pago.raw_projection_q16, 0);
-        assert_eq!(pago.minimum_projection_q16, 197);
-        assert_eq!(pago.correction_q16, 277);
+        assert_eq!(pago.minimum_reliable_length_q16, 197);
+        assert_eq!(pago.radial_length_increase_q16, 277);
         assert_eq!(pago.stabilized_x_q16, -197);
         assert_eq!(pago.stabilized_y_q16, -197);
         assert_eq!(pago.stabilized_length_q16, 278);
@@ -183,8 +183,8 @@ mod quality_blend_tests {
         assert!(organic.stabilization_applied);
         assert_eq!(organic.reference, BlendReference::Correlated);
         assert_eq!(organic.raw_projection_q16, 7);
-        assert_eq!(organic.minimum_projection_q16, 138);
-        assert_eq!(organic.correction_q16, 139);
+        assert_eq!(organic.minimum_reliable_length_q16, 138);
+        assert_eq!(organic.radial_length_increase_q16, 139);
         assert_eq!(organic.stabilized_x_q16, 138);
         assert_eq!(organic.stabilized_y_q16, 52);
         assert_eq!(organic.stabilized_length_q16, 147);
@@ -249,8 +249,8 @@ mod quality_blend_tests {
         assert!(near_diag.stabilization_applied, "near-cancel is corrected");
         assert_eq!(near_diag.reference, BlendReference::Correlated);
         assert_eq!(near_diag.raw_projection_q16, 64);
-        assert_eq!(near_diag.correction_q16, 601);
-        assert_eq!(near_diag.minimum_projection_q16, 665);
+        assert_eq!(near_diag.radial_length_increase_q16, 601);
+        assert_eq!(near_diag.minimum_reliable_length_q16, 665);
         assert_eq!(near_diag.stabilized_x_q16, 665);
         assert_eq!(near_diag.stabilized_y_q16, 0);
         assert_eq!(near_diag.stabilized_length_q16, 665);
@@ -270,31 +270,17 @@ mod quality_blend_tests {
     }
     /// Pure reference-selection policy for the reliability floor.
     #[test]
+    #[rustfmt::skip]
     fn blend_reference_policy_is_deterministic() {
         for (cx, cy, lx, ly, reference) in [
-            (12_000, 0, 8_000, 0, BlendReference::Correlated),
-            (8_000, 0, 12_000, 0, BlendReference::Correlated),
-            (10_000, 0, 10_100, 0, BlendReference::Correlated),
-            (9_000, 0, -9_000, 0, BlendReference::Correlated),
-            (0, 0, 8_000, 0, BlendReference::Local),
-            (8_000, 0, 0, 0, BlendReference::Correlated),
-            (0, 0, 0, 0, BlendReference::FixedPositiveX),
-            (-12_000, 0, 4_000, 0, BlendReference::Correlated),
+            (12_000, 0, 8_000, 0, BlendReference::Correlated), (8_000, 0, 12_000, 0, BlendReference::Correlated),
+            (10_000, 0, 10_100, 0, BlendReference::Correlated), (9_000, 0, -9_000, 0, BlendReference::Correlated),
+            (0, 0, 8_000, 0, BlendReference::Local), (8_000, 0, 0, 0, BlendReference::Correlated),
+            (0, 0, 0, 0, BlendReference::FixedPositiveX), (-12_000, 0, 4_000, 0, BlendReference::Correlated),
         ] {
-            assert_eq!(
-                blend_reference(vector(cx, cy), vector(lx, ly), ORGANIC_WC, ORGANIC_WL),
-                reference
-            );
+            assert_eq!(blend_reference(vector(cx, cy), vector(lx, ly), ORGANIC_WC, ORGANIC_WL), reference);
         }
-        assert_eq!(
-            blend_reference(vector(30_000, 0), vector(20_000, 0), 22_938, 65_536),
-            BlendReference::Local,
-            "weights overturn a raw-magnitude lead"
-        );
-        assert_eq!(
-            blend_reference(vector(20_000, 0), vector(30_000, 0), 65_536, 22_938),
-            BlendReference::Correlated,
-            "weights confirm a raw-magnitude lead"
-        );
+        assert_eq!(blend_reference(vector(30_000, 0), vector(20_000, 0), 22_938, 65_536), BlendReference::Local, "weights overturn a raw-magnitude lead");
+        assert_eq!(blend_reference(vector(20_000, 0), vector(30_000, 0), 65_536, 22_938), BlendReference::Correlated, "weights confirm a raw-magnitude lead");
     }
 }

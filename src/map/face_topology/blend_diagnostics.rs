@@ -28,8 +28,7 @@ pub struct ResolvedBlendReference {
     kind: BlendReference,
 }
 
-/// Resolves a [`BlendReference`] into a concrete vector whose length is
-/// always at least 1, so projection can never divide by zero.
+/// Resolves a [`BlendReference`] into a concrete vector with length >= 1.
 #[must_use]
 pub fn resolve_reference(
     reference: BlendReference,
@@ -48,9 +47,7 @@ pub fn resolve_reference(
     }
 }
 
-/// Projection of `vector` onto a resolved reference, in Q16 fixed point.
-///
-/// Computed in `i128` so the sum of the two products can never overflow.
+/// Projection of `vector` onto a resolved reference in Q16 fixed point.
 #[must_use]
 #[allow(clippy::cast_possible_truncation)]
 pub fn projection_onto_reference_q16(
@@ -83,8 +80,8 @@ pub struct WeightedBlendDiagnostics {
     pub weighted_sum_zero: bool,
     pub stabilization_applied: bool,
     pub raw_projection_q16: i64,
-    pub correction_q16: i64,
-    pub minimum_projection_q16: i64,
+    pub radial_length_increase_q16: i64,
+    pub minimum_reliable_length_q16: i64,
     pub stabilized_x_q16: i64,
     pub stabilized_y_q16: i64,
     pub stabilized_length_q16: i64,
@@ -93,15 +90,13 @@ pub struct WeightedBlendDiagnostics {
     pub stabilized_projection_ratio_q16: i64,
 }
 
-/// Deterministic floor integer square root (Newton, from above). Normalization
-/// stays integer so the blend is exactly platform-independent.
+/// Deterministic floor integer square root (Newton, from above).
 #[must_use]
 pub fn integer_sqrt(value: u64) -> u64 {
     if value < 2 {
         return value;
     }
-    let mut estimate = value;
-    let mut next = estimate.div_ceil(2);
+    let (mut estimate, mut next) = (value, value.div_ceil(2));
     while next < estimate {
         estimate = next;
         next = estimate.midpoint(value / estimate);
@@ -112,11 +107,12 @@ pub fn integer_sqrt(value: u64) -> u64 {
 /// Q16 magnitude of a vector, or zero when it has no mass.
 fn length_q16(x: i64, y: i64) -> i64 {
     if x == 0 && y == 0 {
-        return 0;
-    }
-    #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
-    {
-        integer_sqrt((x * x + y * y) as u64) as i64
+        0
+    } else {
+        #[allow(clippy::cast_possible_wrap, clippy::cast_sign_loss)]
+        {
+            integer_sqrt((x * x + y * y) as u64) as i64
+        }
     }
 }
 
@@ -132,7 +128,7 @@ pub fn target_magnitude_q16(correlated: FixedVectorQ16, local: FixedVectorQ16) -
     length_q16(correlated.x, correlated.y).max(length_q16(local.x, local.y))
 }
 
-/// Deterministic Q16 ratio of a value to a target, zero when the target is.
+/// Deterministic Q16 ratio of a value to a target, zero when target is zero.
 fn ratio_q16(value: i64, target: i64) -> i64 {
     if target == 0 {
         0
@@ -141,74 +137,65 @@ fn ratio_q16(value: i64, target: i64) -> i64 {
     }
 }
 
-/// Ceiling division away from zero for integer fixed-point scaling.
+/// Division away from zero for integer fixed-point radial scaling.
+///
+/// Computes `ceil(|numerator| / denominator) * sign(numerator)` using `i128`
+/// arithmetic to prevent overflow. Returns `None` if `denominator <= 0`
+/// or if the quotient overflows `i64`.
 #[must_use]
-pub fn ceil_div_q16(numerator: i64, denominator: i64) -> i64 {
-    if denominator == 0 {
-        return 0;
+#[allow(clippy::cast_possible_truncation)]
+pub fn div_away_from_zero(numerator: i128, denominator: i64) -> Option<i64> {
+    if denominator <= 0 {
+        return None;
     }
-    if numerator >= 0 {
-        (numerator + denominator - 1) / denominator
+    let den = i128::from(denominator);
+    let (abs_num, is_negative) = if numerator < 0 {
+        (numerator.checked_abs()?, true)
     } else {
-        -((-numerator + denominator - 1) / denominator)
+        (numerator, false)
+    };
+    let quotient = abs_num.checked_add(den - 1)? / den;
+    let signed_quotient = if is_negative { -quotient } else { quotient };
+    if signed_quotient < i128::from(i64::MIN) || signed_quotient > i128::from(i64::MAX) {
+        None
+    } else {
+        Some(signed_quotient as i64)
     }
 }
 
 /// Applies the reliability-floor correction under an explicit policy.
 #[must_use]
+#[rustfmt::skip]
 pub(crate) fn stabilize_blend_direction(
-    weighted: FixedVectorQ16,
-    weighted_length_q16: i64,
-    target_magnitude_q16: i64,
-    correlated: FixedVectorQ16,
-    local: FixedVectorQ16,
-    reference: BlendReference,
-    policy: BlendReliabilityPolicy,
+    weighted: FixedVectorQ16, weighted_length_q16: i64, target_magnitude_q16: i64,
+    correlated: FixedVectorQ16, local: FixedVectorQ16, reference: BlendReference, policy: BlendReliabilityPolicy,
 ) -> BlendStabilization {
     let resolved = resolve_reference(reference, correlated, local);
     let raw_projection = projection_onto_reference_q16(weighted, resolved);
-    let minimum_projection = target_magnitude_q16 * policy.minimum_direction_ratio_q16() / Q16;
-    if !policy.is_below_floor(weighted_length_q16, raw_projection, target_magnitude_q16) {
-        return BlendStabilization {
-            applied: false,
-            projection_q16: raw_projection,
-            correction_q16: 0,
-            minimum_projection_q16: minimum_projection,
-            stabilized_x_q16: weighted.x,
-            stabilized_y_q16: weighted.y,
-            stabilized_length_q16: weighted_length_q16,
-            stabilized_projection_q16: raw_projection,
+    let minimum_reliable_length = target_magnitude_q16 * policy.minimum_direction_ratio_q16() / Q16;
+    let (applied, stabilized_x, stabilized_y) = if policy.is_below_floor(weighted_length_q16, raw_projection, target_magnitude_q16) {
+        let scale = |v: i64, d: i64| div_away_from_zero(i128::from(v) * i128::from(minimum_reliable_length), d).unwrap_or(0);
+        let (sx, sy) = if weighted_length_q16 == 0 {
+            match reference {
+                BlendReference::FixedPositiveX => (minimum_reliable_length, 0),
+                BlendReference::Correlated | BlendReference::Local => (scale(resolved.vector.x, resolved.length_q16), scale(resolved.vector.y, resolved.length_q16)),
+            }
+        } else {
+            (scale(weighted.x, weighted_length_q16), scale(weighted.y, weighted_length_q16))
         };
-    }
-    let (stabilized_x, stabilized_y) = if weighted_length_q16 == 0 {
-        match reference {
-            BlendReference::FixedPositiveX => (minimum_projection, 0),
-            BlendReference::Correlated | BlendReference::Local => (
-                ceil_div_q16(resolved.vector.x * minimum_projection, resolved.length_q16),
-                ceil_div_q16(resolved.vector.y * minimum_projection, resolved.length_q16),
-            ),
-        }
+        (true, sx, sy)
     } else {
-        (
-            ceil_div_q16(weighted.x * minimum_projection, weighted_length_q16),
-            ceil_div_q16(weighted.y * minimum_projection, weighted_length_q16),
-        )
-    };
-    let stabilized = FixedVectorQ16 {
-        x: stabilized_x,
-        y: stabilized_y,
+        (false, weighted.x, weighted.y)
     };
     let stabilized_len = length_q16(stabilized_x, stabilized_y);
-    let correction = stabilized_len - weighted_length_q16;
+    let stab_vec = FixedVectorQ16 { x: stabilized_x, y: stabilized_y };
     BlendStabilization {
-        applied: true,
-        projection_q16: raw_projection,
-        correction_q16: correction,
-        minimum_projection_q16: minimum_projection,
-        stabilized_x_q16: stabilized_x,
-        stabilized_y_q16: stabilized_y,
-        stabilized_length_q16: stabilized_len,
-        stabilized_projection_q16: projection_onto_reference_q16(stabilized, resolved),
+        applied, raw_projection_q16: raw_projection,
+        radial_length_increase_q16: if applied { stabilized_len - weighted_length_q16 } else { 0 },
+        minimum_reliable_length_q16: minimum_reliable_length,
+        stabilized_x_q16: stabilized_x, stabilized_y_q16: stabilized_y,
+        stabilized_length_q16: if applied { stabilized_len } else { weighted_length_q16 },
+        stabilized_projection_q16: if applied { projection_onto_reference_q16(stab_vec, resolved) } else { raw_projection },
     }
 }
 
@@ -219,14 +206,14 @@ pub(crate) fn stabilize_blend_direction(
 pub fn weighted_blend_diagnostics(
     correlated: FixedVectorQ16,
     local: FixedVectorQ16,
-    correlated_weight_q16: u32,
-    local_weight_q16: u32,
+    cw: u32,
+    lw: u32,
 ) -> WeightedBlendDiagnostics {
     weighted_blend_diagnostics_with_policy(
         correlated,
         local,
-        correlated_weight_q16,
-        local_weight_q16,
+        cw,
+        lw,
         super::blend_policy::PRODUCTION_BLEND_RELIABILITY_POLICY,
     )
 }
@@ -240,12 +227,16 @@ pub fn weighted_blend_diagnostics_with_policy(
     local_weight_q16: u32,
     policy: BlendReliabilityPolicy,
 ) -> WeightedBlendDiagnostics {
-    let wc = i64::from(correlated_weight_q16);
-    let wl = i64::from(local_weight_q16);
+    let (wc, wl) = (
+        i64::from(correlated_weight_q16),
+        i64::from(local_weight_q16),
+    );
     let weighted_x = (correlated.x * wc + local.x * wl) / Q16;
     let weighted_y = (correlated.y * wc + local.y * wl) / Q16;
-    let correlated_length = component_length_q16(correlated);
-    let local_length = component_length_q16(local);
+    let (correlated_length, local_length) = (
+        component_length_q16(correlated),
+        component_length_q16(local),
+    );
     let target = correlated_length.max(local_length);
     let weighted_length = length_q16(weighted_x, weighted_y);
     let weighted_over_target = ratio_q16(weighted_length, target);
@@ -283,9 +274,9 @@ pub fn weighted_blend_diagnostics_with_policy(
         components_are_zero: correlated_length == 0 && local_length == 0,
         weighted_sum_zero: weighted_x == 0 && weighted_y == 0,
         stabilization_applied: stabilization.applied,
-        raw_projection_q16: stabilization.projection_q16,
-        correction_q16: stabilization.correction_q16,
-        minimum_projection_q16: stabilization.minimum_projection_q16,
+        raw_projection_q16: stabilization.raw_projection_q16,
+        radial_length_increase_q16: stabilization.radial_length_increase_q16,
+        minimum_reliable_length_q16: stabilization.minimum_reliable_length_q16,
         stabilized_x_q16: stabilization.stabilized_x_q16,
         stabilized_y_q16: stabilization.stabilized_y_q16,
         stabilized_length_q16: stabilization.stabilized_length_q16,

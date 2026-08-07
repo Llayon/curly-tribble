@@ -177,7 +177,7 @@ mod blend_stress_tests {
                                 if min_stab_len_ratio.is_none_or(|(r, _, _)| r_len < r) {
                                     min_stab_len_ratio = Some((r_len, seed, v.canonical_key));
                                 }
-                                let r_proj = diag.minimum_projection_q16 * 65_536
+                                let r_proj = diag.minimum_reliable_length_q16 * 65_536
                                     / diag.target_magnitude_q16;
                                 if min_stab_proj_ratio.is_none_or(|(r, _, _)| r_proj < r) {
                                     min_stab_proj_ratio = Some((r_proj, seed, v.canonical_key));

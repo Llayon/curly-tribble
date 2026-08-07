@@ -94,17 +94,18 @@ changing profile weights. The fix (`blend_policy.rs` + `blend_diagnostics.rs` +
   those corners change direction; all reliable corners keep the exact previous
   integer arithmetic, bit for bit (so `Subtle`, whose geometry never
   near-cancels, is byte-identical).
-- Unreliable corners are projected onto a continuous *reference* component —
-  the larger **weighted** magnitude, with near-ties resolved toward the
-  coherent correlated field via `CORRELATED_PREFERENCE_MARGIN_Q16` (1/8 band,
-  which routes every stabilized corner to `Correlated`; `local_ref = 0` at
-  1/64) — extending the weighted vector along the reference until its
-  projection reaches the floor, then normalizing as before.
-- The production surface is bit-identical to `9ad12ae` (two-level baseline
-  contract in `tests_blend_candidate_geometry.rs`): the public entry points
-  equal the explicit production-policy pipeline over the fast matrix, and the
-  literal geometry/connectivity fingerprints for `Organic`/`PagoniaLike` at
-  seeds 42 and 194 match exactly.
+- Unreliable corners (raw weighted length below `minimum_reliable_length_q16`)
+  are stabilized via sign-aware ceiling radial length scaling (`div_away_from_zero`),
+  scaling the raw weighted vector to reach or exceed the reliability floor while
+  strictly preserving the raw vector's hemisphere orientation. Reference selection
+  (`BlendReference`) determines the activation condition (`is_below_floor`) and
+  exact-zero fallback vector.
+- The production baseline matches the hardened radial stabilization contract (commit
+  `6454046`, two-level baseline contract in `tests_blend_candidate_geometry.rs`):
+  the public entry points equal the explicit production-policy pipeline, and the
+  literal geometry fingerprints for `Organic`/`PagoniaLike` at seeds 42 and 194 match
+  `6454046` (historical pre-fix baseline `9ad12ae` migrated to eliminate reference-projection
+  vector addition direction flips).
 
 **Candidate matrix** — measured honestly: every candidate is generated through
 its own complete pipeline, so no row is a re-classification of another's
