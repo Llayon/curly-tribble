@@ -232,7 +232,7 @@ mod tests {
     fn omits_empty_overlay_meshes() {
         let mut map = MapData::default();
         map.tiles.insert(HexCoord::new(0, 0), TileData::default());
-        let topology = crate::map::topology::generate_topology_from_map_data(&map);
+        let topology = crate::map::topology::generate_legacy_topology_from_map_data(&map);
 
         let (_terrain, water, roof) = create_global_map_meshes(
             &map,

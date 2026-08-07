@@ -23,6 +23,7 @@ pub mod roads;
 pub mod subhex;
 pub mod terrain_gen;
 pub mod topology;
+pub mod topology_adapter;
 pub mod treasures;
 pub mod visibility;
 pub mod zoning;

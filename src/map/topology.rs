@@ -1,8 +1,11 @@
-// src/map/topology.rs
 use crate::map::data::{MapData, OceanState, HEX_SIZE, MAX_HEIGHT};
 use crate::map::HexCoord;
 use bevy::prelude::*;
 use std::collections::HashMap;
+
+pub use crate::map::topology_adapter::{
+    derive_terrain_topology, TerrainTopologyError, TopologyAdapterPlugin,
+};
 
 /// Shared 24-triangle-per-hex terrain topology resource.
 #[derive(Resource, Debug, Clone, Default)]
@@ -17,7 +20,8 @@ pub struct TopologyPlugin;
 
 impl Plugin for TopologyPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<TerrainTopology>();
+        app.init_resource::<TerrainTopology>()
+            .add_plugins(TopologyAdapterPlugin);
     }
 }
 
@@ -32,9 +36,9 @@ pub fn canonical_vertex_key(pos: Vec2) -> (i32, i32) {
     )
 }
 
-/// Generates a deterministic `TerrainTopology` from `MapData`.
+/// Generates a legacy regular-hex `TerrainTopology` from `MapData`.
 #[must_use]
-pub fn generate_topology_from_map_data(map_data: &MapData) -> TerrainTopology {
+pub fn generate_legacy_topology_from_map_data(map_data: &MapData) -> TerrainTopology {
     let mut topology = TerrainTopology::default();
     let mut vertex_map: HashMap<(i32, i32), u32> = HashMap::new();
 
@@ -240,8 +244,8 @@ mod tests {
             },
         );
 
-        let top_b = generate_topology_from_map_data(&map);
-        let top_h = generate_topology_from_map_data(&map);
+        let top_b = generate_legacy_topology_from_map_data(&map);
+        let top_h = generate_legacy_topology_from_map_data(&map);
         assert!(
             !top_b.triangles.is_empty() && top_b.triangles.len() == map.tiles.len() * 24,
             "Tests 1&2: Topology count"

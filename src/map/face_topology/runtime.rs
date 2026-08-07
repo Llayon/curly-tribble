@@ -80,7 +80,9 @@ pub fn regenerate_hex_face_topology(
         .map_or(HexDeformationProfile::Subtle, |c| c.deformation_profile);
     let input_may_have_changed = map_data.is_changed()
         || world_seed.is_changed()
-        || terrain_config.as_ref().is_some_and(|c| c.is_changed())
+        || terrain_config
+            .as_ref()
+            .is_some_and(bevy::prelude::DetectChanges::is_changed)
         || generation_state.last_inputs.is_none();
     if !event_requested && !input_may_have_changed {
         return;

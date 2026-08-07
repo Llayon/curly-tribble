@@ -83,7 +83,7 @@ impl Command for SpawnGlobalTerrainCommand {
             }
         }
 
-        let topology = crate::map::topology::generate_topology_from_map_data(&self.map_data);
+        let topology = crate::map::topology::generate_legacy_topology_from_map_data(&self.map_data);
         world.insert_resource(topology.clone());
 
         let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(
