@@ -18,13 +18,11 @@ impl Plugin for TerrainGenerationPlugin {
 
 #[allow(clippy::cast_possible_truncation)]
 pub fn spawn_map_internal(
-    commands: &mut Commands,
     terrain_gen: &TerrainGenerator,
     terrain_config: &TerrainConfig,
     seed: &WorldSeed,
     map_data: &mut MapData,
     nav_map: &mut NavigationMap,
-    faction_manager: &crate::game_state::FactionManager,
     phase: EditorPhase,
     generation_mode: GenerationMode,
     auto_fill: Option<EditorPhase>,
@@ -53,13 +51,6 @@ pub fn spawn_map_internal(
     }
 
     rebuild_navigation_grid(map_data, nav_map);
-
-    commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
-        map_data: map_data.clone(),
-        phase,
-        faction_manager: faction_manager.clone(),
-        config: (*terrain_config).clone(),
-    });
 }
 
 fn build_base_tiles(

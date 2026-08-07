@@ -21,6 +21,7 @@ impl Plugin for MapSystemsPlugin {
 pub fn handle_regeneration(
     mut commands: Commands,
     mut ev_gen: MessageReader<GenerateMapEvent>,
+    mut ev_rebuild: MessageWriter<RebuildMeshEvent>,
     q_map_entities: Query<Entity, With<MapEntity>>,
     q_faction_markers: Query<Entity, With<FactionMarker>>,
     q_mines: Query<Entity, With<super::mines::MineDeposit>>,
@@ -56,13 +57,11 @@ pub fn handle_regeneration(
         }
 
         spawn_map_internal(
-            &mut commands,
             &terrain_gen,
             &config,
             &seed,
             &mut map_data,
             &mut nav_map,
-            &faction_manager,
             *phase.get(),
             ev.mode,
             ev.auto_fill_phase,
@@ -96,6 +95,8 @@ pub fn handle_regeneration(
 
         crate::map::validation::run_map_validation(&mut map_data, *phase.get());
 
+        ev_rebuild.write(RebuildMeshEvent);
+
         log_writer.write(GameLogMessage {
             message: format!(
                 "World regenerated: {}x{}, seed {}",
@@ -111,23 +112,36 @@ pub fn handle_rebuild_mesh(
     mut ev_rebuild: MessageReader<RebuildMeshEvent>,
     q_map_entities: Query<Entity, With<MapVisualEntity>>,
     map_data: Res<MapData>,
+    face_topology: Res<crate::map::face_topology::types::HexFaceTopology>,
     faction_manager: Res<FactionManager>,
     config: Res<TerrainConfig>,
     phase: Res<State<EditorPhase>>,
 ) {
-    if ev_rebuild.read().next().is_none() {
+    if ev_rebuild.read().count() == 0 {
         return;
     }
 
-    for entity in &q_map_entities {
-        commands.entity(entity).despawn();
+    match crate::map::topology::derive_terrain_topology(&map_data, &face_topology) {
+        Ok(derived_topology) => {
+            for entity in &q_map_entities {
+                commands.entity(entity).despawn();
+            }
+            commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
+                topology: derived_topology,
+                map_data: map_data.clone(),
+                phase: *phase.get(),
+                faction_manager: faction_manager.clone(),
+                config: (*config).clone(),
+            });
+        }
+        Err(err) => {
+            bevy::log::tracing::event!(
+                bevy::log::tracing::Level::ERROR,
+                error = ?err,
+                "Failed to derive terrain topology from HexFaceTopology"
+            );
+        }
     }
-    commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
-        map_data: map_data.clone(),
-        phase: *phase.get(),
-        faction_manager: faction_manager.clone(),
-        config: (*config).clone(),
-    });
 }
 
 pub fn monitor_inspector_triggers(
@@ -148,7 +162,6 @@ pub fn monitor_inspector_triggers(
 }
 
 pub fn handle_faction_auto_relocation(
-    mut commands: Commands,
     faction_manager: Res<FactionManager>,
     mut map_data: ResMut<MapData>,
     terrain_gen: Res<TerrainGenerator>,
@@ -191,13 +204,11 @@ pub fn handle_faction_auto_relocation(
 
     if changed {
         spawn_map_internal(
-            &mut commands,
             &terrain_gen,
             &config,
             &seed,
             &mut map_data,
             &mut nav_map,
-            &faction_manager,
             *phase.get(),
             GenerationMode::Preserve,
             None,
@@ -223,6 +234,7 @@ mod tests {
         app.insert_resource(MapData::default())
             .insert_resource(FactionManager::default())
             .insert_resource(TerrainConfig::default())
+            .init_resource::<crate::map::face_topology::types::HexFaceTopology>()
             .insert_resource(State::new(EditorPhase::Shape))
             .insert_resource(GameAssets::default())
             .insert_resource(Assets::<Mesh>::default())

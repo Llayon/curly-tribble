@@ -157,7 +157,6 @@ impl Plugin for MapPlugin {
                 Update,
                 (
                     systems::handle_regeneration.in_set(GameSet::Logic),
-                    systems::handle_rebuild_mesh.in_set(GameSet::Logic),
                     tools::handle_shape_tools.in_set(GameSet::Logic),
                     tools::handle_faction_tools.in_set(GameSet::Logic),
                     tools::handle_landscape_tools.in_set(GameSet::Logic),
@@ -178,6 +177,9 @@ impl Plugin for MapPlugin {
                     phase_transitions::rebuild_map_on_phase_change
                         .run_if(state_changed::<crate::game_state::EditorPhase>)
                         .in_set(GameSet::Logic),
+                    systems::handle_rebuild_mesh
+                        .in_set(GameSet::Visuals)
+                        .after(face_topology::runtime::regenerate_hex_face_topology),
                 ),
             );
     }

@@ -50,6 +50,7 @@ impl Plugin for MeshGenPlugin {
 }
 
 pub struct SpawnGlobalTerrainCommand {
+    pub topology: crate::map::topology::TerrainTopology,
     pub map_data: MapData,
     pub phase: EditorPhase,
     pub faction_manager: crate::game_state::FactionManager,
@@ -83,12 +84,11 @@ impl Command for SpawnGlobalTerrainCommand {
             }
         }
 
-        let topology = crate::map::topology::generate_legacy_topology_from_map_data(&self.map_data);
-        world.insert_resource(topology.clone());
+        world.insert_resource(self.topology.clone());
 
         let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(
             &self.map_data,
-            &topology,
+            &self.topology,
             self.phase,
             &self.faction_manager,
             &self.config,
@@ -145,8 +145,8 @@ impl Command for SpawnGlobalTerrainCommand {
             "TERRAIN REBUILD DIAGNOSTICS [Phase: {:?}]: TileCount={}, TopVerts={}, TopTris={}, ResTris={}, MinElev={:.3}, MaxElev={:.3}, MinMeshY={:.3}, MaxMeshY={:.3}, GroundUnlit={}, ExactUpNormals={}, SlopedNormals={}",
             self.phase,
             self.map_data.tiles.len(),
-            topology.vertices_xz.len(),
-            topology.triangles.len(),
+            self.topology.vertices_xz.len(),
+            self.topology.triangles.len(),
             res_tri_count,
             min_elev,
             max_elev,
