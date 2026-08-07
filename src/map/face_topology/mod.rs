@@ -28,6 +28,8 @@ mod tests_compat;
 #[cfg(test)]
 mod tests_debug;
 #[cfg(test)]
+mod tests_integration;
+#[cfg(test)]
 mod tests_mutation;
 #[cfg(test)]
 mod tests_profiles;
