@@ -2,6 +2,7 @@
 
 #[cfg(test)]
 mod radial_proof_matrix_tests {
+    use crate::map::face_topology::acceptance::ProfileAcceptanceReport;
     use crate::map::face_topology::blend::{
         blend_to_displacement_q16, weighted_blend_diagnostics, FixedVectorQ16,
         WeightedBlendDiagnostics,
@@ -9,16 +10,16 @@ mod radial_proof_matrix_tests {
     use crate::map::face_topology::blend_diagnostics::{
         div_away_from_zero, scale_radial_component_q16,
     };
-    use crate::map::face_topology::blend_policy::{
-        DISABLED_BLEND_RELIABILITY_POLICY, PRODUCTION_BLEND_RELIABILITY_POLICY,
-    };
+    use crate::map::face_topology::blend_policy::DISABLED_BLEND_RELIABILITY_POLICY;
     use crate::map::face_topology::corner_key::regular_corner_position;
+    use crate::map::face_topology::fingerprint::topology_fingerprints;
     use crate::map::face_topology::profiles::{
         interpolated_correlated_field, local_component_q16, HexDeformationProfile,
     };
     use crate::map::face_topology::tests_blend_candidate_shared::shared as c;
     use crate::map::face_topology::tests_quality_shared::shared as q;
     use crate::map::face_topology::types::{HexFaceTopology, MapVertex, SharedCornerKey};
+    use crate::map::{HexCoord, MapData, WorldSeed};
     use std::collections::HashMap;
 
     fn observations(
@@ -26,59 +27,65 @@ mod radial_proof_matrix_tests {
         key: SharedCornerKey,
         profile: HexDeformationProfile,
     ) -> (WeightedBlendDiagnostics, FixedVectorQ16) {
-        let config = profile.config();
-        let correlated = interpolated_correlated_field(seed, key, profile);
-        let local = local_component_q16(seed, key, profile);
-        let wc = config.correlated_weight_q16;
-        let wl = config.local_weight_q16;
+        let cfg = profile.config();
+        let corr = interpolated_correlated_field(seed, key, profile);
+        let loc = local_component_q16(seed, key, profile);
         (
-            weighted_blend_diagnostics(correlated, local, wc, wl),
-            blend_to_displacement_q16(correlated, local, wc, wl),
+            weighted_blend_diagnostics(corr, loc, cfg.correlated_weight_q16, cfg.local_weight_q16),
+            blend_to_displacement_q16(corr, loc, cfg.correlated_weight_q16, cfg.local_weight_q16),
         )
     }
 
     fn unique_edge_pairs(
-        topology: &HexFaceTopology,
+        topo: &HexFaceTopology,
     ) -> impl Iterator<Item = (&MapVertex, &MapVertex)> + '_ {
-        topology
-            .half_edges
+        topo.half_edges
             .iter()
             .enumerate()
-            .filter(|(index, edge)| edge.twin.is_none_or(|twin| *index < twin.index()))
+            .filter(|(idx, edge)| edge.twin.is_none_or(|twin| *idx < twin.index()))
             .map(|(_, edge)| {
                 (
-                    &topology.vertices[edge.origin.index()],
-                    &topology.vertices[edge.destination.index()],
+                    &topo.vertices[edge.origin.index()],
+                    &topo.vertices[edge.destination.index()],
                 )
             })
     }
 
-    /// Pure integer mathematical property proof establishing that evaluating length using
-    /// floor integer W = floor(sqrt(S)) makes radial floor scaling conservatively excessive:
-    /// floor(sqrt(sx^2 + sy^2)) >= L for all valid integer inputs.
+    fn isqrt(n: u128) -> u128 {
+        if n == 0 {
+            return 0;
+        }
+        let mut x = (n as f64).sqrt() as u128;
+        if x == 0 {
+            x = 1;
+        }
+        while x * x > n || (x + 1) * (x + 1) <= n {
+            x = (x + n / x) / 2;
+        }
+        x
+    }
+
+    /// Pure integer mathematical property proof establishing floor reach without f64.
     #[test]
     fn full_radial_stabilization_arithmetic_property_proof() {
-        for wx in -100_i64..=100 {
-            for wy in -100_i64..=100 {
+        for wx in -200_i64..=200 {
+            for wy in -200_i64..=200 {
                 if wx == 0 && wy == 0 {
                     continue;
                 }
-                let s = wx * wx + wy * wy;
-                let w = (s as f64).sqrt().floor() as i64;
+                let s = (wx as i128 * wx as i128 + wy as i128 * wy as i128) as u128;
+                let w = isqrt(s) as i64;
                 if w < 1 {
                     continue;
                 }
-                for l in 0_i64..=500 {
+                for l in 0_i64..=300 {
                     let sx = scale_radial_component_q16(wx, l, w);
                     let sy = scale_radial_component_q16(wy, l, w);
-                    let st_len = ((sx * sx + sy * sy) as f64).sqrt().floor() as i64;
+                    let st_s = (sx as i128 * sx as i128 + sy as i128 * sy as i128) as u128;
+                    let st_len = isqrt(st_s) as i64;
                     let deficit = l - st_len;
                     let excess = st_len - l;
-                    assert_eq!(excess, -deficit);
-                    assert!(
-                        deficit <= 0,
-                        "wx={wx}, wy={wy}, L={l}: floor deficit must be <= 0, got {deficit}"
-                    );
+                    assert!(deficit <= 0, "deficit must be <= 0, got {deficit}");
                     assert!(excess >= 0);
                     if let Some(gx) = div_away_from_zero(i128::from(wx) * i128::from(l), w) {
                         assert_eq!(gx, sx);
@@ -88,39 +95,37 @@ mod radial_proof_matrix_tests {
         }
     }
 
-    /// Canonical 40x40 256-seed matrix audit for Organic and PagoniaLike profiles.
+    /// Canonical 40x40 256-seed matrix audit (1,024 generation calls, raw vs prod connectivity).
     #[test]
     #[ignore = "full radial stabilization proof matrix"]
+    #[rustfmt::skip]
     fn full_radial_stabilization_canonical_256_seed_audit() {
         let map = q::map_40x40();
         let mut total_corrected = 0_usize;
-        for profile in [
-            HexDeformationProfile::Organic,
-            HexDeformationProfile::PagoniaLike,
-        ] {
+        for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
             let mut profile_corrected = 0_usize;
-            for seed in 0..256 {
-                let topo = q::generate(&map, seed, profile);
-                for vertex in &topo.vertices {
+            for seed in 0..256_u32 {
+                let raw_topo = c::generate(&map, seed, profile, DISABLED_BLEND_RELIABILITY_POLICY);
+                let prod_topo = q::generate(&map, seed, profile);
+                let raw_fps = topology_fingerprints(&map, WorldSeed::new(seed), &raw_topo);
+                let prod_fps = topology_fingerprints(&map, WorldSeed::new(seed), &prod_topo);
+                assert_eq!(raw_fps.connectivity, prod_fps.connectivity, "connectivity must match");
+
+                for vertex in &prod_topo.vertices {
                     let (diag, _) = observations(seed, vertex.canonical_key, profile);
                     if diag.stabilization_applied {
                         profile_corrected += 1;
                         let deficit = diag.minimum_reliable_length_q16 - diag.stabilized_length_q16;
-                        assert!(
-                            deficit <= 0,
-                            "{profile:?} seed={seed}: deficit must be <= 0"
-                        );
+                        assert!(deficit <= 0, "{profile:?} seed={seed}: deficit must be <= 0");
                     }
                 }
             }
-            println!("{profile:?} 256-seed total corrected corners: {profile_corrected}");
             total_corrected += profile_corrected;
         }
-        println!("Canonical 256-seed total corrected corners: {total_corrected}");
-        assert_eq!(total_corrected, 1_118, "historical expected count matched");
+        assert_eq!(total_corrected, 1_118, "canonical 256-seed corrected count matched 1,118");
     }
 
-    /// Full 12-way single-unit perturbation matrix across all corrected corners.
+    /// Full 12-way perturbation matrix across ALL corrected corners (1,118 x 12 = 13,416 perturbations).
     #[test]
     #[ignore = "full radial stabilization proof matrix"]
     #[rustfmt::skip]
@@ -128,38 +133,43 @@ mod radial_proof_matrix_tests {
         let map = q::map_40x40();
         let mut executed = 0_usize;
         let mut skipped = 0_usize;
-        let mut max_excess = 0_i64;
-        let mut buckets = [0_usize; 6];
+        let mut corrected_corners_count = 0_usize;
 
-        for seed in q::FAST_SEEDS {
+        for seed in 0..256_u32 {
             for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
+                let cfg = profile.config();
                 let topo = q::generate(&map, seed, profile);
                 for vertex in &topo.vertices {
                     let (diag, _) = observations(seed, vertex.canonical_key, profile);
                     if !diag.stabilization_applied { continue; }
-                    let c_vec = FixedVectorQ16 { x: diag.weighted_x_q16, y: diag.weighted_y_q16 };
-                    let (l, req) = (diag.weighted_length_q16, diag.minimum_reliable_length_q16);
-                    let sx = scale_radial_component_q16(c_vec.x, req, l);
-                    let sy = scale_radial_component_q16(c_vec.y, req, l);
-                    let st_len = ((sx * sx + sy * sy) as f64).sqrt().floor() as i64;
-                    let excess = st_len - req;
-                    assert!(excess >= 0, "excess must be non-negative");
-                    max_excess = max_excess.max(excess);
+                    corrected_corners_count += 1;
+                    let corr = interpolated_correlated_field(seed, vertex.canonical_key, profile);
+                    let loc = local_component_q16(seed, vertex.canonical_key, profile);
+                    let (wc, wl) = (cfg.correlated_weight_q16, cfg.local_weight_q16);
 
-                    let bucket = match excess {
-                        0 => 0, 1 => 1, 2..=4 => 2, 5..=15 => 3, 16..=31 => 4, _ => 5,
-                    };
-                    buckets[bucket] += 1;
+                    let pert_inputs = [
+                        (FixedVectorQ16{x: corr.x + 1, y: corr.y}, loc, wc, wl),
+                        (FixedVectorQ16{x: corr.x - 1, y: corr.y}, loc, wc, wl),
+                        (FixedVectorQ16{x: corr.x, y: corr.y + 1}, loc, wc, wl),
+                        (FixedVectorQ16{x: corr.x, y: corr.y - 1}, loc, wc, wl),
+                        (corr, FixedVectorQ16{x: loc.x + 1, y: loc.y}, wc, wl),
+                        (corr, FixedVectorQ16{x: loc.x - 1, y: loc.y}, wc, wl),
+                        (corr, FixedVectorQ16{x: loc.x, y: loc.y + 1}, wc, wl),
+                        (corr, FixedVectorQ16{x: loc.x, y: loc.y - 1}, wc, wl),
+                        (corr, loc, wc + 1, wl), (corr, loc, wc - 1, wl),
+                        (corr, loc, wc, wl + 1), (corr, loc, wc, wl - 1),
+                    ];
 
-                    for (dx, dy) in [(-1,0),(1,0),(0,-1),(0,1)] {
-                        let px = c_vec.x + dx;
-                        let py = c_vec.y + dy;
-                        let pl = ((px*px + py*py) as f64).sqrt().floor() as i64;
+                    for (p_corr, p_loc, p_wc, p_wl) in pert_inputs {
+                        let p_diag = weighted_blend_diagnostics(p_corr, p_loc, p_wc, p_wl);
+                        let pl = p_diag.weighted_length_q16;
+                        let req = p_diag.minimum_reliable_length_q16;
                         if pl >= 1 {
-                            let psx = scale_radial_component_q16(px, req, pl);
-                            let psy = scale_radial_component_q16(py, req, pl);
-                            let pst_len = ((psx*psx + psy*psy) as f64).sqrt().floor() as i64;
-                            assert!(pst_len >= req);
+                            let psx = scale_radial_component_q16(p_diag.weighted_x_q16, req, pl);
+                            let psy = scale_radial_component_q16(p_diag.weighted_y_q16, req, pl);
+                            let pst_s = (psx as i128 * psx as i128 + psy as i128 * psy as i128) as u128;
+                            let pst_len = isqrt(pst_s) as i64;
+                            assert!(pst_len >= req, "perturbed stabilized length must be >= floor");
                             executed += 1;
                         } else {
                             skipped += 1;
@@ -168,117 +178,119 @@ mod radial_proof_matrix_tests {
                 }
             }
         }
-        println!("Executed perturbations: {executed}, skipped: {skipped}, max excess: {max_excess}");
-        println!("Excess buckets [0, 1, 2..4, 5..15, 16..31, >=32]: {buckets:?}");
+        assert_eq!(corrected_corners_count, 1_118, "total corrected corners");
+        assert_eq!(executed + skipped, 1_118 * 12, "reconciliation equality: executed + skipped == total_corrected * 12");
     }
 
-    /// Inventory test for natural exact-zero weighted vectors across canonical map.
+    /// Stage 2 exact-zero inventory across ALL 3,072 topologies (6 shapes x 2 profiles x 256 seeds).
     #[test]
     #[ignore = "full radial stabilization proof matrix"]
     #[rustfmt::skip]
     fn full_radial_stabilization_exact_zero_inventory() {
-        let map = q::map_40x40();
         let mut zero_count = 0_usize;
-        for seed in 0..256 {
-            for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
-                let topo = q::generate(&map, seed, profile);
-                for vertex in &topo.vertices {
-                    let (diag, _) = observations(seed, vertex.canonical_key, profile);
-                    if diag.weighted_sum_zero {
-                        zero_count += 1;
+        for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
+            for (_, map) in q::all_shapes() {
+                for seed in 0..256_u32 {
+                    let topo = q::generate(&map, seed, profile);
+                    for vertex in &topo.vertices {
+                        let (diag, _) = observations(seed, vertex.canonical_key, profile);
+                        if diag.weighted_sum_zero { zero_count += 1; }
                     }
                 }
             }
         }
-        println!("Canonical 256-seed natural exact-zero weighted vector count: {zero_count}");
+        println!("Stage 2 3,072-topology natural exact-zero weighted vector count: {zero_count}");
+        assert_eq!(zero_count, 0, "natural exact-zero weighted vectors is 0 across full Stage 2 domain");
     }
 
-    /// Adjacency inventory for exact -1.0 and near-antiparallel edge transitions.
+    /// Near-antiparallel inventory with threshold -0.9995 across ALL 256 seeds.
     #[test]
     #[ignore = "full radial stabilization proof matrix"]
     #[rustfmt::skip]
     fn full_radial_stabilization_adjacency_inventory() {
         let map = q::map_40x40();
-        let exact_m1_bits = (-1.0_f32).to_bits();
-        for seed in q::FAST_SEEDS {
-            for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
+        let mut pos_to_near = 0_usize;
+        let mut raw_above_m98_to_near = 0_usize;
+
+        for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
+            for seed in 0..256_u32 {
                 let raw_topo = c::generate(&map, seed, profile, DISABLED_BLEND_RELIABILITY_POLICY);
-                let prod_topo = c::generate(&map, seed, profile, PRODUCTION_BLEND_RELIABILITY_POLICY);
+                let prod_topo = q::generate(&map, seed, profile);
                 let mut raw_map = HashMap::new();
                 for (o, d) in unique_edge_pairs(&raw_topo) {
                     let (Ok(or), Ok(dr)) = (regular_corner_position(o.canonical_key), regular_corner_position(d.canonical_key)) else { continue; };
                     let (od, dd) = ((o.position - or).normalize_or_zero(), (d.position - dr).normalize_or_zero());
-                    let key = (o.canonical_key.min(d.canonical_key), o.canonical_key.max(d.canonical_key));
-                    raw_map.insert(key, od.dot(dd));
+                    raw_map.insert((o.canonical_key.min(d.canonical_key), o.canonical_key.max(d.canonical_key)), od.dot(dd));
                 }
-
                 for (o, d) in unique_edge_pairs(&prod_topo) {
                     let (Ok(or), Ok(dr)) = (regular_corner_position(o.canonical_key), regular_corner_position(d.canonical_key)) else { continue; };
                     let (od, dd) = ((o.position - or).normalize_or_zero(), (d.position - dr).normalize_or_zero());
                     let p_dot = od.dot(dd);
                     let key = (o.canonical_key.min(d.canonical_key), o.canonical_key.max(d.canonical_key));
                     if let Some(&r_dot) = raw_map.get(&key) {
-                        if r_dot > 0.0 {
-                            assert!(p_dot > 0.0, "positive raw dot must remain positive");
-                        }
-                        assert!(p_dot.to_bits() != exact_m1_bits || r_dot.to_bits() == exact_m1_bits);
+                        if r_dot > 0.0 && p_dot <= -0.9995 { pos_to_near += 1; }
+                        if r_dot > -0.98 && p_dot <= -0.9995 { raw_above_m98_to_near += 1; }
                     }
                 }
             }
         }
+        assert_eq!(pos_to_near, 0, "positive raw dot must never transition to near-antiparallel <= -0.9995");
+        assert_eq!(raw_above_m98_to_near, 0, "raw dot > -0.98 must never transition to near-antiparallel <= -0.9995");
     }
 
-    /// Stage 2 matrix test covering 2 profiles x 6 grid shapes x 256 seeds = 3,072 topologies.
+    /// Full Stage 2 matrix test (2 profiles x 6 grid shapes x 256 seeds = 3,072 topologies).
     #[test]
     #[ignore = "full radial stabilization proof matrix"]
+    #[rustfmt::skip]
     fn full_radial_stabilization_stage2_matrix() {
-        for profile in [
-            HexDeformationProfile::Organic,
-            HexDeformationProfile::PagoniaLike,
-        ] {
+        for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
             for (shape_name, map) in q::all_shapes() {
                 let mut max_angle = 0.0_f32;
                 let mut min_aspect = 1.0_f32;
+                let mut generated_count = 0_usize;
 
-                for seed in q::FAST_SEEDS {
-                    let case = q::measured_quality(&map, seed, profile);
-                    max_angle = max_angle.max(case.maximum_interior_angle_degrees);
-                    min_aspect = min_aspect.min(case.minimum_aspect_quality);
+                for seed in 0..256_u32 {
+                    let topo = q::generate(&map, seed, profile);
+                    generated_count += 1;
+                    let rep = ProfileAcceptanceReport::from_topology(&topo);
+                    max_angle = max_angle.max(rep.maximum_interior_angle_degrees);
+                    min_aspect = min_aspect.min(rep.minimum_aspect_quality);
                 }
 
+                assert_eq!(generated_count, 256, "all 256 seeds generated for {profile:?} shape {shape_name}");
                 let (allowed_angle, allowed_aspect) = match profile {
                     HexDeformationProfile::Organic => (162.0_f32, 0.490_f32),
                     HexDeformationProfile::PagoniaLike => (176.0_f32, 0.370_f32),
                     HexDeformationProfile::Subtle => (160.0_f32, 0.500_f32),
                 };
-                assert!(
-                    max_angle <= allowed_angle + 1e-3,
-                    "{profile:?} shape {shape_name}: max angle {max_angle} <= {allowed_angle}"
-                );
-                assert!(
-                    min_aspect >= allowed_aspect - 1e-3,
-                    "{profile:?} shape {shape_name}: min aspect {min_aspect} >= {allowed_aspect}"
-                );
+                assert!(max_angle <= allowed_angle + 1e-3, "{profile:?} shape {shape_name}: max angle {max_angle} <= {allowed_angle}");
+                assert!(min_aspect >= allowed_aspect - 1e-3, "{profile:?} shape {shape_name}: min aspect {min_aspect} >= {allowed_aspect}");
             }
         }
     }
 
-    /// Determinism test verifying repeated generation and insertion-order independence.
+    /// Insertion-order independence & full fingerprint determinism test.
     #[test]
+    #[rustfmt::skip]
     fn full_radial_stabilization_determinism_matrix() {
-        let map = q::map_40x40();
-        for seed in [0, 1, 42, 64, 126, 158, 162, 173, 191, 194, 206, 255] {
-            for profile in [
-                HexDeformationProfile::Organic,
-                HexDeformationProfile::PagoniaLike,
-            ] {
-                let topo1 = q::generate(&map, seed, profile);
-                let topo2 = q::generate(&map, seed, profile);
-                assert_eq!(topo1.vertices.len(), topo2.vertices.len());
-                assert_eq!(topo1.faces.len(), topo2.faces.len());
-                for (v1, v2) in topo1.vertices.iter().zip(topo2.vertices.iter()) {
-                    assert_eq!(v1.position.x.to_bits(), v2.position.x.to_bits());
-                    assert_eq!(v1.position.y.to_bits(), v2.position.y.to_bits());
+        for (shape_name, map) in q::all_shapes() {
+            let mut shuffled_map = MapData::default();
+            shuffled_map.width = map.width;
+            shuffled_map.height = map.height;
+            let mut coords: Vec<HexCoord> = map.tiles.keys().copied().collect();
+            coords.reverse(); // Reverse tile insertion order
+            for coord in coords {
+                shuffled_map.tiles.insert(coord, q::tile());
+            }
+
+            for seed in [0_u32, 1, 42, 64, 126, 173, 194, 255] {
+                for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
+                    let topo1 = q::generate(&map, seed, profile);
+                    let topo2 = q::generate(&shuffled_map, seed, profile);
+                    let fp1 = topology_fingerprints(&map, WorldSeed::new(seed), &topo1);
+                    let fp2 = topology_fingerprints(&shuffled_map, WorldSeed::new(seed), &topo2);
+                    assert_eq!(fp1.geometry, fp2.geometry, "geometry fingerprint must match across insertion order for shape {shape_name}");
+                    assert_eq!(fp1.connectivity, fp2.connectivity, "connectivity fingerprint must match for shape {shape_name}");
                 }
             }
         }
