@@ -149,19 +149,23 @@ pub fn monitor_inspector_triggers(
     mut ev_gen: MessageWriter<GenerateMapEvent>,
     mut ev_rebuild: MessageWriter<RebuildMeshEvent>,
 ) {
-    let request = std::mem::take(&mut config.generation_request);
-    if request == GenerationRequest::RandomizeSeed {
-        config.seed = rand::thread_rng().gen_range(0..999_999);
+    if config.generation_request == GenerationRequest::None {
+        ev_rebuild.write(RebuildMeshEvent);
+        return;
     }
 
-    if request == GenerationRequest::None {
-        ev_rebuild.write(RebuildMeshEvent);
-    } else {
-        ev_gen.write(GenerateMapEvent {
-            mode: GenerationMode::Reset,
-            auto_fill_phase: None,
-        });
+    let request = config.generation_request;
+    let bypass = config.bypass_change_detection();
+    bypass.generation_request = GenerationRequest::None;
+
+    if request == GenerationRequest::RandomizeSeed {
+        bypass.seed = rand::thread_rng().gen_range(0..999_999);
     }
+
+    ev_gen.write(GenerateMapEvent {
+        mode: GenerationMode::Reset,
+        auto_fill_phase: None,
+    });
 }
 
 pub fn handle_faction_auto_relocation(

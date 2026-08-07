@@ -2,7 +2,7 @@
 #[cfg(test)]
 mod tests {
     use crate::map::data::{MapData, TileData};
-    use crate::map::face_topology::corner_key::{canonical_corner_key, regular_corner_position};
+    use crate::map::face_topology::corner_key::regular_corner_position;
     use crate::map::face_topology::generate_hex_face_topology_with_profile;
     use crate::map::face_topology::profiles::HexDeformationProfile;
     use crate::map::face_topology::tests_quality_shared::shared as q;
