@@ -163,7 +163,15 @@ mod debug_tests {
             .init_resource::<HexFaceTopologyGenerationState>()
             .add_message::<GenerateMapEvent>()
             .add_message::<RebuildMeshEvent>()
-            .add_systems(Update, regenerate_hex_face_topology);
+            .add_systems(
+                Update,
+                (
+                    crate::map::systems::monitor_inspector_triggers
+                        .run_if(resource_changed::<TerrainConfig>),
+                    regenerate_hex_face_topology,
+                )
+                    .chain(),
+            );
         app.update();
         let fp1 = topology_fingerprints(
             app.world().resource::<MapData>(),

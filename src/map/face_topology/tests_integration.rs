@@ -60,14 +60,26 @@ mod tests {
             expected_incidents.sort_by_key(|c| (c.q, c.r));
             expected_incidents.dedup();
 
-            let d_idx = derived
+            let matches: Vec<_> = derived
                 .vertices_xz
                 .iter()
-                .position(|&pos| pos == src_vert.position)
-                .unwrap_or_else(|| panic!("Source vertex {v_idx} missing from derived vertices"));
+                .enumerate()
+                .filter(|(_, &pos)| {
+                    pos.to_array().map(f32::to_bits)
+                        == src_vert.position.to_array().map(f32::to_bits)
+                })
+                .collect();
 
             assert_eq!(
-                derived.vertices_xz[d_idx], src_vert.position,
+                matches.len(),
+                1,
+                "Source vertex {v_idx} must match exactly 1 derived vertex, found {}",
+                matches.len()
+            );
+            let (d_idx, &d_pos) = matches[0];
+
+            assert_eq!(
+                d_pos, src_vert.position,
                 "Derived vertex {d_idx} position must match source vertex {v_idx} bit-identically"
             );
 
@@ -76,16 +88,18 @@ mod tests {
                 "Derived vertex {d_idx} influences must match actual incident faces for source vertex {v_idx}"
             );
 
-            let reg_pos = regular_corner_position(canonical_corner_key(expected_incidents[0], 0))
-                .expect("reg pos");
-            if src_vert.position != reg_pos {
+            let reg_pos = regular_corner_position(src_vert.canonical_key)
+                .expect("regular position for canonical key");
+            if src_vert.position.to_array().map(f32::to_bits)
+                != reg_pos.to_array().map(f32::to_bits)
+            {
                 displaced_count += 1;
             }
         }
 
         assert!(
             displaced_count > 0,
-            "At least one source corner must be displaced from regular position"
+            "At least one source corner must be displaced from its regular canonical position"
         );
     }
 
