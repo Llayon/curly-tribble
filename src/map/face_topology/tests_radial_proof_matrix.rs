@@ -1,21 +1,15 @@
 //! Exhaustive proof matrix and invariant test suite for radial blend stabilization.
 
 #[cfg(test)]
+#[rustfmt::skip]
 mod radial_proof_matrix_tests {
-    use crate::map::face_topology::acceptance::ProfileAcceptanceReport;
-    use crate::map::face_topology::blend::{
-        blend_to_displacement_q16, weighted_blend_diagnostics, FixedVectorQ16,
-        WeightedBlendDiagnostics,
-    };
-    use crate::map::face_topology::blend_diagnostics::{
-        div_away_from_zero, scale_radial_component_q16,
-    };
+    use crate::map::face_topology::acceptance::{ProfileAcceptanceCriteria, ProfileAcceptanceReport};
+    use crate::map::face_topology::blend::{blend_to_displacement_q16, weighted_blend_diagnostics, FixedVectorQ16, WeightedBlendDiagnostics};
+    use crate::map::face_topology::blend_diagnostics::{div_away_from_zero, scale_radial_component_q16};
     use crate::map::face_topology::blend_policy::DISABLED_BLEND_RELIABILITY_POLICY;
     use crate::map::face_topology::corner_key::regular_corner_position;
     use crate::map::face_topology::fingerprint::topology_fingerprints;
-    use crate::map::face_topology::profiles::{
-        interpolated_correlated_field, local_component_q16, HexDeformationProfile,
-    };
+    use crate::map::face_topology::profiles::{interpolated_correlated_field, local_component_q16, HexDeformationProfile};
     use crate::map::face_topology::tests_blend_candidate_shared::shared as c;
     use crate::map::face_topology::tests_quality_shared::shared as q;
     use crate::map::face_topology::types::{HexFaceTopology, MapVertex, SharedCornerKey};
@@ -55,10 +49,8 @@ mod radial_proof_matrix_tests {
         if n == 0 {
             return 0;
         }
-        let mut x = (n as f64).sqrt() as u128;
-        if x == 0 {
-            x = 1;
-        }
+        let bits = 128 - n.leading_zeros();
+        let mut x = 1_u128 << ((bits + 1) / 2);
         while x * x > n || (x + 1) * (x + 1) <= n {
             x = (x + n / x) / 2;
         }
@@ -199,18 +191,19 @@ mod radial_proof_matrix_tests {
                 }
             }
         }
-        println!("Stage 2 3,072-topology natural exact-zero weighted vector count: {zero_count}");
         assert_eq!(zero_count, 0, "natural exact-zero weighted vectors is 0 across full Stage 2 domain");
     }
 
-    /// Near-antiparallel inventory with threshold -0.9995 across ALL 256 seeds.
+    /// Near-antiparallel & exact -1.0 inventory across ALL 256 seeds.
     #[test]
     #[ignore = "full radial stabilization proof matrix"]
     #[rustfmt::skip]
     fn full_radial_stabilization_adjacency_inventory() {
         let map = q::map_40x40();
+        let exact_m1_bits = (-1.0_f32).to_bits();
         let mut pos_to_near = 0_usize;
         let mut raw_above_m98_to_near = 0_usize;
+        let mut newly_exact_m1 = 0_usize;
 
         for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
             for seed in 0..256_u32 {
@@ -230,67 +223,69 @@ mod radial_proof_matrix_tests {
                     if let Some(&r_dot) = raw_map.get(&key) {
                         if r_dot > 0.0 && p_dot <= -0.9995 { pos_to_near += 1; }
                         if r_dot > -0.98 && p_dot <= -0.9995 { raw_above_m98_to_near += 1; }
+                        if p_dot.to_bits() == exact_m1_bits && r_dot.to_bits() != exact_m1_bits { newly_exact_m1 += 1; }
                     }
                 }
             }
         }
         assert_eq!(pos_to_near, 0, "positive raw dot must never transition to near-antiparallel <= -0.9995");
         assert_eq!(raw_above_m98_to_near, 0, "raw dot > -0.98 must never transition to near-antiparallel <= -0.9995");
+        assert_eq!(newly_exact_m1, 0, "0 newly created exact -1.0 edges involving corrected endpoints");
     }
 
-    /// Full Stage 2 matrix test (2 profiles x 6 grid shapes x 256 seeds = 3,072 topologies).
+    /// Full Stage 2 matrix test (2 profiles x 6 grid shapes x 256 seeds = 3,072 topologies) checking full acceptance criteria.
     #[test]
     #[ignore = "full radial stabilization proof matrix"]
     #[rustfmt::skip]
     fn full_radial_stabilization_stage2_matrix() {
         for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
+            let criteria = ProfileAcceptanceCriteria::for_profile(profile);
             for (shape_name, map) in q::all_shapes() {
-                let mut max_angle = 0.0_f32;
-                let mut min_aspect = 1.0_f32;
                 let mut generated_count = 0_usize;
-
                 for seed in 0..256_u32 {
                     let topo = q::generate(&map, seed, profile);
                     generated_count += 1;
                     let rep = ProfileAcceptanceReport::from_topology(&topo);
-                    max_angle = max_angle.max(rep.maximum_interior_angle_degrees);
-                    min_aspect = min_aspect.min(rep.minimum_aspect_quality);
+                    let violations = rep.violations(criteria);
+                    assert!(violations.is_empty(), "{profile:?} shape {shape_name} seed {seed}: violations: {violations:?}");
                 }
-
                 assert_eq!(generated_count, 256, "all 256 seeds generated for {profile:?} shape {shape_name}");
-                let (allowed_angle, allowed_aspect) = match profile {
-                    HexDeformationProfile::Organic => (162.0_f32, 0.490_f32),
-                    HexDeformationProfile::PagoniaLike => (176.0_f32, 0.370_f32),
-                    HexDeformationProfile::Subtle => (160.0_f32, 0.500_f32),
-                };
-                assert!(max_angle <= allowed_angle + 1e-3, "{profile:?} shape {shape_name}: max angle {max_angle} <= {allowed_angle}");
-                assert!(min_aspect >= allowed_aspect - 1e-3, "{profile:?} shape {shape_name}: min aspect {min_aspect} >= {allowed_aspect}");
             }
         }
     }
 
-    /// Insertion-order independence & full fingerprint determinism test.
+    /// Insertion-order independence & full fingerprint determinism test with deterministic shuffled maps.
     #[test]
     #[rustfmt::skip]
     fn full_radial_stabilization_determinism_matrix() {
         for (shape_name, map) in q::all_shapes() {
-            let mut shuffled_map = MapData::default();
-            shuffled_map.width = map.width;
-            shuffled_map.height = map.height;
+            let mut rev_map = MapData::default();
+            let mut shuf_map = MapData::default();
+            rev_map.width = map.width; rev_map.height = map.height;
+            shuf_map.width = map.width; shuf_map.height = map.height;
             let mut coords: Vec<HexCoord> = map.tiles.keys().copied().collect();
-            coords.reverse(); // Reverse tile insertion order
-            for coord in coords {
-                shuffled_map.tiles.insert(coord, q::tile());
+            for &coord in coords.iter().rev() { rev_map.tiles.insert(coord, q::tile()); }
+            // Deterministic LCG swap permutation
+            let mut rng_state = 0x1234_5678_u32;
+            for i in (1..coords.len()).rev() {
+                rng_state = rng_state.wrapping_mul(1_103_515_245).wrapping_add(12_345);
+                let j = (rng_state as usize) % (i + 1);
+                coords.swap(i, j);
             }
+            for coord in coords { shuf_map.tiles.insert(coord, q::tile()); }
 
             for seed in [0_u32, 1, 42, 64, 126, 173, 194, 255] {
                 for profile in [HexDeformationProfile::Organic, HexDeformationProfile::PagoniaLike] {
                     let topo1 = q::generate(&map, seed, profile);
-                    let topo2 = q::generate(&shuffled_map, seed, profile);
+                    let topo_rev = q::generate(&rev_map, seed, profile);
+                    let topo_shuf = q::generate(&shuf_map, seed, profile);
                     let fp1 = topology_fingerprints(&map, WorldSeed::new(seed), &topo1);
-                    let fp2 = topology_fingerprints(&shuffled_map, WorldSeed::new(seed), &topo2);
-                    assert_eq!(fp1.geometry, fp2.geometry, "geometry fingerprint must match across insertion order for shape {shape_name}");
-                    assert_eq!(fp1.connectivity, fp2.connectivity, "connectivity fingerprint must match for shape {shape_name}");
+                    let fp_rev = topology_fingerprints(&rev_map, WorldSeed::new(seed), &topo_rev);
+                    let fp_shuf = topology_fingerprints(&shuf_map, WorldSeed::new(seed), &topo_shuf);
+                    assert_eq!(fp1.geometry, fp_rev.geometry, "geometry fingerprint reversed match {shape_name}");
+                    assert_eq!(fp1.connectivity, fp_rev.connectivity, "connectivity fingerprint reversed match {shape_name}");
+                    assert_eq!(fp1.geometry, fp_shuf.geometry, "geometry fingerprint shuffled match {shape_name}");
+                    assert_eq!(fp1.connectivity, fp_shuf.connectivity, "connectivity fingerprint shuffled match {shape_name}");
                 }
             }
         }
