@@ -143,11 +143,14 @@ fn ratio_q16(value: i64, target: i64) -> i64 {
 /// intermediate arithmetic. Mathematically total for all production inputs (`denominator >= 1`).
 #[must_use]
 #[allow(clippy::cast_possible_truncation)]
+#[rustfmt::skip]
 pub(crate) fn scale_radial_component_q16(
     component: i64,
     target_floor: i64,
     denominator: i64,
 ) -> i64 {
+    debug_assert!(denominator >= 1, "denominator must be >= 1 in production domain");
+    debug_assert!(target_floor >= 0, "target_floor must be >= 0 in production domain");
     if denominator <= 0 {
         return 0;
     }
