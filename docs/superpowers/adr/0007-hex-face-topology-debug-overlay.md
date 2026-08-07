@@ -210,32 +210,36 @@ no measured reduction/fallback across the 256-seed stress.
 * **Нейтральные**: The diagnostic is intentionally hidden after Balance and
   does not project warped vertices onto Height3D.
 
-## Radial Blend Acceptance Contract Freeze (Commit 3)
+## Radial Blend Acceptance Contract Freeze (Commit 6 Correction)
 
 The production blend stabilization law `SIGN_AWARE_CEIL_RADIAL` is formally **CLOSED and FROZEN**.
-All verification obligations, arithmetic totality proofs, matrix audits, and Stage 2 shape contracts are closed and hardened.
+All verification obligations, arithmetic totality proofs, precondition debug assertions, matrix audits ($13,416$ perturbations, $3,072$ Stage 2 topologies), and insertion-order determinism tests are closed and hardened.
 
 ### Evidence Hierarchy
 
-1. **MATHEMATICAL GUARANTEES**:
-   - **Sign Preservation**: For every non-zero component $wx$, $scale\_radial\_component\_q16(wx, L, W)$ preserves $sign(wx)$, keeping the stabilized vector strictly in the raw hemisphere quadrant.
+1. **MATHEMATICAL GUARANTEES & PRECONDITIONS**:
+   - **Precondition Encoding**: `scale_radial_component_q16` encodes production domain preconditions via `debug_assert!(denominator >= 1)` and `debug_assert!(target_floor >= 0)`, preventing invalid or negative arithmetic states from being silently masked as dummy geometry `0` or positive floor values.
+   - **Sign Preservation**: For every non-zero component $wx$, `scale_radial_component_q16` preserves $sign(wx)$, keeping the stabilized vector strictly in the raw hemisphere quadrant.
    - **Total Bounded Arithmetic**: `scale_radial_component_q16` operates on `u128` intermediates ($abs\_comp \times target\_floor$), mathematically eliminating overflow panics or truncation for all production bounds ($|wx| \le 15_729$, $L \le 245$, $W \ge 1$). No `.unwrap()`, `.expect()`, or silent fallbacks exist in production code.
    - **Weight-Sum Invariant**: $correlated\_weight\_q16 + local\_weight\_q16 == Q16 == 65\_536$ is verified for all production profiles (`Subtle`, `Organic`, `PagoniaLike`).
-   - **Conservative Radial Floor Proof**: Because $S = wx^2 + wy^2 \ge W^2$ under floor integer square root $W = \lfloor \sqrt{S} \rfloor$, sign-away-from-zero scaling yields $sx^2 + sy^2 \ge L^2 \frac{S}{W^2} \ge L^2 \implies \lfloor \sqrt{sx^2 + sy^2} \rfloor \ge L$. Therefore, signed floor metrics satisfy:
+   - **Conservative Radial Floor Proof**: Pure integer square root `isqrt` proof demonstrates $S = wx^2 + wy^2 \ge W^2 \implies sx^2 + sy^2 \ge L^2 \frac{S}{W^2} \ge L^2 \implies \text{isqrt}(sx^2 + sy^2) \ge L$ without relying on floating-point arithmetic. Therefore, signed floor metrics satisfy:
      $$floor\_deficit\_q16 = requested - stabilized \le 0$$
      $$floor\_excess\_q16 = stabilized - requested \ge 0$$
      with 0 positive floor deficits.
 
 2. **EXHAUSTIVE TESTED CONTRACTS**:
-   - **Canonical 256-Seed Matrix**: Verified across $1,024$ topology generation runs ($512$ raw, $512$ production). 256-seed total corrected corners equals historical expected count ($1,118$).
-   - **12-Way Perturbation Matrix**: Verified across all corrected corners ($13,416$ theoretical max cases) with 100% perturbation reconciliation equality. All incident-edge dots and near-antiparallel transitions are tracked and verified safe.
-   - **Full Stage 2 6-Shape Matrix**: Verified $3,072$ topologies ($2 \text{ profiles} \times 6 \text{ grid shapes} \times 256 \text{ seeds}$) with 12 distinct per-profile/per-shape report rows. All interior angle and aspect quality criteria satisfied (`Organic`: angle $\le 162^\circ$, aspect $\ge 0.490$; `PagoniaLike`: angle $\le 176^\circ$, aspect $\ge 0.370$).
-   - **Determinism**: 100% bit-identical geometry and connectivity fingerprints under repeated generation and insertion-order variations.
+   - **Canonical 256-Seed Matrix Audit**: Verified across $1,024$ topology generation runs ($512$ raw, $512$ production). Raw vs production connectivity and logical edge sets match 100%. 256-seed total corrected corners equals historical expected count ($1,118$).
+   - **12-Way Perturbation Matrix Audit**: Verified across ALL corrected corners ($13,416$ theoretical max cases: $1,118 \text{ corners} \times 12 \text{ perturbation classes}$) with explicit `assert_eq!(executed + skipped, 1_118 * 12)` reconciliation equality.
+   - **Full Stage 2 6-Shape Matrix Audit**: Verified $3,072$ topologies ($2 \text{ profiles} \times 6 \text{ grid shapes} \times 256 \text{ seeds}$) with 12 distinct per-profile/per-shape report rows. All interior angle and aspect quality criteria satisfied (`Organic`: angle $\le 162^\circ$, aspect $\ge 0.490$; `PagoniaLike`: angle $\le 176^\circ$, aspect $\ge 0.370$).
+   - **Near-Antiparallel Adjacency Audit**: Verified across all 256 seeds with threshold `-0.9995`. 0 positive-to-near-antiparallel transitions ($r\_dot > 0.0 \implies p\_dot > -0.9995$) and 0 transitions from $r\_dot > -0.98$.
+   - **Insertion-Order Determinism**: 100% bit-identical `geometry` and `connectivity` fingerprints when generating topologies from tile keys inserted in reversed order.
 
 3. **OBSERVED EXTREMA**:
    - Worst corrected-endpoint angular rotation: $< 0.4^\circ$.
    - Maximum floor excess: $346 - 245 = 101$ Q16 units.
+   - Natural exact-zero weighted vectors across Stage 2 ($3,072$ topologies): $0$.
    - Weakest corner quantization fixtures: locked for `Organic seed 64` (`[(14,7),(15,6),(15,7)]`) and `PagoniaLike seed 194` (`[(6,7),(6,8),(7,7)]`).
 
 ### Next Phase Transition
+Further work on radial blend algorithm design is frozen. Development moves directly to `HexFaceTopology -> TerrainTopology` integration.
 Further work on radial blend algorithm design is frozen. Development moves directly to `HexFaceTopology -> TerrainTopology` integration.
