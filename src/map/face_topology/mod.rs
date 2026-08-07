@@ -56,6 +56,8 @@ mod tests_blend_candidate_shared;
 mod tests_blend_separation;
 #[cfg(test)]
 mod tests_blend_stress;
+#[cfg(test)]
+mod tests_radial_proof_matrix;
 
 pub use corner_key::{
     canonical_corner_key, corner_displacement, regular_corner_position, seed_for_corner,
