@@ -242,4 +242,3 @@ All verification obligations, arithmetic totality proofs, precondition debug ass
 
 ### Next Phase Transition
 Further work on radial blend algorithm design is frozen. Development moves directly to `HexFaceTopology -> TerrainTopology` integration.
-Further work on radial blend algorithm design is frozen. Development moves directly to `HexFaceTopology -> TerrainTopology` integration.
