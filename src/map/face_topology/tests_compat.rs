@@ -254,18 +254,9 @@ mod compat_tests {
         let adr =
             fs::read_to_string("docs/superpowers/adr/0007-hex-face-topology-debug-overlay.md")
                 .expect("read ADR");
-        assert!(
-            !adr.to_lowercase().contains("camera rotation"),
-            "ADR must not claim camera-rotation dependence"
-        );
-        assert!(
-            !adr.contains("gradient arises from the fixed camera rotation"),
-            "obsolete camera wording still present"
-        );
-        assert!(
-            adr.contains("independent of the camera"),
-            "ADR must assert camera independence"
-        );
+        assert!(!adr.to_lowercase().contains("camera rotation"));
+        assert!(!adr.contains("gradient arises from the fixed camera rotation"));
+        assert!(adr.contains("independent of the camera"));
     }
 
     /// 2. Topology generation has no camera input or resource dependency.

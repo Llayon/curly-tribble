@@ -51,6 +51,7 @@ pub struct TerrainConfig {
     pub map_width: u32,
     pub map_height: u32,
     pub seed: u32,
+    pub deformation_profile: crate::map::face_topology::profiles::HexDeformationProfile,
 
     // --- INTEGRATED TOOLS (appear as a state selector in inspector) ---
     pub generation_request: GenerationRequest,
@@ -96,6 +97,7 @@ impl Default for TerrainConfig {
             map_width: 40,
             map_height: 40,
             seed: 42,
+            deformation_profile: crate::map::face_topology::profiles::HexDeformationProfile::Subtle,
             generation_request: GenerationRequest::None,
             macro_freq: 0.04,
             macro_height: 12.0,

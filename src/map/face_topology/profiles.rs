@@ -7,7 +7,7 @@ use crate::map::face_topology::corner_key::{
     corner_displacement, seed_for_corner, DISPLACEMENT_DIRECTIONS_Q15,
 };
 use crate::map::face_topology::types::SharedCornerKey;
-use bevy::prelude::Vec2;
+use bevy::prelude::{Reflect, Vec2};
 
 pub use crate::map::face_topology::blend::FixedVectorQ16;
 
@@ -17,7 +17,7 @@ const FIELD_DIRECTION_MASK: u64 = 0x0f;
 const FIELD_STRENGTH_SHIFT: u32 = 12;
 const FIELD_STRENGTH_MASK: u64 = 0xff;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, PartialOrd, Ord)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, PartialOrd, Ord, Reflect)]
 pub enum HexDeformationProfile {
     #[default]
     Subtle,

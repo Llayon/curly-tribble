@@ -1,7 +1,6 @@
 //! Authoritative runtime population of the data-only face topology resource.
 use crate::map::face_topology::acceptance::warn_on_acceptance_misses;
 use crate::map::face_topology::cache::HexFaceDebugCache;
-use crate::map::face_topology::debug::HexFaceDebugSettings;
 use crate::map::face_topology::fingerprint::topology_fingerprints;
 use crate::map::face_topology::generate_hex_face_topology_with_profile;
 use crate::map::face_topology::profiles::HexDeformationProfile;
@@ -67,7 +66,7 @@ pub fn regenerate_hex_face_topology(
     mut generation_state: ResMut<HexFaceTopologyGenerationState>,
     map_data: Res<MapData>,
     world_seed: Res<WorldSeed>,
-    debug_settings: Res<HexFaceDebugSettings>,
+    terrain_config: Option<Res<crate::map::terrain_gen::TerrainConfig>>,
     mut generation_events: MessageReader<GenerateMapEvent>,
     mut rebuild_events: MessageReader<RebuildMeshEvent>,
 ) {
@@ -76,21 +75,24 @@ pub fn regenerate_hex_face_topology(
     generation_state.generation_events_consumed += generation_events_consumed as u64;
     generation_state.rebuild_events_consumed += rebuild_events_consumed as u64;
     let event_requested = generation_events_consumed > 0 || rebuild_events_consumed > 0;
+    let profile = terrain_config
+        .as_ref()
+        .map_or(HexDeformationProfile::Subtle, |c| c.deformation_profile);
     let input_may_have_changed = map_data.is_changed()
         || world_seed.is_changed()
-        || debug_settings.is_changed()
+        || terrain_config.as_ref().is_some_and(|c| c.is_changed())
         || generation_state.last_inputs.is_none();
     if !event_requested && !input_may_have_changed {
         return;
     }
 
-    let inputs = LogicalMapInputs::from_map(&map_data, *world_seed, debug_settings.profile);
+    let inputs = LogicalMapInputs::from_map(&map_data, *world_seed, profile);
     if generation_state.last_inputs.as_ref() == Some(&inputs) {
         return;
     }
     generation_state.last_inputs = Some(inputs.clone());
 
-    match generate_hex_face_topology_with_profile(&map_data, *world_seed, debug_settings.profile) {
+    match generate_hex_face_topology_with_profile(&map_data, *world_seed, profile) {
         Ok(new_topology) => {
             let mut new_cache = HexFaceDebugCache::default();
             new_cache.rebuild(&new_topology, &map_data);
@@ -118,14 +120,14 @@ pub fn regenerate_hex_face_topology(
                 half_edges = new_topology.half_edges.len(),
                 unique_debug_edges = unique_edge_count,
                 unique_regular_edges = new_cache.regular_edges.len(),
-                profile = debug_settings.profile.name(),
+                profile = profile.name(),
                 stats = ?new_topology.stats,
                 "HexFaceTopology regenerated"
             );
             *debug_cache = new_cache;
             topology.clone_from(&new_topology);
             let fingerprint = topology_fingerprints(&map_data, *world_seed, &new_topology);
-            warn_on_acceptance_misses(&topology, debug_settings.profile, fingerprint.geometry);
+            warn_on_acceptance_misses(&topology, profile, fingerprint.geometry);
             generation_state.last_successful_inputs = Some(inputs);
             generation_state.generation_count += 1;
         }
@@ -151,6 +153,7 @@ pub fn regenerate_hex_face_topology(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::map::face_topology::debug::HexFaceDebugSettings;
     use crate::map::face_topology::validate_complete_topology;
 
     fn map_with_tiles(count: i32) -> MapData {
@@ -170,6 +173,7 @@ mod tests {
         let mut app = App::new();
         app.insert_resource(map)
             .insert_resource(WorldSeed::new(seed))
+            .init_resource::<crate::map::terrain_gen::TerrainConfig>()
             .init_resource::<HexFaceTopology>()
             .init_resource::<HexFaceDebugSettings>()
             .init_resource::<HexFaceDebugCache>()
@@ -277,8 +281,8 @@ mod tests {
         let mut app = test_app(map_with_tiles(2), 42);
         app.update();
         app.world_mut()
-            .resource_mut::<HexFaceDebugSettings>()
-            .profile = HexDeformationProfile::Organic;
+            .resource_mut::<crate::map::terrain_gen::TerrainConfig>()
+            .deformation_profile = HexDeformationProfile::Organic;
         app.update();
         let state = app.world().resource::<HexFaceTopologyGenerationState>();
         assert_eq!(state.generation_count, 2);

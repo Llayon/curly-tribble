@@ -140,4 +140,65 @@ mod debug_tests {
         assert_eq!(cache.shared_vertices.len(), topology.vertices.len());
         assert!(cache.is_consistent(&topology));
     }
+
+    #[test]
+    fn debug_settings_toggle_does_not_alter_production_face_topology() {
+        use crate::map::face_topology::fingerprint::topology_fingerprints;
+        use crate::map::face_topology::profiles::HexDeformationProfile;
+        use crate::map::face_topology::runtime::{
+            regenerate_hex_face_topology, HexFaceTopologyGenerationState,
+        };
+        use crate::map::face_topology::types::HexFaceTopology;
+        use crate::map::terrain_gen::TerrainConfig;
+        use crate::map::{GenerateMapEvent, RebuildMeshEvent};
+        use bevy::prelude::*;
+
+        let mut app = App::new();
+        app.insert_resource(map_40x40())
+            .insert_resource(WorldSeed::new(42))
+            .init_resource::<TerrainConfig>()
+            .init_resource::<HexFaceTopology>()
+            .init_resource::<HexFaceDebugSettings>()
+            .init_resource::<HexFaceDebugCache>()
+            .init_resource::<HexFaceTopologyGenerationState>()
+            .add_message::<GenerateMapEvent>()
+            .add_message::<RebuildMeshEvent>()
+            .add_systems(Update, regenerate_hex_face_topology);
+        app.update();
+        let fp1 = topology_fingerprints(
+            app.world().resource::<MapData>(),
+            WorldSeed::new(42),
+            app.world().resource::<HexFaceTopology>(),
+        );
+
+        app.world_mut()
+            .resource_mut::<HexFaceDebugSettings>()
+            .profile = HexDeformationProfile::Organic;
+        app.update();
+        let fp2 = topology_fingerprints(
+            app.world().resource::<MapData>(),
+            WorldSeed::new(42),
+            app.world().resource::<HexFaceTopology>(),
+        );
+        assert_eq!(fp1.geometry, fp2.geometry);
+        assert_eq!(
+            app.world().resource::<HexFaceTopology>().stats.profile,
+            HexDeformationProfile::Subtle
+        );
+
+        app.world_mut()
+            .resource_mut::<TerrainConfig>()
+            .deformation_profile = HexDeformationProfile::Organic;
+        app.update();
+        let fp3 = topology_fingerprints(
+            app.world().resource::<MapData>(),
+            WorldSeed::new(42),
+            app.world().resource::<HexFaceTopology>(),
+        );
+        assert_ne!(fp1.geometry, fp3.geometry);
+        assert_eq!(
+            app.world().resource::<HexFaceTopology>().stats.profile,
+            HexDeformationProfile::Organic
+        );
+    }
 }

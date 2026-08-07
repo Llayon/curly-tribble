@@ -56,6 +56,7 @@ impl Plugin for FaceTopologyDebugPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HexFaceDebugSettings>()
             .init_resource::<HexFaceDebugCache>()
+            .init_resource::<HexFaceDebugComparisonTopology>()
             .add_systems(
                 Update,
                 toggle_debug_settings
@@ -102,11 +103,21 @@ pub fn apply_debug_shortcuts(
     }
 }
 
+#[derive(Resource, Debug, Clone, Default)]
+pub struct HexFaceDebugComparisonTopology {
+    pub last_inputs: Option<(u32, u32, HexDeformationProfile)>,
+    pub topology: HexFaceTopology,
+    pub cache: HexFaceDebugCache,
+}
+
 pub fn draw_face_topology_debug(
     mut gizmos: Gizmos,
     settings: Res<HexFaceDebugSettings>,
     cache: Res<HexFaceDebugCache>,
     topology: Res<HexFaceTopology>,
+    map_data: Res<crate::map::MapData>,
+    world_seed: Res<crate::map::WorldSeed>,
+    mut comp_topo: ResMut<HexFaceDebugComparisonTopology>,
     phase: Res<State<EditorPhase>>,
     game_state: Res<State<GameState>>,
 ) {
@@ -116,17 +127,42 @@ pub fn draw_face_topology_debug(
         return;
     }
 
+    let (active_topology, active_cache) = if settings.profile == topology.stats.profile {
+        (&*topology, &*cache)
+    } else {
+        #[allow(clippy::cast_possible_truncation)]
+        let key = (
+            world_seed.value(),
+            map_data.tiles.len() as u32,
+            settings.profile,
+        );
+        if comp_topo.last_inputs != Some(key) {
+            if let Ok(new_top) = crate::map::face_topology::generate_hex_face_topology_with_profile(
+                &map_data,
+                *world_seed,
+                settings.profile,
+            ) {
+                let mut new_cache = HexFaceDebugCache::default();
+                new_cache.rebuild(&new_top, &map_data);
+                comp_topo.topology = new_top;
+                comp_topo.cache = new_cache;
+                comp_topo.last_inputs = Some(key);
+            }
+        }
+        (&comp_topo.topology, &comp_topo.cache)
+    };
+
     if settings.show_regular_outlines {
-        draw_regular_outlines(&mut gizmos, &cache.regular_edges);
+        draw_regular_outlines(&mut gizmos, &active_cache.regular_edges);
     }
     if settings.show_warped_outlines {
-        draw_warped_outlines(&mut gizmos, &topology, &cache.edges);
+        draw_warped_outlines(&mut gizmos, active_topology, &active_cache.edges);
     }
     if settings.show_shared_vertices {
-        draw_shared_vertices(&mut gizmos, &topology, &cache.shared_vertices);
+        draw_shared_vertices(&mut gizmos, active_topology, &active_cache.shared_vertices);
     }
     if settings.show_half_edge_directions {
-        draw_half_edge_directions(&mut gizmos, &topology);
+        draw_half_edge_directions(&mut gizmos, active_topology);
     }
 }
 
