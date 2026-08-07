@@ -210,10 +210,10 @@ no measured reduction/fallback across the 256-seed stress.
 * **Нейтральные**: The diagnostic is intentionally hidden after Balance and
   does not project warped vertices onto Height3D.
 
-## Radial Blend Acceptance Contract Freeze (Commit 8 Finalization)
+## Radial Blend Acceptance Contract Freeze (Commit 10 Finalization)
 
 The production blend stabilization law `SIGN_AWARE_CEIL_RADIAL` is formally **CLOSED and FROZEN**.
-All 15 verification obligations, arithmetic totality proofs, precondition debug assertions with release guards, matrix audits ($13,416$ perturbations with incident-edge safety tracking, $3,072$ Stage 2 topologies with full 14-metric acceptance assertions), and insertion-order determinism tests are closed and hardened.
+All 15 verification obligations, arithmetic totality proofs, precondition debug assertions with release guards, matrix audits ($13,416$ perturbations with 100% executed incident-edge safety tracking, $3,072$ Stage 2 topologies with full 14-metric acceptance assertions), and insertion-order determinism tests are closed and hardened.
 
 ### Evidence Hierarchy
 
@@ -229,7 +229,7 @@ All 15 verification obligations, arithmetic totality proofs, precondition debug 
 
 2. **EXHAUSTIVE TESTED CONTRACTS**:
    - **Canonical 256-Seed Matrix Audit**: Verified across $1,024$ topology generation runs ($512$ raw, $512$ production). Raw vs production connectivity and logical edge sets match 100%. 256-seed total corrected corners equals historical expected count ($1,118$).
-   - **12-Way Perturbation & Incident-Edge Safety Audit**: Verified across ALL corrected corners ($13,416$ theoretical max cases: $1,118 \text{ corners} \times 12 \text{ perturbation classes}$) with explicit `assert_eq!(executed + skipped, 1_118 * 12)` reconciliation equality. Incident-edge dot products computed for all perturbed displacements demonstrate 0 newly created exact -1.0 edges and 0 transitions to $\le -0.9995$ from positive or raw $> -0.98$ dots.
+   - **12-Way Perturbation & Incident-Edge Safety Audit**: Verified across ALL corrected corners ($13,416$ theoretical max cases: $1,118 \text{ corners} \times 12 \text{ perturbation classes}$) with explicit `assert_eq!(skipped, 0)` and `assert_eq!(executed, 13_416)` execution proof. Incident-edge dot products computed for all perturbed displacements demonstrate 0 newly created exact -1.0 edges (`raw_dot.to_bits() != exact_m1_bits`) and 0 transitions to $\le -0.9995$ from non-near (`raw_dot > -0.9995`) or historical (`raw_dot > -0.98`) dots.
    - **Full Stage 2 6-Shape Matrix Audit**: Verified $3,072$ topologies ($2 \text{ profiles} \times 6 \text{ grid shapes} \times 256 \text{ seeds}$) with full `report.violations(criteria).is_empty()` assertions across all 14 acceptance metrics (`Organic`: angle $\le 162^\circ$, aspect $\ge 0.490$; `PagoniaLike`: angle $\le 176^\circ$, aspect $\ge 0.370$).
    - **Near-Antiparallel & Exact -1.0 Canonical Inventory**: Verified across all 256 seeds with threshold `-0.9995`. 0 positive-to-near-antiparallel transitions ($r\_dot > 0.0 \implies p\_dot > -0.9995$), 0 transitions from $r\_dot > -0.98$, and 0 newly created exact -1.0 edges (`newly_exact_m1 == 0`).
    - **Representative Tile Insertion-Order Determinism**: 100% bit-identical `geometry` and `connectivity` fingerprints across all 6 Stage 2 shapes $\times$ 8 representative seeds $\times$ 2 profiles under normal, reversed, and deterministic LCG-shuffled tile insertion orders.
