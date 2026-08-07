@@ -270,7 +270,7 @@ Candidate validation measured on canonical 40x40 map across 256 seeds per candid
 
 *Note*: Production selection (`1/64_len`) remains unchanged. Production minimum stabilized length ratios are Organic `995` (seed 189) and PagoniaLike `1004` (seed 112).
 
-## Radial Blend Acceptance Contract Freeze (Commit 6 Correction)
+## Radial Blend Acceptance Contract Freeze (Commit 8 Finalization)
 
 The production blend stabilization law `SIGN_AWARE_CEIL_RADIAL` is formally **CLOSED and FROZEN**.
 
@@ -285,9 +285,9 @@ cargo test --lib full_radial_stabilization_determinism_matrix
 ```
 
 ### Verified Evidence Summary
-1. **Preconditions & Mathematical Totality**: `scale_radial_component_q16` encodes production domain preconditions via `debug_assert!(denominator >= 1)` and `debug_assert!(target_floor >= 0)` and operates on `u128` intermediates, guaranteeing zero arithmetic overflow or truncation across all production bounds ($|wx| \le 15_729$, $L \le 245$, $W \ge 1$). Signed floor metrics satisfy $floor\_deficit\_q16 \le 0$ and $floor\_excess\_q16 \ge 0$ with 0 positive floor deficits proved via pure integer `isqrt`.
+1. **Preconditions & Pure Integer Math**: `scale_radial_component_q16` encodes production domain preconditions via `debug_assert!(denominator >= 1)` and `debug_assert!(target_floor >= 0)` (with defensive release guards `denominator <= 0 => 0`) and operates on `u128` intermediates. Signed floor metrics satisfy $floor\_deficit\_q16 \le 0$ proved via pure integer bit-shift `isqrt` (no `f64`).
 2. **Weight-Sum Invariant**: $correlated\_weight\_q16 + local\_weight\_q16 == 65\_536$ locked for all profiles.
-3. **Exhaustive Matrix Audits**: Canonical 256-seed audit ($1,024$ raw + prod runs, $1,118$ corrected corners), 12-way perturbation matrix ($13,416$ max cases with 100% reconciliation equality `executed + skipped == 1,118 * 12`), and Stage 2 matrix ($3,072$ topologies) passed with 100% compliance.
-4. **Adjacency & Determinism**: Near-antiparallel threshold `-0.9995` verified (0 transitions from positive or raw $> -0.98$ dots); 100% bit-identical `geometry` and `connectivity` fingerprints under repeated runs and tile key insertion-order variations.
+3. **Exhaustive Matrix Audits**: Canonical 256-seed audit ($1,024$ raw + prod runs, $1,118$ corrected corners), 12-way perturbation matrix ($13,416$ max cases with 100% reconciliation equality `executed + skipped == 1,118 * 12` and full incident-edge safety tracking), and Stage 2 matrix ($3,072$ topologies with 100% `violations(criteria).is_empty()`) passed with 100% compliance.
+4. **Adjacency & Determinism**: Near-antiparallel threshold `-0.9995` and exact -1.0 inventory verified (0 newly created exact -1.0 edges and 0 transitions from positive or raw $> -0.98$ dots); 100% bit-identical `geometry` and `connectivity` fingerprints under normal, reversed, and deterministic LCG-shuffled tile insertion orders.
 
 *Next Phase*: Development moves directly to `HexFaceTopology -> TerrainTopology` integration.
