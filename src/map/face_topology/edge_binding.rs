@@ -87,17 +87,27 @@ pub fn bind_cliff_edges(
             .get(&logical_edge.b)
             .ok_or(CliffBindingError::MissingFaceB(logical_edge))?;
 
-        let face_a_obj = &topology.faces[face_a.index()];
+        let face_a_obj = topology
+            .faces
+            .get(face_a.index())
+            .ok_or(CliffBindingError::MissingFaceA(logical_edge))?;
+        let _face_b_obj = topology
+            .faces
+            .get(face_b.index())
+            .ok_or(CliffBindingError::MissingFaceB(logical_edge))?;
 
         let mut matched_pair = None;
         let mut curr_he_id = face_a_obj.boundary;
         for _ in 0..6 {
-            let he_a = &topology.half_edges[curr_he_id.index()];
+            let Some(he_a) = topology.half_edges.get(curr_he_id.index()) else {
+                break;
+            };
             if let Some(twin_id) = he_a.twin {
-                let twin = &topology.half_edges[twin_id.index()];
-                if twin.incident_face == face_b {
-                    matched_pair = Some((curr_he_id, twin_id));
-                    break;
+                if let Some(twin) = topology.half_edges.get(twin_id.index()) {
+                    if twin.incident_face == face_b {
+                        matched_pair = Some((curr_he_id, twin_id));
+                        break;
+                    }
                 }
             }
             curr_he_id = he_a.next;
@@ -106,8 +116,14 @@ pub fn bind_cliff_edges(
         let (bound_he_a, bound_he_b) =
             matched_pair.ok_or(CliffBindingError::MissingAdjacency(logical_edge))?;
 
-        let he_a = &topology.half_edges[bound_he_a.index()];
-        let he_b = &topology.half_edges[bound_he_b.index()];
+        let he_a = topology
+            .half_edges
+            .get(bound_he_a.index())
+            .ok_or(CliffBindingError::MissingAdjacency(logical_edge))?;
+        let he_b = topology
+            .half_edges
+            .get(bound_he_b.index())
+            .ok_or(CliffBindingError::MissingAdjacency(logical_edge))?;
 
         if he_b.twin != Some(bound_he_a) {
             return Err(CliffBindingError::NonReciprocalTwin {

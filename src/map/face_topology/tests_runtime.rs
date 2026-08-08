@@ -3,6 +3,7 @@
 
 use bevy::prelude::*;
 
+#[allow(dead_code)]
 pub struct RuntimeTestsPlugin;
 
 impl Plugin for RuntimeTestsPlugin {

@@ -26,34 +26,35 @@ pub fn compute_cliff_gizmo_geometry(
     bound_edge: &BoundCliffEdge,
     topology: &HexFaceTopology,
 ) -> Result<CliffGizmoGeometry, CliffBindingError> {
-    if bound_edge.half_edge_a.index() >= topology.half_edges.len() {
-        return Err(CliffBindingError::MissingAdjacency(bound_edge.logical_edge));
-    }
-    let he_a = &topology.half_edges[bound_edge.half_edge_a.index()];
+    let he_a = topology
+        .half_edges
+        .get(bound_edge.half_edge_a.index())
+        .ok_or(CliffBindingError::MissingAdjacency(bound_edge.logical_edge))?;
 
-    if he_a.origin.index() >= topology.vertices.len()
-        || he_a.destination.index() >= topology.vertices.len()
-    {
-        return Err(CliffBindingError::MissingAdjacency(bound_edge.logical_edge));
-    }
+    let v_origin = topology
+        .vertices
+        .get(he_a.origin.index())
+        .ok_or(CliffBindingError::MissingAdjacency(bound_edge.logical_edge))?;
+    let v_dest = topology
+        .vertices
+        .get(he_a.destination.index())
+        .ok_or(CliffBindingError::MissingAdjacency(bound_edge.logical_edge))?;
 
-    let segment_start = topology.vertices[he_a.origin.index()].position;
-    let segment_end = topology.vertices[he_a.destination.index()].position;
-
-    if bound_edge.face_a.index() >= topology.faces.len()
-        || bound_edge.face_b.index() >= topology.faces.len()
-    {
-        return Err(CliffBindingError::MissingFaceA(bound_edge.logical_edge));
-    }
+    let segment_start = v_origin.position;
+    let segment_end = v_dest.position;
 
     let compute_face_center = |face_idx: usize| -> Result<Vec2, CliffBindingError> {
-        let face = &topology.faces[face_idx];
+        let face = topology
+            .faces
+            .get(face_idx)
+            .ok_or(CliffBindingError::MissingFaceA(bound_edge.logical_edge))?;
         let mut sum = Vec2::ZERO;
         for &vid in &face.vertices {
-            if vid.index() >= topology.vertices.len() {
-                return Err(CliffBindingError::MissingAdjacency(bound_edge.logical_edge));
-            }
-            sum += topology.vertices[vid.index()].position;
+            let v = topology
+                .vertices
+                .get(vid.index())
+                .ok_or(CliffBindingError::MissingAdjacency(bound_edge.logical_edge))?;
+            sum += v.position;
         }
         Ok(sum / 6.0)
     };

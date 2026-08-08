@@ -1,5 +1,6 @@
 use bevy::prelude::*;
 
+#[allow(dead_code)]
 pub struct EdgeBindingTestsPlugin;
 
 impl Plugin for EdgeBindingTestsPlugin {
@@ -15,28 +16,10 @@ mod tests {
     use crate::map::face_topology::edge_binding::{bind_cliff_edges, CliffBindingError};
     use crate::map::face_topology::generate_hex_face_topology_with_profile;
     use crate::map::face_topology::profiles::HexDeformationProfile;
+    use crate::map::face_topology::tests_quality_shared::shared as q;
+    use crate::map::generation::cliffs::generate_cliffs;
     use crate::map::HexCoord;
-
-    fn generate_test_shape(shape_id: usize) -> MapData {
-        let mut map = MapData::default();
-        let size = match shape_id {
-            0 => 1,
-            1 => 2,
-            2 => 3,
-            3 => 4,
-            4 => 5,
-            _ => 6,
-        };
-        for q in -size..=size {
-            for r in -size..=size {
-                let sum: i32 = q + r;
-                if sum.abs() <= size {
-                    map.tiles.insert(HexCoord::new(q, r), TileData::default());
-                }
-            }
-        }
-        map
-    }
+    use std::collections::HashMap;
 
     fn create_two_tile_map() -> MapData {
         let mut map = MapData::default();
@@ -76,8 +59,14 @@ mod tests {
             );
             assert_eq!(b.lower_side, CliffLowerSide::A);
 
-            let he_a = &topology.half_edges[b.half_edge_a.index()];
-            let he_b = &topology.half_edges[b.half_edge_b.index()];
+            let he_a = topology
+                .half_edges
+                .get(b.half_edge_a.index())
+                .expect("he_a missing");
+            let he_b = topology
+                .half_edges
+                .get(b.half_edge_b.index())
+                .expect("he_b missing");
 
             assert_eq!(he_a.incident_face, b.face_a);
             assert_eq!(he_b.incident_face, b.face_b);
@@ -89,10 +78,10 @@ mod tests {
     }
 
     #[test]
-    fn fail_fast_typed_error_on_missing_tile_or_face() {
+    fn fail_fast_typed_error_on_missing_tile_face_or_adjacency() {
         let map = create_two_tile_map();
         let seed = WorldSeed::new(42);
-        let topology =
+        let mut topology =
             generate_hex_face_topology_with_profile(&map, seed, HexDeformationProfile::Subtle)
                 .expect("Topology generation failed");
 
@@ -109,90 +98,158 @@ mod tests {
         let err =
             bind_cliff_edges(&invalid_map, &topology).expect_err("Should fail on missing tile");
         assert_eq!(err, CliffBindingError::MissingTileB(missing_edge));
+
+        let c2 = HexCoord::new(1, 0);
+        topology.hex_to_face.remove(&c2);
+        let edge = EdgeCoord::new(HexCoord::new(0, 0), c2);
+        let err2 = bind_cliff_edges(&map, &topology).expect_err("Should fail on missing face");
+        assert_eq!(err2, CliffBindingError::MissingFaceB(edge));
     }
 
     #[test]
-    fn insertion_order_determinism_holds() {
-        let mut map_a = MapData::default();
-        let mut map_b = MapData::default();
-        let coords = [
-            HexCoord::new(0, 0),
-            HexCoord::new(1, 0),
-            HexCoord::new(0, 1),
-        ];
+    fn tile_and_edge_insertion_order_determinism_normal_reverse_lcg() {
+        let mut map_normal = MapData::default();
+        let mut map_reverse = MapData::default();
+        let mut map_lcg = MapData::default();
+
+        let coords: Vec<_> = (0..5)
+            .flat_map(|q| (0..5).map(move |r| HexCoord::new(q, r)))
+            .collect();
 
         for &c in &coords {
-            map_a.tiles.insert(c, TileData::default());
-            map_b.tiles.insert(c, TileData::default());
+            map_normal.tiles.insert(c, TileData::default());
+        }
+        for &c in coords.iter().rev() {
+            map_reverse.tiles.insert(c, TileData::default());
+        }
+        let mut lcg_coords = coords.clone();
+        lcg_coords.sort_by_key(|c| {
+            c.q.unsigned_abs()
+                .wrapping_mul(1664525)
+                .wrapping_add(c.r.unsigned_abs().wrapping_mul(1013904223))
+                % 4294967291
+        });
+        for &c in &lcg_coords {
+            map_lcg.tiles.insert(c, TileData::default());
         }
 
-        let edges = [
-            (EdgeCoord::new(coords[0], coords[1]), CliffLowerSide::A),
-            (EdgeCoord::new(coords[0], coords[2]), CliffLowerSide::B),
-            (
-                EdgeCoord::new(coords[1], coords[2]),
-                CliffLowerSide::Unresolved,
-            ),
-        ];
-
-        for &(e, lower) in &edges {
-            map_a.edges.insert(
-                e,
-                EdgeData {
-                    edge_type: EdgeType::Cliff,
-                    cliff_lower_side: lower,
-                },
-            );
+        let mut edges = Vec::new();
+        for &c in &coords {
+            for n in c.neighbors() {
+                if coords.contains(&n) {
+                    edges.push(EdgeCoord::new(c, n));
+                }
+            }
         }
-        for &(e, lower) in edges.iter().rev() {
-            map_b.edges.insert(
-                e,
-                EdgeData {
-                    edge_type: EdgeType::Cliff,
-                    cliff_lower_side: lower,
-                },
-            );
+        edges.sort_by_key(|e| (e.a, e.b));
+        edges.dedup();
+
+        let edge_data = |e: EdgeCoord| -> EdgeData {
+            let lower = match (e.a.q + e.b.r).rem_euclid(3) {
+                0 => CliffLowerSide::Unresolved,
+                1 => CliffLowerSide::A,
+                _ => CliffLowerSide::B,
+            };
+            EdgeData {
+                edge_type: EdgeType::Cliff,
+                cliff_lower_side: lower,
+            }
+        };
+
+        for &e in &edges {
+            map_normal.edges.insert(e, edge_data(e));
+        }
+        for &e in edges.iter().rev() {
+            map_reverse.edges.insert(e, edge_data(e));
+        }
+        let mut lcg_edges = edges.clone();
+        lcg_edges.sort_by_key(|e| {
+            e.a.q
+                .unsigned_abs()
+                .wrapping_mul(1103515245)
+                .wrapping_add(e.b.r.unsigned_abs().wrapping_mul(12345))
+                % 2147483647
+        });
+        for &e in &lcg_edges {
+            map_lcg.edges.insert(e, edge_data(e));
         }
 
-        let seed = WorldSeed::new(100);
-        let top_a =
-            generate_hex_face_topology_with_profile(&map_a, seed, HexDeformationProfile::Organic)
-                .expect("Topology failed");
-        let top_b =
-            generate_hex_face_topology_with_profile(&map_b, seed, HexDeformationProfile::Organic)
-                .expect("Topology failed");
+        let seed = WorldSeed::new(42);
+        let top_normal = generate_hex_face_topology_with_profile(
+            &map_normal,
+            seed,
+            HexDeformationProfile::Subtle,
+        )
+        .unwrap();
+        let top_reverse = generate_hex_face_topology_with_profile(
+            &map_reverse,
+            seed,
+            HexDeformationProfile::Subtle,
+        )
+        .unwrap();
+        let top_lcg =
+            generate_hex_face_topology_with_profile(&map_lcg, seed, HexDeformationProfile::Subtle)
+                .unwrap();
 
-        let bound_a = bind_cliff_edges(&map_a, &top_a).expect("Binding failed");
-        let bound_b = bind_cliff_edges(&map_b, &top_b).expect("Binding failed");
+        let bound_normal = bind_cliff_edges(&map_normal, &top_normal).unwrap();
+        let bound_reverse = bind_cliff_edges(&map_reverse, &top_reverse).unwrap();
+        let bound_lcg = bind_cliff_edges(&map_lcg, &top_lcg).unwrap();
 
-        assert_eq!(bound_a, bound_b);
+        assert_eq!(bound_normal, bound_reverse);
+        assert_eq!(bound_normal, bound_lcg);
+    }
+
+    #[test]
+    fn generate_cliffs_insertion_order_determinism() {
+        let mut map_a = MapData::default();
+        let mut map_b = MapData::default();
+
+        let coords: Vec<_> = (0..6)
+            .flat_map(|q| (0..6).map(move |r| HexCoord::new(q, r)))
+            .collect();
+
+        for &c in &coords {
+            let mut tile = TileData::default();
+            if (c.q + c.r) % 3 == 0 {
+                tile.landscape_feature = crate::map::LandscapeFeature::Mountain;
+            }
+            map_a.tiles.insert(c, tile.clone());
+        }
+        for &c in coords.iter().rev() {
+            let mut tile = TileData::default();
+            if (c.q + c.r) % 3 == 0 {
+                tile.landscape_feature = crate::map::LandscapeFeature::Mountain;
+            }
+            map_b.tiles.insert(c, tile);
+        }
+
+        let distance_field: HashMap<HexCoord, u32> = coords
+            .iter()
+            .map(|&c| (c, (c.q.abs() + c.r.abs()) as u32))
+            .collect();
+
+        generate_cliffs(&mut map_a, &distance_field, 42);
+        generate_cliffs(&mut map_b, &distance_field, 42);
+
+        assert_eq!(map_a.edges, map_b.edges);
     }
 
     #[test]
     fn fast_144_case_cliff_binding_matrix() {
-        let profiles = [
-            HexDeformationProfile::Subtle,
-            HexDeformationProfile::Organic,
-            HexDeformationProfile::PagoniaLike,
-        ];
-        let shapes = 0..6usize;
-        let seeds = [1u32, 7, 42, 101, 169, 203, 500, 999];
-
-        let mut case_count = 0;
-
-        for &profile in &profiles {
-            for shape_id in shapes.clone() {
-                for &seed_val in &seeds {
-                    case_count += 1;
+        let mut cases = 0;
+        for (shape, map) in q::all_shapes() {
+            for seed_val in q::FAST_SEEDS {
+                for profile in q::all_profiles() {
+                    cases += 1;
                     let seed = WorldSeed::new(seed_val);
-                    let mut map = generate_test_shape(shape_id);
+                    let mut test_map = map.clone();
 
-                    let unique_coords: Vec<_> = map.tiles.keys().copied().collect();
+                    let unique_coords: Vec<_> = test_map.tiles.keys().copied().collect();
                     for &coord in &unique_coords {
                         for n in coord.neighbors() {
-                            if map.tiles.contains_key(&n) {
+                            if test_map.tiles.contains_key(&n) {
                                 let edge = EdgeCoord::new(coord, n);
-                                map.edges.entry(edge).or_insert(EdgeData {
+                                test_map.edges.entry(edge).or_insert(EdgeData {
                                     edge_type: EdgeType::Cliff,
                                     cliff_lower_side: if (coord.q + coord.r) % 2 == 0 {
                                         CliffLowerSide::A
@@ -204,15 +261,31 @@ mod tests {
                         }
                     }
 
-                    let topology = generate_hex_face_topology_with_profile(&map, seed, profile)
-                        .expect("Topology generation failed");
+                    let topology =
+                        generate_hex_face_topology_with_profile(&test_map, seed, profile)
+                            .expect("Topology generation failed");
 
-                    let bound =
-                        bind_cliff_edges(&map, &topology).expect("144-matrix edge binding failed");
+                    let bound = bind_cliff_edges(&test_map, &topology)
+                        .expect("144-matrix edge binding failed");
+
+                    if shape == "1x1" {
+                        assert_eq!(
+                            bound.edges.len(),
+                            0,
+                            "1x1 shape must have 0 bound cliff edges"
+                        );
+                    }
 
                     for b in &bound.edges {
-                        let he_a = &topology.half_edges[b.half_edge_a.index()];
-                        let he_b = &topology.half_edges[b.half_edge_b.index()];
+                        let he_a = topology
+                            .half_edges
+                            .get(b.half_edge_a.index())
+                            .expect("he_a missing");
+                        let he_b = topology
+                            .half_edges
+                            .get(b.half_edge_b.index())
+                            .expect("he_b missing");
+
                         assert_eq!(he_a.incident_face, b.face_a);
                         assert_eq!(he_b.incident_face, b.face_b);
                         assert_eq!(he_a.twin, Some(b.half_edge_b));
@@ -222,6 +295,6 @@ mod tests {
             }
         }
 
-        assert_eq!(case_count, 144);
+        assert_eq!(cases, 144);
     }
 }

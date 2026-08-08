@@ -140,7 +140,7 @@ pub fn regenerate_hex_face_topology(
             generation_state.last_successful_inputs = Some(inputs);
             generation_state.generation_count += 1;
         }
-        Err(_error) => {
+        Err(error) => {
             generation_state.failure_count += 1;
             if generation_state.last_successful_inputs.as_ref() != Some(&inputs) {
                 *topology = HexFaceTopology::default();
@@ -152,6 +152,7 @@ pub fn regenerate_hex_face_topology(
                 tiles = map_data.tiles.len(),
                 width = map_data.width,
                 height = map_data.height,
+                error = ?error,
                 "HexFaceTopology generation failed"
             );
         }
@@ -178,6 +179,7 @@ pub fn rebuild_bound_cliff_edges(
                 error = ?err,
                 "Failed to bind cliff edges to topology"
             );
+            *bound_cliff_edges = BoundCliffEdges::default();
         }
     }
 }
