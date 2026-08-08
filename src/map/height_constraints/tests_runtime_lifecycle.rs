@@ -170,4 +170,45 @@ mod tests {
             .generation_count;
         assert_eq!(gen2, gen1 + 1);
     }
+
+    #[test]
+    fn height_constraint_compilation_outcome_transitions_test() {
+        use crate::map::height_constraints::runtime::HeightConstraintCompilationOutcome;
+
+        let mut app = App::new();
+        app.add_plugins((
+            MinimalPlugins,
+            crate::map::face_topology::FaceTopologyPlugin,
+            crate::map::surface_topology::SurfaceTopologyPlugin,
+            crate::map::height_constraints::HeightConstraintsPlugin,
+        ));
+
+        let state = app.world().resource::<HeightConstraintCompilationState>();
+        assert_eq!(
+            state.last_outcome,
+            HeightConstraintCompilationOutcome::Uninitialized
+        );
+
+        let mut map = MapData::default();
+        let c1 = HexCoord::new(0, 0);
+        map.tiles.insert(
+            c1,
+            TileData {
+                landscape_feature: LandscapeFeature::Mountain,
+                ..Default::default()
+            },
+        );
+
+        app.add_message::<crate::map::GenerateMapEvent>()
+            .add_message::<crate::map::RebuildMeshEvent>()
+            .insert_resource(map)
+            .insert_resource(WorldSeed::new(42));
+
+        app.update();
+        let outcome1 = app
+            .world()
+            .resource::<HeightConstraintCompilationState>()
+            .last_outcome;
+        assert_eq!(outcome1, HeightConstraintCompilationOutcome::Success);
+    }
 }

@@ -39,11 +39,20 @@ impl HeightConstraintLogicalInputs {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HeightConstraintCompilationOutcome {
+    #[default]
+    Uninitialized,
+    Success,
+    Failure,
+}
+
 #[derive(Resource, Debug, Default)]
 pub struct HeightConstraintCompilationState {
     pub generation_count: u64,
     pub failure_count: u64,
     pub last_inputs: Option<HeightConstraintLogicalInputs>,
+    pub last_outcome: HeightConstraintCompilationOutcome,
 }
 
 #[allow(dead_code)]
@@ -94,9 +103,11 @@ pub fn regenerate_height_constraints(
                     );
                     *constraints = new_constraints;
                     state.generation_count += 1;
+                    state.last_outcome = HeightConstraintCompilationOutcome::Success;
                 }
                 Err(error) => {
                     state.failure_count += 1;
+                    state.last_outcome = HeightConstraintCompilationOutcome::Failure;
                     *constraints = HeightConstraintSet::default();
                     bevy::log::tracing::event!(
                         bevy::log::tracing::Level::ERROR,
@@ -108,6 +119,7 @@ pub fn regenerate_height_constraints(
         }
         Err(error) => {
             state.failure_count += 1;
+            state.last_outcome = HeightConstraintCompilationOutcome::Failure;
             *constraints = HeightConstraintSet::default();
             bevy::log::tracing::event!(
                 bevy::log::tracing::Level::ERROR,
