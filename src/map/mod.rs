@@ -41,7 +41,7 @@ pub use artifacts::{
 use bevy::prelude::*;
 pub use camps::{EnemyCamp, EnemyCampBundle};
 pub use data::{
-    EdgeCoord, EdgeData, EdgeDirection, EdgeType, ForestType, LandscapeFeature, MapData,
+    CliffLowerSide, EdgeCoord, EdgeData, EdgeType, ForestType, LandscapeFeature, MapData,
     TerrainType, TileData, WorldSeed, HEX_SIZE, MAX_HEIGHT,
 };
 pub use deposits::{DepositType, ResourceDeposit, ResourceDepositBundle};

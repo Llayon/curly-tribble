@@ -1,7 +1,7 @@
 use crate::game_state::{CurrentTool, EditorPhase, LandscapeTool};
 use crate::map::tools::utils::get_mouse_world_pos;
 use crate::map::{
-    EdgeCoord, EdgeDirection, EdgeType, HexCoord, LandscapeFeature, MapData, RebuildMeshEvent,
+    CliffLowerSide, EdgeCoord, EdgeType, HexCoord, LandscapeFeature, MapData, RebuildMeshEvent,
     HEX_SIZE,
 };
 use bevy::prelude::*;
@@ -76,12 +76,12 @@ pub fn handle_landscape_tools(
                             let mut new_data = data;
                             if data.edge_type == EdgeType::Flat {
                                 new_data.edge_type = EdgeType::Cliff;
-                                new_data.direction = EdgeDirection::Normal;
+                                new_data.cliff_lower_side = CliffLowerSide::Unresolved;
                             } else {
-                                new_data.direction = if data.direction == EdgeDirection::Normal {
-                                    EdgeDirection::Reversed
-                                } else {
-                                    EdgeDirection::Normal
+                                new_data.cliff_lower_side = match data.cliff_lower_side {
+                                    CliffLowerSide::Unresolved => CliffLowerSide::A,
+                                    CliffLowerSide::A => CliffLowerSide::B,
+                                    CliffLowerSide::B => CliffLowerSide::Unresolved,
                                 };
                             }
                             map_data.edges.insert(edge, new_data);

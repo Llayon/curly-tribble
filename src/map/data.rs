@@ -133,16 +133,17 @@ pub enum EdgeType {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
-pub enum EdgeDirection {
+pub enum CliffLowerSide {
     #[default]
-    Normal,
-    Reversed,
+    Unresolved,
+    A,
+    B,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
 pub struct EdgeData {
     pub edge_type: EdgeType,
-    pub direction: EdgeDirection,
+    pub cliff_lower_side: CliffLowerSide,
 }
 
 #[derive(Resource, Default, Clone)]

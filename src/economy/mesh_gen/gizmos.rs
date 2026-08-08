@@ -1,5 +1,5 @@
 use crate::map::{
-    EdgeDirection, EdgeType, EnemyCamp, ForestType, MapData, PoiType, PointOfInterest, HEX_SIZE,
+    CliffLowerSide, EdgeType, EnemyCamp, ForestType, MapData, PoiType, PointOfInterest, HEX_SIZE,
 };
 use bevy::prelude::*;
 
@@ -30,29 +30,41 @@ pub fn draw_cliffs_gizmos(
             let start = midpoint - perp * edge_half_len;
             let end = midpoint + perp * edge_half_len;
             gizmos.line(start + Vec3::Y * y, end + Vec3::Y * y, Color::WHITE);
-            let arrow_dir = if data.direction == EdgeDirection::Normal {
-                dir
-            } else {
-                -dir
+
+            let draw_arrow = |g: &mut Gizmos, d: Vec3| {
+                let arrow_base = midpoint + d * 0.15;
+                let arrow_tip = midpoint + d * 0.35;
+                g.line(
+                    arrow_base + Vec3::Y * y,
+                    arrow_tip + Vec3::Y * y,
+                    Color::BLACK,
+                );
+                let head_left = arrow_tip - d * 0.1 + perp * 0.08;
+                let head_right = arrow_tip - d * 0.1 - perp * 0.08;
+                g.line(
+                    arrow_tip + Vec3::Y * y,
+                    head_left + Vec3::Y * y,
+                    Color::BLACK,
+                );
+                g.line(
+                    arrow_tip + Vec3::Y * y,
+                    head_right + Vec3::Y * y,
+                    Color::BLACK,
+                );
             };
-            let arrow_base = midpoint + arrow_dir * 0.15;
-            let arrow_tip = midpoint + arrow_dir * 0.35;
-            gizmos.line(
-                midpoint + Vec3::Y * y,
-                arrow_tip + Vec3::Y * y,
-                Color::WHITE,
-            );
-            let arrow_perp = Vec3::new(-arrow_dir.z, 0.0, arrow_dir.x) * 0.1;
-            gizmos.line(
-                arrow_tip + Vec3::Y * y,
-                (arrow_base + arrow_perp) + Vec3::Y * y,
-                Color::WHITE,
-            );
-            gizmos.line(
-                arrow_tip + Vec3::Y * y,
-                (arrow_base - arrow_perp) + Vec3::Y * y,
-                Color::WHITE,
-            );
+
+            match data.cliff_lower_side {
+                CliffLowerSide::Unresolved => {
+                    draw_arrow(&mut gizmos, dir);
+                    draw_arrow(&mut gizmos, -dir);
+                }
+                CliffLowerSide::A => {
+                    draw_arrow(&mut gizmos, -dir);
+                }
+                CliffLowerSide::B => {
+                    draw_arrow(&mut gizmos, dir);
+                }
+            }
         }
     }
 }
