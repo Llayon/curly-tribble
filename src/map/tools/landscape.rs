@@ -9,7 +9,9 @@ use bevy::prelude::*;
 pub struct LandscapeToolPlugin;
 
 impl Plugin for LandscapeToolPlugin {
-    fn build(&self, _app: &mut App) {}
+    fn build(&self, app: &mut App) {
+        app.init_resource::<super::landscape_edge_picker::LandscapeEdgePickIndex>();
+    }
 }
 
 pub fn handle_landscape_tools(

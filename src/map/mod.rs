@@ -118,6 +118,7 @@ impl Plugin for MapPlugin {
             >::default())
             .add_message::<GenerateMapEvent>()
             .add_message::<RebuildMeshEvent>()
+            .init_resource::<tools::LandscapeEdgePickIndex>()
             .add_plugins((
                 zoning::ZoningPlugin,
                 resources::ResourcesPlugin,
@@ -178,6 +179,9 @@ impl Plugin for MapPlugin {
                         .run_if(state_changed::<crate::game_state::EditorPhase>)
                         .in_set(GameSet::Logic),
                     systems::handle_rebuild_mesh
+                        .in_set(GameSet::Visuals)
+                        .after(face_topology::runtime::regenerate_hex_face_topology),
+                    tools::rebuild_landscape_edge_pick_index
                         .in_set(GameSet::Visuals)
                         .after(face_topology::runtime::regenerate_hex_face_topology),
                 ),
