@@ -108,7 +108,7 @@ pub struct TileData {
     pub landscape_feature: LandscapeFeature,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Reflect)]
 pub struct EdgeCoord {
     pub a: HexCoord,
     pub b: HexCoord,

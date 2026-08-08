@@ -12,6 +12,7 @@ pub mod export;
 pub mod face_topology;
 pub mod factions;
 pub mod height_constraints;
+pub mod height_graph;
 pub mod hex_math;
 pub mod mines;
 pub mod navigation;
@@ -132,6 +133,7 @@ impl Plugin for MapPlugin {
                 face_topology::FaceTopologyPlugin,
                 surface_topology::SurfaceTopologyPlugin,
                 height_constraints::HeightConstraintsPlugin,
+                height_graph::HeightGraphPlugin,
                 crate::economy::mesh_gen::MeshGenPlugin,
                 river_gen::RiverGenPlugin,
                 terrain_gen::TerrainGenPlugin,
