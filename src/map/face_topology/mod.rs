@@ -33,6 +33,8 @@ mod tests_compat;
 #[cfg(test)]
 mod tests_debug;
 #[cfg(test)]
+mod tests_edge_binding;
+#[cfg(test)]
 mod tests_integration;
 #[cfg(test)]
 mod tests_mutation;
@@ -48,6 +50,8 @@ mod tests_quality_blend_direction;
 pub(crate) mod tests_quality_shared;
 #[cfg(test)]
 mod tests_quality_stress;
+#[cfg(test)]
+mod tests_runtime;
 #[cfg(test)]
 mod tests_stress;
 

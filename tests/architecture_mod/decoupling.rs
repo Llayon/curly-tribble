@@ -49,3 +49,20 @@ fn check_decoupling_recursive(dir: &Path) {
         }
     }
 }
+
+/// Architecture Guard: Enforces that cliff gizmo visualization relies ONLY on authoritative HexFaceTopology,
+/// forbidding HEX_SIZE, EdgeDirection, to_world, .sin(), and .cos() in src/economy/mesh_gen/cliff_gizmos.rs.
+#[test]
+fn test_cliff_gizmos_authoritative_topology_decoupling() {
+    let sniffer = CodeSniffer::new("src/economy/mesh_gen/cliff_gizmos.rs");
+    let code = sniffer.clean;
+
+    let forbidden = ["HEX_SIZE", "EdgeDirection", "to_world", ".sin()", ".cos()"];
+
+    for item in forbidden {
+        assert!(
+            !code.contains(item),
+            "Cliff Gizmos Architecture Violation: cliff_gizmos.rs must not contain '{item}'. Geometry must come purely from HexFaceTopology."
+        );
+    }
+}

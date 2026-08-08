@@ -6,6 +6,8 @@ pub mod gizmos;
 pub mod treasures;
 
 #[cfg(test)]
+mod tests_cliff_gizmos;
+#[cfg(test)]
 mod tests_overlay;
 
 use crate::game_state::EditorPhase;
