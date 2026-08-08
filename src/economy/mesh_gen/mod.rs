@@ -1,5 +1,6 @@
 // src/economy/mesh_gen/mod.rs
 pub mod billboards;
+pub mod cliff_gizmos;
 pub mod generator;
 pub mod gizmos;
 pub mod treasures;
@@ -27,6 +28,7 @@ impl Plugin for MeshGenPlugin {
         app.init_resource::<GeneratedMapAssets>()
             .add_plugins((
                 billboards::BillboardPlugin,
+                cliff_gizmos::CliffGizmosPlugin,
                 generator::MeshGeneratorPlugin,
                 gizmos::GizmosPlugin,
                 treasures::TreasureMeshPlugin,
@@ -36,9 +38,11 @@ impl Plugin for MeshGenPlugin {
                 (
                     gizmos::draw_hex_grid_gizmos,
                     gizmos::draw_factions_gizmos.run_if(in_state(EditorPhase::Factions)),
-                    gizmos::draw_cliffs_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
-                        *phase.get() >= EditorPhase::Landscape
-                    }),
+                    cliff_gizmos::draw_cliffs_gizmos
+                        .after(crate::map::face_topology::runtime::rebuild_bound_cliff_edges)
+                        .run_if(|phase: Res<State<EditorPhase>>| {
+                            *phase.get() >= EditorPhase::Landscape
+                        }),
                     gizmos::draw_forest_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
                         *phase.get() >= EditorPhase::Sediments
                     }),
