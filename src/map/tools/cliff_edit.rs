@@ -30,6 +30,32 @@ pub struct LandscapeEdgeHit {
     pub distance_squared: f32,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CliffStrokeMode {
+    PaintUnresolved,
+    OrientExisting,
+    Erase,
+}
+
+#[derive(Resource, Default, Debug, Clone)]
+pub struct CliffStrokeState {
+    pub active: bool,
+    pub mode: Option<CliffStrokeMode>,
+    pub previous_accepted_edge: Option<EdgeCoord>,
+    pub previous_accepted_vertices: Option<[VertexId; 2]>,
+    pub visited_edges: std::collections::HashSet<EdgeCoord>,
+}
+
+impl CliffStrokeState {
+    pub fn reset(&mut self) {
+        self.active = false;
+        self.mode = None;
+        self.previous_accepted_edge = None;
+        self.previous_accepted_vertices = None;
+        self.visited_edges.clear();
+    }
+}
+
 #[allow(clippy::similar_names)]
 pub fn apply_single_cliff_click(
     map_data: &mut MapData,
@@ -163,8 +189,8 @@ pub fn pick_landscape_edge(
     hits.into_iter().next()
 }
 
-#[allow(clippy::similar_names)]
-pub fn handle_single_click_cliff_tools(
+#[allow(clippy::similar_names, clippy::too_many_lines)]
+pub fn handle_cliff_tools(
     mouse: Res<ButtonInput<MouseButton>>,
     q_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
     q_window: Query<&Window, With<bevy::window::PrimaryWindow>>,
@@ -172,31 +198,148 @@ pub fn handle_single_click_cliff_tools(
     mut map_data: ResMut<MapData>,
     current_tool: Res<CurrentTool>,
     phase: Res<State<EditorPhase>>,
+    mut stroke_state: ResMut<CliffStrokeState>,
     mut hovered: ResMut<HoveredCliffEdge>,
 ) {
     if *phase.get() != EditorPhase::Landscape || current_tool.landscape != LandscapeTool::Cliff {
+        if stroke_state.active {
+            stroke_state.reset();
+        }
         if hovered.edge.is_some() {
             *hovered = HoveredCliffEdge::default();
         }
         return;
     }
 
+    let is_lmb_pressed = mouse.pressed(MouseButton::Left);
+    let is_rmb_pressed = mouse.pressed(MouseButton::Right);
+
+    if !is_lmb_pressed && !is_rmb_pressed && stroke_state.active {
+        stroke_state.reset();
+    }
+
     let Some(world_pos) = get_mouse_world_pos(&q_camera, &q_window) else {
         *hovered = HoveredCliffEdge::default();
         return;
     };
+    let cursor_xz = world_pos.xz();
 
-    let current_hit = pick_landscape_edge(world_pos.xz(), &pick_index);
+    let current_hit = pick_landscape_edge(cursor_xz, &pick_index);
+
     if let Some(ref hit) = current_hit {
         hovered.edge = Some(hit.logical_edge);
         hovered.side = hit.side;
-
-        let is_lmb = mouse.just_pressed(MouseButton::Left);
-        let is_rmb = mouse.just_pressed(MouseButton::Right);
-        if is_lmb || is_rmb {
-            apply_single_cliff_click(&mut map_data, hit, is_lmb, is_rmb);
-        }
     } else {
         *hovered = HoveredCliffEdge::default();
+    }
+
+    let is_lmb_just_pressed = mouse.just_pressed(MouseButton::Left);
+    let is_rmb_just_pressed = mouse.just_pressed(MouseButton::Right);
+
+    if (is_lmb_just_pressed || is_rmb_just_pressed) && !stroke_state.active {
+        if let Some(ref hit) = current_hit {
+            stroke_state.active = true;
+            stroke_state.visited_edges.insert(hit.logical_edge);
+            stroke_state.previous_accepted_edge = Some(hit.logical_edge);
+            stroke_state.previous_accepted_vertices = Some(hit.vertices);
+
+            if is_rmb_just_pressed {
+                stroke_state.mode = Some(CliffStrokeMode::Erase);
+                map_data.edges.remove(&hit.logical_edge);
+            } else {
+                let current_data = map_data
+                    .edges
+                    .get(&hit.logical_edge)
+                    .copied()
+                    .unwrap_or_default();
+                if current_data.edge_type == EdgeType::Flat {
+                    stroke_state.mode = Some(CliffStrokeMode::PaintUnresolved);
+                    map_data.edges.insert(
+                        hit.logical_edge,
+                        EdgeData {
+                            edge_type: EdgeType::Cliff,
+                            cliff_lower_side: CliffLowerSide::Unresolved,
+                        },
+                    );
+                } else {
+                    stroke_state.mode = Some(CliffStrokeMode::OrientExisting);
+                    if let Some(side) = hit.side {
+                        let new_lower = match side {
+                            LogicalEdgeSide::A => CliffLowerSide::A,
+                            LogicalEdgeSide::B => CliffLowerSide::B,
+                        };
+                        map_data.edges.insert(
+                            hit.logical_edge,
+                            EdgeData {
+                                edge_type: EdgeType::Cliff,
+                                cliff_lower_side: new_lower,
+                            },
+                        );
+                    }
+                }
+            }
+        }
+    } else if stroke_state.active && (is_lmb_pressed || is_rmb_pressed) {
+        if let Some(ref hit) = current_hit {
+            if !stroke_state.visited_edges.contains(&hit.logical_edge) {
+                if let Some(prev_v) = stroke_state.previous_accepted_vertices {
+                    let is_connected = hit.vertices[0] == prev_v[0]
+                        || hit.vertices[0] == prev_v[1]
+                        || hit.vertices[1] == prev_v[0]
+                        || hit.vertices[1] == prev_v[1];
+
+                    if is_connected {
+                        stroke_state.visited_edges.insert(hit.logical_edge);
+                        stroke_state.previous_accepted_edge = Some(hit.logical_edge);
+                        stroke_state.previous_accepted_vertices = Some(hit.vertices);
+
+                        match stroke_state.mode {
+                            Some(CliffStrokeMode::Erase) => {
+                                map_data.edges.remove(&hit.logical_edge);
+                            }
+                            Some(CliffStrokeMode::PaintUnresolved) => {
+                                let current_data = map_data
+                                    .edges
+                                    .get(&hit.logical_edge)
+                                    .copied()
+                                    .unwrap_or_default();
+                                if current_data.edge_type == EdgeType::Flat {
+                                    map_data.edges.insert(
+                                        hit.logical_edge,
+                                        EdgeData {
+                                            edge_type: EdgeType::Cliff,
+                                            cliff_lower_side: CliffLowerSide::Unresolved,
+                                        },
+                                    );
+                                }
+                            }
+                            Some(CliffStrokeMode::OrientExisting) => {
+                                let current_data = map_data
+                                    .edges
+                                    .get(&hit.logical_edge)
+                                    .copied()
+                                    .unwrap_or_default();
+                                if current_data.edge_type == EdgeType::Cliff {
+                                    if let Some(side) = hit.side {
+                                        let new_lower = match side {
+                                            LogicalEdgeSide::A => CliffLowerSide::A,
+                                            LogicalEdgeSide::B => CliffLowerSide::B,
+                                        };
+                                        map_data.edges.insert(
+                                            hit.logical_edge,
+                                            EdgeData {
+                                                edge_type: EdgeType::Cliff,
+                                                cliff_lower_side: new_lower,
+                                            },
+                                        );
+                                    }
+                                }
+                            }
+                            None => {}
+                        }
+                    }
+                }
+            }
+        }
     }
 }
