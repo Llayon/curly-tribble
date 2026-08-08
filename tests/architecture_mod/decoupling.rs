@@ -192,3 +192,51 @@ fn test_production_terrain_routes_through_surface_topology() {
         "Production Terrain Bypass Violation in systems.rs: handle_rebuild_mesh must not call legacy derive_terrain_topology directly."
     );
 }
+
+/// Architecture Guard: Enforces that HeightConstraint compilation modules rely ONLY on MapData intent and SurfaceTopology identity/connectivity,
+/// forbidding TerrainTopology, derive_terrain_topology, terrain_adapter, topology_adapter, compute_vertex_heights, MAX_HEIGHT, .elevation, HEX_SIZE, from_world, to_world, Vec2, .position, .sin(), .cos(), face_topology, HexFaceTopology, MapVertex, BoundCliffEdges, SurfaceVertexSource, RebuildMeshEvent.
+#[test]
+fn test_height_constraints_decoupling() {
+    let files = [
+        "src/map/height_constraints/types.rs",
+        "src/map/height_constraints/compiler.rs",
+        "src/map/height_constraints/validation.rs",
+        "src/map/height_constraints/runtime.rs",
+    ];
+
+    let forbidden = [
+        "TerrainTopology",
+        "derive_terrain_topology",
+        "terrain_adapter",
+        "topology_adapter",
+        "compute_vertex_heights",
+        "MAX_HEIGHT",
+        ".elevation",
+        "HEX_SIZE",
+        "from_world",
+        "to_world(",
+        "Vec2",
+        ".position",
+        ".sin()",
+        ".cos()",
+        "HexFace",
+        "HexFaceTopology",
+        "map::face_topology",
+        "MapVertex",
+        "BoundCliffEdges",
+        "SurfaceVertexSource",
+        "RebuildMeshEvent",
+    ];
+
+    for file in files {
+        let sniffer = CodeSniffer::new(file);
+        let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+        for item in forbidden {
+            assert!(
+                !code_no_tests.contains(item),
+                "HeightConstraint Architecture Violation in {file}: code must not contain '{item}'."
+            );
+        }
+    }
+}
