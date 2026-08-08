@@ -131,6 +131,7 @@ impl Plugin for MapPlugin {
                 topology::TopologyPlugin,
                 face_topology::FaceTopologyPlugin,
                 surface_topology::SurfaceTopologyPlugin,
+                height_constraints::HeightConstraintsPlugin,
                 crate::economy::mesh_gen::MeshGenPlugin,
                 river_gen::RiverGenPlugin,
                 terrain_gen::TerrainGenPlugin,

@@ -27,13 +27,46 @@ pub fn validate_height_constraint_set(
     map_data: &MapData,
     surface: &SurfaceTopology,
 ) -> Result<(), HeightConstraintCompileError> {
-    if surface.vertices.is_empty() || surface.faces.is_empty() {
+    let has_authored_features = map_data
+        .tiles
+        .values()
+        .any(|t| t.landscape_feature != LandscapeFeature::None);
+    let has_authored_cliffs = map_data
+        .edges
+        .values()
+        .any(|e| e.edge_type == EdgeType::Cliff);
+
+    if !has_authored_features && !has_authored_cliffs {
         if constraints.regions.is_empty() && constraints.cliffs.is_empty() {
             return Ok(());
         }
         return Err(HeightConstraintCompileError::UnauthoredRegionConstraint(
             crate::map::HexCoord::new(0, 0),
         ));
+    }
+
+    if surface.vertices.is_empty() || surface.faces.is_empty() {
+        if let Some(&first_hex) = map_data
+            .tiles
+            .iter()
+            .find(|(_, t)| t.landscape_feature != LandscapeFeature::None)
+            .map(|(h, _)| h)
+        {
+            return Err(HeightConstraintCompileError::MissingSurfaceRegion(
+                first_hex,
+            ));
+        }
+        if let Some(&first_edge) = map_data
+            .edges
+            .iter()
+            .find(|(_, e)| e.edge_type == EdgeType::Cliff)
+            .map(|(e, _)| e)
+        {
+            return Err(HeightConstraintCompileError::MissingSurfaceBoundary(
+                first_edge,
+            ));
+        }
+        return Ok(());
     }
 
     let mut expected_regions = HashMap::new();

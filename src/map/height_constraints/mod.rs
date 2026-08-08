@@ -37,3 +37,6 @@ mod tests_regions;
 
 #[cfg(test)]
 mod tests_runtime;
+
+#[cfg(test)]
+mod tests_runtime_lifecycle;

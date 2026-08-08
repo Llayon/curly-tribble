@@ -240,3 +240,15 @@ fn test_height_constraints_decoupling() {
         }
     }
 }
+
+/// Architecture Guard: Enforces that MapPlugin registers HeightConstraintsPlugin in production.
+#[test]
+fn test_production_map_plugin_registers_height_constraints() {
+    let sniffer = CodeSniffer::new("src/map/mod.rs");
+    let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+    assert!(
+        code_no_tests.contains("height_constraints::HeightConstraintsPlugin"),
+        "Production Plugin Registration Violation in src/map/mod.rs: MapPlugin must register HeightConstraintsPlugin."
+    );
+}

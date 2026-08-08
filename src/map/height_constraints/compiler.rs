@@ -27,7 +27,40 @@ pub fn compile_height_constraints(
     map_data: &MapData,
     surface: &SurfaceTopology,
 ) -> Result<HeightConstraintSet, HeightConstraintCompileError> {
+    let has_authored_features = map_data
+        .tiles
+        .values()
+        .any(|t| t.landscape_feature != LandscapeFeature::None);
+    let has_authored_cliffs = map_data
+        .edges
+        .values()
+        .any(|e| e.edge_type == EdgeType::Cliff);
+
+    if !has_authored_features && !has_authored_cliffs {
+        return Ok(HeightConstraintSet::default());
+    }
+
     if surface.vertices.is_empty() || surface.faces.is_empty() {
+        if let Some(&first_hex) = map_data
+            .tiles
+            .iter()
+            .find(|(_, t)| t.landscape_feature != LandscapeFeature::None)
+            .map(|(h, _)| h)
+        {
+            return Err(HeightConstraintCompileError::MissingSurfaceRegion(
+                first_hex,
+            ));
+        }
+        if let Some(&first_edge) = map_data
+            .edges
+            .iter()
+            .find(|(_, e)| e.edge_type == EdgeType::Cliff)
+            .map(|(e, _)| e)
+        {
+            return Err(HeightConstraintCompileError::MissingSurfaceBoundary(
+                first_edge,
+            ));
+        }
         return Ok(HeightConstraintSet::default());
     }
 
@@ -37,7 +70,10 @@ pub fn compile_height_constraints(
     let mut regions = Vec::new();
 
     for hex in sorted_coords {
-        let tile = &map_data.tiles[&hex];
+        let tile = map_data
+            .tiles
+            .get(&hex)
+            .ok_or(HeightConstraintCompileError::MissingSurfaceRegion(hex))?;
         let intent = match tile.landscape_feature {
             LandscapeFeature::Mountain => RegionHeightIntent::Mountain,
             LandscapeFeature::Plateau => RegionHeightIntent::Plateau,

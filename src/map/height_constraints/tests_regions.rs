@@ -149,4 +149,24 @@ mod tests {
 
         assert_eq!(constraints1, constraints2);
     }
+
+    #[test]
+    fn mountain_and_cliff_with_empty_surface_returns_typed_error() {
+        let mut map = MapData::default();
+        let c1 = HexCoord::new(0, 0);
+        map.tiles.insert(
+            c1,
+            TileData {
+                landscape_feature: LandscapeFeature::Mountain,
+                ..Default::default()
+            },
+        );
+
+        let empty_surface = crate::map::surface_topology::types::SurfaceTopology::default();
+        let err = compile_height_constraints(&map, &empty_surface).unwrap_err();
+        assert_eq!(
+            err,
+            crate::map::height_constraints::types::HeightConstraintCompileError::MissingSurfaceRegion(c1)
+        );
+    }
 }
