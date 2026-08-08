@@ -266,17 +266,13 @@ mod tests {
         );
         assert!(max_y > min_y, "Test 5: Height3D Y range non-zero");
 
-        let face_topo = crate::map::face_topology::generate_hex_face_topology_with_profile(
-            &map,
-            crate::map::WorldSeed::new(42),
-            crate::map::face_topology::profiles::HexDeformationProfile::Subtle,
-        )
-        .unwrap();
-
+        use crate::map::face_topology::generate_hex_face_topology_with_profile as gen_ft;
+        use crate::map::face_topology::profiles::HexDeformationProfile as HDP;
+        let ft = gen_ft(&map, crate::map::WorldSeed::new(42), HDP::Subtle).unwrap();
         let (mesh, _, _) = crate::economy::mesh_gen::generator::create_global_map_meshes(
             &map,
             &top_h,
-            &face_topo,
+            &ft,
             EditorPhase::Height3D,
             &default(),
             &default(),

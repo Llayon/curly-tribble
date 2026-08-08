@@ -40,7 +40,7 @@ mod tests_quality_blend;
 #[cfg(test)]
 mod tests_quality_blend_direction;
 #[cfg(test)]
-mod tests_quality_shared;
+pub(crate) mod tests_quality_shared;
 #[cfg(test)]
 mod tests_quality_stress;
 #[cfg(test)]

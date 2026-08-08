@@ -4,6 +4,9 @@ pub mod generator;
 pub mod gizmos;
 pub mod treasures;
 
+#[cfg(test)]
+mod tests_overlay;
+
 use crate::game_state::EditorPhase;
 use crate::map::zoning::{GlobalTerrainBundle, Roof, WaterBundle};
 use crate::map::{MapData, MapEntity, MapVisualEntity};
