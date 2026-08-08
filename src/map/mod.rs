@@ -21,6 +21,7 @@ pub mod resources;
 pub mod river_gen;
 pub mod roads;
 pub mod subhex;
+pub mod surface_topology;
 pub mod terrain_gen;
 pub mod topology;
 pub mod topology_adapter;
@@ -85,6 +86,7 @@ pub struct RebuildMeshEvent;
 pub struct MapPlugin;
 
 impl Plugin for MapPlugin {
+    #[allow(clippy::too_many_lines)]
     fn build(&self, app: &mut App) {
         let config = TerrainConfig::default();
         app.insert_resource(TerrainGenerator::new(config.seed))
@@ -127,6 +129,7 @@ impl Plugin for MapPlugin {
                 visibility::VisibilityPlugin,
                 topology::TopologyPlugin,
                 face_topology::FaceTopologyPlugin,
+                surface_topology::SurfaceTopologyPlugin,
                 crate::economy::mesh_gen::MeshGenPlugin,
                 river_gen::RiverGenPlugin,
                 terrain_gen::TerrainGenPlugin,
