@@ -233,8 +233,11 @@ mod debug_tests {
             .insert_resource(Assets::<StandardMaterial>::default())
             .init_resource::<TerrainConfig>()
             .init_resource::<HexFaceTopology>()
+            .init_resource::<crate::map::surface_topology::types::SurfaceTopology>()
             .init_resource::<HexFaceDebugCache>()
             .init_resource::<HexFaceTopologyGenerationState>()
+            .init_resource::<crate::map::surface_topology::runtime::SurfaceTopologyGenerationState>(
+            )
             .add_message::<GenerateMapEvent>()
             .add_message::<RebuildMeshEvent>()
             .add_systems(
@@ -242,6 +245,7 @@ mod debug_tests {
                 (
                     monitor_inspector_triggers.run_if(resource_changed::<TerrainConfig>),
                     regenerate_hex_face_topology,
+                    crate::map::surface_topology::runtime::regenerate_surface_topology,
                     handle_rebuild_mesh,
                 )
                     .chain(),

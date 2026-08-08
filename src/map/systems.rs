@@ -113,6 +113,7 @@ pub fn handle_rebuild_mesh(
     q_map_entities: Query<Entity, With<MapVisualEntity>>,
     map_data: Res<MapData>,
     face_topology: Res<crate::map::face_topology::types::HexFaceTopology>,
+    surface_topology: Res<crate::map::surface_topology::types::SurfaceTopology>,
     faction_manager: Res<FactionManager>,
     config: Res<TerrainConfig>,
     phase: Res<State<EditorPhase>>,
@@ -121,7 +122,17 @@ pub fn handle_rebuild_mesh(
         return;
     }
 
-    match crate::map::topology::derive_terrain_topology(&map_data, &face_topology) {
+    if !map_data.tiles.is_empty()
+        && (face_topology.faces.is_empty() || surface_topology.faces.is_empty())
+    {
+        bevy::log::tracing::event!(
+            bevy::log::tracing::Level::ERROR,
+            "Cannot rebuild mesh: map is non-empty but topology generation failed"
+        );
+        return;
+    }
+
+    match crate::map::surface_topology::derive_terrain_topology_from_surface(&surface_topology) {
         Ok(derived_topology) => {
             for entity in &q_map_entities {
                 commands.entity(entity).despawn();
@@ -139,7 +150,7 @@ pub fn handle_rebuild_mesh(
             bevy::log::tracing::event!(
                 bevy::log::tracing::Level::ERROR,
                 error = ?err,
-                "Failed to derive terrain topology from HexFaceTopology"
+                "Failed to derive terrain topology from SurfaceTopology"
             );
         }
     }
@@ -243,6 +254,7 @@ mod tests {
             .insert_resource(FactionManager::default())
             .insert_resource(TerrainConfig::default())
             .init_resource::<crate::map::face_topology::types::HexFaceTopology>()
+            .init_resource::<crate::map::surface_topology::types::SurfaceTopology>()
             .insert_resource(State::new(EditorPhase::Shape))
             .insert_resource(GameAssets::default())
             .insert_resource(Assets::<Mesh>::default())

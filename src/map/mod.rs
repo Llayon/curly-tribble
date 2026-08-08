@@ -183,7 +183,7 @@ impl Plugin for MapPlugin {
                         .in_set(GameSet::Logic),
                     systems::handle_rebuild_mesh
                         .in_set(GameSet::Visuals)
-                        .after(face_topology::runtime::regenerate_hex_face_topology),
+                        .after(surface_topology::runtime::regenerate_surface_topology),
                     tools::rebuild_landscape_edge_pick_index
                         .in_set(GameSet::Visuals)
                         .after(face_topology::runtime::regenerate_hex_face_topology),
