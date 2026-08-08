@@ -11,7 +11,13 @@ impl Plugin for CliffEditTestsPlugin {
 }
 
 #[cfg(test)]
-mod tests;
+mod tests_matrix;
 
 #[cfg(test)]
-mod tests_matrix;
+mod tests_picking;
+
+#[cfg(test)]
+mod tests_runtime;
+
+#[cfg(test)]
+mod tests_semantics;

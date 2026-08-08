@@ -74,6 +74,7 @@ fn test_cliff_gizmos_authoritative_topology_decoupling() {
 fn test_cliff_edit_authoritative_topology_decoupling() {
     let files = [
         "src/map/tools/cliff_edit.rs",
+        "src/map/tools/cliff_picking.rs",
         "src/map/tools/landscape_edge_picker.rs",
     ];
 

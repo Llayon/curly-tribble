@@ -1,10 +1,11 @@
 // src/map/tools/cliff_picking.rs
-//! Pure warped edge picking algorithms and geometry calculations.
+//! Pure warped edge picking algorithms, geometry calculations, and stroke types.
 
 use crate::map::data::EdgeCoord;
 use crate::map::face_topology::types::VertexId;
 use crate::map::tools::landscape_edge_picker::LandscapeEdgePickIndex;
 use bevy::prelude::*;
+use std::collections::HashSet;
 
 pub const CLIFF_PICK_RADIUS_RATIO: f32 = 0.25;
 
@@ -19,6 +20,50 @@ impl Plugin for CliffPickingPlugin {
 pub enum LogicalEdgeSide {
     A,
     B,
+}
+
+#[derive(Resource, Default, Debug, Clone, PartialEq, Eq)]
+pub struct HoveredCliffEdge {
+    pub edge: Option<EdgeCoord>,
+    pub side: Option<LogicalEdgeSide>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CliffClickButton {
+    Primary,
+    Secondary,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CliffStrokePhase {
+    Initial,
+    Subsequent,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CliffStrokeMode {
+    PaintUnresolved,
+    OrientExisting,
+    Erase,
+}
+
+#[derive(Resource, Default, Debug, Clone)]
+pub struct CliffStrokeState {
+    pub active: bool,
+    pub mode: Option<CliffStrokeMode>,
+    pub previous_accepted_edge: Option<EdgeCoord>,
+    pub previous_accepted_vertices: Option<[VertexId; 2]>,
+    pub visited_edges: HashSet<EdgeCoord>,
+}
+
+impl CliffStrokeState {
+    pub fn reset(&mut self) {
+        self.active = false;
+        self.mode = None;
+        self.previous_accepted_edge = None;
+        self.previous_accepted_vertices = None;
+        self.visited_edges.clear();
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]

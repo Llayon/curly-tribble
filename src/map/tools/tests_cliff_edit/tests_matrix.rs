@@ -44,11 +44,11 @@ mod tests {
 
                     total_interior_edges += pick_index.edges.len();
 
-                    if shape == "1x1" {
+                    if shape == "isolated" {
                         assert_eq!(
                             pick_index.edges.len(),
                             0,
-                            "1x1 shape must have 0 interior editable edges"
+                            "isolated shape must have 0 interior editable edges"
                         );
                     }
 
@@ -68,6 +68,12 @@ mod tests {
                         assert_eq!(he_b.twin, Some(e.half_edge_a));
                         assert_eq!(he_a.origin, he_b.destination);
                         assert_eq!(he_a.destination, he_b.origin);
+
+                        let v0 = topology.vertices[he_a.origin.index()].position;
+                        let v1 = topology.vertices[he_a.destination.index()].position;
+
+                        assert_eq!(e.segment_start, v0);
+                        assert_eq!(e.segment_end, v1);
 
                         assert!(e.segment_start.is_finite());
                         assert!(e.segment_end.is_finite());
