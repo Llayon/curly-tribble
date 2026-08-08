@@ -5,6 +5,13 @@ use crate::map::data::EdgeCoord;
 use crate::map::face_topology::types::{FaceId, HalfEdgeId, HexFaceTopology, VertexId};
 use bevy::prelude::*;
 
+#[allow(dead_code)]
+pub struct LandscapeEdgePickerPlugin;
+
+impl Plugin for LandscapeEdgePickerPlugin {
+    fn build(&self, _app: &mut App) {}
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct EditableLandscapeEdge {
     pub logical_edge: EdgeCoord,

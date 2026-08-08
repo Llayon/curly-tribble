@@ -1,8 +1,6 @@
 use crate::game_state::{CurrentTool, EditorPhase, LandscapeTool};
 use crate::map::tools::utils::get_mouse_world_pos;
-use crate::map::{
-    HexCoord, LandscapeFeature, MapData, RebuildMeshEvent, HEX_SIZE,
-};
+use crate::map::{HexCoord, LandscapeFeature, MapData, RebuildMeshEvent, HEX_SIZE};
 use bevy::prelude::*;
 
 use crate::sets::GameSet;

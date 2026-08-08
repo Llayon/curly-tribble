@@ -124,7 +124,11 @@ pub fn draw_hovered_cliff_gizmo(
         return;
     };
 
-    if let Some(editable) = pick_index.edges.iter().find(|e| e.logical_edge == edge_coord) {
+    if let Some(editable) = pick_index
+        .edges
+        .iter()
+        .find(|e| e.logical_edge == edge_coord)
+    {
         let p0 = Vec3::new(editable.segment_start.x, 0.08, editable.segment_start.y);
         let p1 = Vec3::new(editable.segment_end.x, 0.08, editable.segment_end.y);
 
