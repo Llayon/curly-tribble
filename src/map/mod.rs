@@ -11,6 +11,7 @@ pub mod deposits;
 pub mod export;
 pub mod face_topology;
 pub mod factions;
+pub mod height_constraints;
 pub mod hex_math;
 pub mod mines;
 pub mod navigation;
