@@ -2,12 +2,14 @@
 //! Semantic `SurfaceTopology` model, generator, validator, and runtime lifecycle.
 
 pub mod generator;
+pub mod provenance_validation;
 pub mod runtime;
 pub mod twins;
 pub mod types;
 pub mod validation;
 
 pub use generator::*;
+pub use provenance_validation::*;
 pub use runtime::*;
 pub use twins::*;
 pub use types::*;

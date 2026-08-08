@@ -1,10 +1,11 @@
 // src/map/surface_topology/runtime.rs
 //! Authoritative runtime regeneration of the semantic `SurfaceTopology` resource.
 
+use super::provenance_validation::validate_surface_provenance;
+use super::validation::{validate_fixed24_surface_topology, validate_surface_topology};
 use crate::map::face_topology::types::HexFaceTopology;
 use crate::map::surface_topology::generator::generate_surface_topology;
 use crate::map::surface_topology::types::SurfaceTopology;
-use crate::map::surface_topology::validation::validate_surface_topology;
 use crate::sets::GameSet;
 use bevy::prelude::*;
 
@@ -28,6 +29,16 @@ impl Plugin for SurfaceTopologyRuntimePlugin {
     }
 }
 
+fn run_surface_validation(
+    surface: &SurfaceTopology,
+    face_topology: &HexFaceTopology,
+) -> Result<(), crate::map::surface_topology::types::SurfaceTopologyError> {
+    validate_surface_topology(surface)?;
+    validate_fixed24_surface_topology(surface, face_topology)?;
+    validate_surface_provenance(surface, face_topology)?;
+    Ok(())
+}
+
 /// Regenerates the derived semantic `SurfaceTopology` whenever authoritative `HexFaceTopology` changes.
 pub fn regenerate_surface_topology(
     face_topology: Res<HexFaceTopology>,
@@ -44,7 +55,7 @@ pub fn regenerate_surface_topology(
     }
 
     match generate_surface_topology(&face_topology) {
-        Ok(new_surface) => match validate_surface_topology(&new_surface) {
+        Ok(new_surface) => match run_surface_validation(&new_surface, &face_topology) {
             Ok(()) => {
                 bevy::log::tracing::event!(
                     bevy::log::tracing::Level::INFO,

@@ -40,11 +40,62 @@ mod tests {
 
         assert_eq!(surface.faces.len(), 9 * 24);
         assert_eq!(surface.half_edges.len(), 9 * 24 * 3);
-        assert!(surface.stats.paired_half_edge_count > 0);
-        assert!(surface.stats.boundary_half_edge_count > 0);
-        assert_eq!(
-            surface.stats.paired_half_edge_count + surface.stats.boundary_half_edge_count,
-            surface.half_edges.len()
-        );
+
+        // Independent manifold audit over half-edges
+        let mut edge_buckets: std::collections::HashMap<(usize, usize), Vec<usize>> =
+            std::collections::HashMap::new();
+
+        for (idx, he) in surface.half_edges.iter().enumerate() {
+            let u0 = he.origin.index();
+            let u1 = he.destination.index();
+            let key = (u0.min(u1), u0.max(u1));
+            edge_buckets.entry(key).or_default().push(idx);
+        }
+
+        let mut boundary_count = 0;
+        let mut paired_count = 0;
+
+        for (&(u0, u1), bucket) in &edge_buckets {
+            match bucket.len() {
+                1 => {
+                    boundary_count += 1;
+                    let he = &surface.half_edges[bucket[0]];
+                    assert!(
+                        he.twin.is_none(),
+                        "Boundary half-edge must have twin == None"
+                    );
+                }
+                2 => {
+                    paired_count += 2;
+                    let h_a_idx = bucket[0];
+                    let h_b_idx = bucket[1];
+                    let h_a = &surface.half_edges[h_a_idx];
+                    let h_b = &surface.half_edges[h_b_idx];
+
+                    assert_eq!(
+                        h_a.twin,
+                        Some(crate::map::surface_topology::types::SurfaceHalfEdgeId::new(
+                            h_b_idx
+                        ))
+                    );
+                    assert_eq!(
+                        h_b.twin,
+                        Some(crate::map::surface_topology::types::SurfaceHalfEdgeId::new(
+                            h_a_idx
+                        ))
+                    );
+                    assert_eq!(h_a.origin.index(), h_b.destination.index());
+                    assert_eq!(h_a.destination.index(), h_b.origin.index());
+                    assert_ne!(h_a.incident_face, h_b.incident_face);
+                }
+                count => {
+                    panic!("Non-manifold edge between vertex {u0} and {u1}: count = {count}");
+                }
+            }
+        }
+
+        assert_eq!(paired_count, surface.stats.paired_half_edge_count);
+        assert_eq!(boundary_count, surface.stats.boundary_half_edge_count);
+        assert_eq!(paired_count + boundary_count, surface.half_edges.len());
     }
 }

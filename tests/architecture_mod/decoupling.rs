@@ -110,7 +110,9 @@ fn test_surface_topology_authoritative_decoupling() {
     let files = [
         "src/map/surface_topology/types.rs",
         "src/map/surface_topology/generator.rs",
+        "src/map/surface_topology/twins.rs",
         "src/map/surface_topology/validation.rs",
+        "src/map/surface_topology/provenance_validation.rs",
         "src/map/surface_topology/runtime.rs",
     ];
 

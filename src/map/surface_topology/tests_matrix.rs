@@ -16,8 +16,10 @@ mod tests {
     use crate::map::face_topology::generate_hex_face_topology_with_profile;
     use crate::map::face_topology::tests_quality_shared::shared as q;
     use crate::map::surface_topology::generator::generate_surface_topology;
-    use crate::map::surface_topology::types::SurfaceVertexSource;
-    use crate::map::surface_topology::validation::validate_surface_topology;
+    use crate::map::surface_topology::provenance_validation::validate_surface_provenance;
+    use crate::map::surface_topology::validation::{
+        validate_fixed24_surface_topology, validate_surface_topology,
+    };
 
     #[test]
     fn canonical_144_case_surface_topology_matrix() {
@@ -38,6 +40,10 @@ mod tests {
                         .expect("Surface topology generation failed");
 
                     validate_surface_topology(&surface).expect("Surface validation failed");
+                    validate_fixed24_surface_topology(&surface, &face_topology)
+                        .expect("Fixed24 validation failed");
+                    validate_surface_provenance(&surface, &face_topology)
+                        .expect("Provenance validation failed");
 
                     assert_eq!(
                         surface.faces.len(),
@@ -52,17 +58,6 @@ mod tests {
 
                     total_surface_faces += surface.faces.len();
                     total_surface_half_edges += surface.half_edges.len();
-
-                    for vertex in &surface.vertices {
-                        assert!(vertex.position.is_finite());
-                        if let SurfaceVertexSource::HexCorner { source_vertex } = &vertex.source {
-                            let source_pos = face_topology.vertices[source_vertex.index()].position;
-                            assert_eq!(
-                                (vertex.position.x.to_bits(), vertex.position.y.to_bits()),
-                                (source_pos.x.to_bits(), source_pos.y.to_bits())
-                            );
-                        }
-                    }
 
                     if shape == "isolated" {
                         assert_eq!(
@@ -103,6 +98,10 @@ mod tests {
                         generate_surface_topology(&face_topology).expect("Surface topology failed");
 
                     validate_surface_topology(&surface).expect("Surface validation failed");
+                    validate_fixed24_surface_topology(&surface, &face_topology)
+                        .expect("Fixed24 validation failed");
+                    validate_surface_provenance(&surface, &face_topology)
+                        .expect("Provenance validation failed");
 
                     total_surface_faces += surface.faces.len();
                     total_surface_half_edges += surface.half_edges.len();

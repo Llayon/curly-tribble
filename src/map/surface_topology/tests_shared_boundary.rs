@@ -94,36 +94,48 @@ mod tests {
         let sv_mid = surface_v_mid.expect("Surface edge midpoint");
 
         // Verify shared half-edges across c1 and c2
-        let segment1_twins: Vec<_> = surface
+        let seg1_indices: Vec<_> = surface
             .half_edges
             .iter()
-            .filter(|he| {
+            .enumerate()
+            .filter(|(_, he)| {
                 (he.origin == sv_a && he.destination == sv_mid)
                     || (he.origin == sv_mid && he.destination == sv_a)
             })
-            .collect();
-
-        assert_eq!(segment1_twins.len(), 2);
-        assert_eq!(
-            segment1_twins[0].twin,
-            Some(crate::map::surface_topology::types::SurfaceHalfEdgeId::new(
-                surface
-                    .half_edges
-                    .iter()
-                    .position(|h| h == segment1_twins[1])
-                    .unwrap()
-            ))
-        );
-
-        let segment2_twins: Vec<_> = surface
-            .half_edges
-            .iter()
-            .filter(|he| {
-                (he.origin == sv_mid && he.destination == sv_b)
-                    || (he.origin == sv_b && he.destination == sv_mid)
+            .map(|(idx, he)| {
+                (
+                    crate::map::surface_topology::types::SurfaceHalfEdgeId::new(idx),
+                    he,
+                )
             })
             .collect();
 
-        assert_eq!(segment2_twins.len(), 2);
+        assert_eq!(seg1_indices.len(), 2);
+        let (h1_id, h1_he) = seg1_indices[0];
+        let (h2_id, h2_he) = seg1_indices[1];
+        assert_eq!(h1_he.twin, Some(h2_id));
+        assert_eq!(h2_he.twin, Some(h1_id));
+
+        let seg2_indices: Vec<_> = surface
+            .half_edges
+            .iter()
+            .enumerate()
+            .filter(|(_, he)| {
+                (he.origin == sv_mid && he.destination == sv_b)
+                    || (he.origin == sv_b && he.destination == sv_mid)
+            })
+            .map(|(idx, he)| {
+                (
+                    crate::map::surface_topology::types::SurfaceHalfEdgeId::new(idx),
+                    he,
+                )
+            })
+            .collect();
+
+        assert_eq!(seg2_indices.len(), 2);
+        let (h3_id, h3_he) = seg2_indices[0];
+        let (h4_id, h4_he) = seg2_indices[1];
+        assert_eq!(h3_he.twin, Some(h4_id));
+        assert_eq!(h4_he.twin, Some(h3_id));
     }
 }
