@@ -7,7 +7,12 @@ pub mod blend_policy;
 pub mod cache;
 pub mod corner_key;
 pub mod debug;
+pub mod edge_binding;
 pub mod fingerprint;
+
+pub use edge_binding::{
+    bind_cliff_edges, BoundCliffEdge, BoundCliffEdges, CliffBindingError, EdgeBindingPlugin,
+};
 pub mod generator;
 pub mod logical_adjacency;
 pub mod metrics;

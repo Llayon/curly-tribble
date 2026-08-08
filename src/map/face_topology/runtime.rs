@@ -1,6 +1,7 @@
 //! Authoritative runtime population of the data-only face topology resource.
 use crate::map::face_topology::acceptance::warn_on_acceptance_misses;
 use crate::map::face_topology::cache::HexFaceDebugCache;
+use crate::map::face_topology::edge_binding::{self, BoundCliffEdges};
 use crate::map::face_topology::fingerprint::topology_fingerprints;
 use crate::map::face_topology::generate_hex_face_topology_with_profile;
 use crate::map::face_topology::profiles::HexDeformationProfile;
@@ -52,9 +53,15 @@ pub struct FaceTopologyRuntimePlugin;
 impl Plugin for FaceTopologyRuntimePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HexFaceTopologyGenerationState>()
+            .init_resource::<edge_binding::BoundCliffEdges>()
             .add_systems(
                 Update,
-                regenerate_hex_face_topology.in_set(GameSet::Visuals),
+                (
+                    regenerate_hex_face_topology,
+                    rebuild_bound_cliff_edges.after(regenerate_hex_face_topology),
+                )
+                    .chain()
+                    .in_set(GameSet::Visuals),
             );
     }
 }
@@ -133,7 +140,7 @@ pub fn regenerate_hex_face_topology(
             generation_state.last_successful_inputs = Some(inputs);
             generation_state.generation_count += 1;
         }
-        Err(error) => {
+        Err(_error) => {
             generation_state.failure_count += 1;
             if generation_state.last_successful_inputs.as_ref() != Some(&inputs) {
                 *topology = HexFaceTopology::default();
@@ -145,9 +152,33 @@ pub fn regenerate_hex_face_topology(
                 tiles = map_data.tiles.len(),
                 width = map_data.width,
                 height = map_data.height,
-                error = ?error,
                 "HexFaceTopology generation failed"
             );
+        }
+    }
+}
+
+/// Derives `BoundCliffEdges` runtime state from `MapData` and `HexFaceTopology`.
+pub fn rebuild_bound_cliff_edges(
+    map_data: Res<MapData>,
+    face_topology: Res<HexFaceTopology>,
+    mut bound_cliff_edges: ResMut<BoundCliffEdges>,
+) {
+    if !map_data.is_changed() && !face_topology.is_changed() && !bound_cliff_edges.is_added() {
+        return;
+    }
+
+    match edge_binding::bind_cliff_edges(&map_data, &face_topology) {
+        Ok(bound) => {
+            *bound_cliff_edges = bound;
+        }
+        Err(err) => {
+            bevy::log::tracing::event!(
+                bevy::log::tracing::Level::ERROR,
+                error = ?err,
+                "Failed to bind cliff edges to topology"
+            );
+            *bound_cliff_edges = BoundCliffEdges::default();
         }
     }
 }
