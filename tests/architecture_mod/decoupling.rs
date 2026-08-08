@@ -102,3 +102,41 @@ fn test_cliff_edit_authoritative_topology_decoupling() {
         }
     }
 }
+
+/// Architecture Guard: Enforces that SurfaceTopology production modules rely ONLY on authoritative HexFaceTopology XZ/connectivity,
+/// forbidding HEX_SIZE, to_world, canonical_vertex_key, angle_deg, angle_rad, .sin(), .cos(), MAX_HEIGHT, compute_vertex_heights, TerrainHeightMode, and .elevation.
+#[test]
+fn test_surface_topology_authoritative_decoupling() {
+    let files = [
+        "src/map/surface_topology/types.rs",
+        "src/map/surface_topology/generator.rs",
+        "src/map/surface_topology/validation.rs",
+        "src/map/surface_topology/runtime.rs",
+    ];
+
+    let forbidden = [
+        "HEX_SIZE",
+        "to_world(",
+        "canonical_vertex_key",
+        "angle_deg",
+        "angle_rad",
+        ".sin()",
+        ".cos()",
+        "MAX_HEIGHT",
+        "compute_vertex_heights",
+        "TerrainHeightMode",
+        ".elevation",
+    ];
+
+    for file in files {
+        let sniffer = CodeSniffer::new(file);
+        let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+        for item in forbidden {
+            assert!(
+                !code_no_tests.contains(item),
+                "SurfaceTopology Architecture Violation in {file}: production code must not contain '{item}'."
+            );
+        }
+    }
+}
