@@ -142,3 +142,53 @@ fn test_surface_topology_authoritative_decoupling() {
         }
     }
 }
+
+/// Architecture Guard: Enforces that SurfaceTerrainAdapter relies ONLY on SurfaceTopology,
+/// forbidding face_topology, MapData, HEX_SIZE, to_world, canonical_vertex_key, SurfaceVertexSource, MAX_HEIGHT, .elevation, compute_vertex_heights, TerrainHeightMode, .sin(), .cos().
+#[test]
+fn test_surface_terrain_adapter_decoupling() {
+    let sniffer = CodeSniffer::new("src/map/surface_topology/terrain_adapter.rs");
+    let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+    let forbidden = [
+        "HexFaceTopology",
+        "HexFace",
+        "map::face_topology",
+        "MapData",
+        "HEX_SIZE",
+        "to_world(",
+        "canonical_vertex_key",
+        "SurfaceVertexSource",
+        "MAX_HEIGHT",
+        ".elevation",
+        "compute_vertex_heights",
+        "TerrainHeightMode",
+        ".sin()",
+        ".cos()",
+    ];
+
+    for item in forbidden {
+        assert!(
+            !code_no_tests.contains(item),
+            "SurfaceTerrainAdapter Architecture Violation in terrain_adapter.rs: code must not contain '{item}'."
+        );
+    }
+}
+
+/// Architecture Guard: Enforces that production terrain mesh rebuild in systems.rs routes ONLY through SurfaceTopology,
+/// forbidding direct calls to derive_terrain_topology(&map_data).
+#[test]
+fn test_production_terrain_routes_through_surface_topology() {
+    let sniffer = CodeSniffer::new("src/map/systems.rs");
+    let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+    assert!(
+        code_no_tests.contains("derive_terrain_topology_from_surface"),
+        "Production Terrain Routing Violation in systems.rs: handle_rebuild_mesh must call derive_terrain_topology_from_surface."
+    );
+
+    assert!(
+        !code_no_tests.contains("derive_terrain_topology(&map_data"),
+        "Production Terrain Bypass Violation in systems.rs: handle_rebuild_mesh must not call legacy derive_terrain_topology directly."
+    );
+}
