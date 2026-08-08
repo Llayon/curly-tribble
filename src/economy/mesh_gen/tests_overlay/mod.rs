@@ -11,6 +11,8 @@ impl Plugin for OverlayTestsPlugin {
 #[cfg(test)]
 mod tests_cases_advanced;
 #[cfg(test)]
-mod tests_cases_basic;
+mod tests_cases_roof;
+#[cfg(test)]
+mod tests_cases_water;
 #[cfg(test)]
 mod tests_matrix;

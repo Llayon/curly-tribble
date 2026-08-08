@@ -1,10 +1,10 @@
-//! Basic case-specific integration tests for warped water and roof overlays.
+//! Water overlay case integration tests.
 
 use bevy::prelude::*;
 
-pub struct OverlayCasesBasicTestsPlugin;
+pub struct OverlayCasesWaterTestsPlugin;
 
-impl Plugin for OverlayCasesBasicTestsPlugin {
+impl Plugin for OverlayCasesWaterTestsPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
@@ -121,49 +121,28 @@ mod tests {
     }
 
     #[test]
-    fn roof_overlay_exact_boundary_and_constant_offset_y() {
+    fn extract_warped_face_corners_returns_typed_error_on_missing_tile() {
         let mut map = MapData::default();
-        let coord = HexCoord::new(0, 0);
-        let mut tile = TileData::default();
-        tile.roof_state = RoofState::Roofed;
-        map.tiles.insert(coord, tile);
-
-        let (face_topo, terrain_topo) = build_test_topology(&map, HexDeformationProfile::Organic);
-        let (_terrain, _water, roof_opt) = create_global_map_meshes(
+        map.tiles.insert(HexCoord::new(0, 0), TileData::default());
+        let face_topo = crate::map::face_topology::generate_hex_face_topology_with_profile(
             &map,
-            &terrain_topo,
+            WorldSeed::new(42),
+            HexDeformationProfile::Subtle,
+        )
+        .expect("valid face topo");
+
+        let missing_coord = HexCoord::new(99, 99);
+        let err = crate::economy::mesh_gen::generator::extract_warped_face_corners(
+            missing_coord,
             &face_topo,
-            EditorPhase::Shape,
-            &FactionManager::default(),
-            &TerrainConfig::default(),
-        );
+        )
+        .expect_err("should return error for missing tile");
 
-        let roof_mesh = roof_opt.expect("roof mesh should be created for Roofed state");
-        let Some(bevy::mesh::VertexAttributeValues::Float32x3(positions)) =
-            roof_mesh.attribute(Mesh::ATTRIBUTE_POSITION)
-        else {
-            panic!("missing roof positions");
-        };
-
-        assert_eq!(positions.len(), 7, "roof cell must have 7 vertices");
-
-        for pos in positions {
-            assert_eq!(pos[1], 2.5, "Flat phase roof Y must be 2.5");
-        }
-
-        roof_mesh.attribute(Mesh::ATTRIBUTE_NORMAL).map_or_else(
-            || panic!("missing roof normals"),
-            |normals| {
-                if let bevy::mesh::VertexAttributeValues::Float32x3(nor) = normals {
-                    for n in nor {
-                        assert!(
-                            n[1] > 0.999,
-                            "roof surface normals must point upward (+Y), got {:?}",
-                            n
-                        );
-                    }
-                }
-            },
+        assert_eq!(
+            err,
+            crate::economy::mesh_gen::generator::OverlayGeometryError::MissingFaceForTile(
+                missing_coord
+            )
         );
     }
 
@@ -226,57 +205,5 @@ mod tests {
             "exactly 2 tiles (River+Land, Lake+Land) generate water"
         );
         assert_eq!(r_pos.len(), 7, "exactly 1 tile generates roof");
-    }
-
-    #[test]
-    fn height_phase_compatibility() {
-        let mut map = MapData::default();
-        let c = HexCoord::new(0, 0);
-        let mut tile = TileData::default();
-        tile.elevation = 4.0;
-        tile.ocean_state = OceanState::Land;
-        tile.landscape_feature = LandscapeFeature::Lake;
-        tile.roof_state = RoofState::Roofed;
-        map.tiles.insert(c, tile);
-
-        let (face_topo, terrain_topo) = build_test_topology(&map, HexDeformationProfile::Subtle);
-
-        let (_, w_flat, r_flat) = create_global_map_meshes(
-            &map,
-            &terrain_topo,
-            &face_topo,
-            EditorPhase::Shape,
-            &FactionManager::default(),
-            &TerrainConfig::default(),
-        );
-        if let Some(bevy::mesh::VertexAttributeValues::Float32x3(pos)) =
-            w_flat.unwrap().attribute(Mesh::ATTRIBUTE_POSITION)
-        {
-            assert_eq!(pos[0][1], 0.0);
-        }
-        if let Some(bevy::mesh::VertexAttributeValues::Float32x3(pos)) =
-            r_flat.unwrap().attribute(Mesh::ATTRIBUTE_POSITION)
-        {
-            assert_eq!(pos[0][1], 2.5);
-        }
-
-        let (_, w_3d, r_3d) = create_global_map_meshes(
-            &map,
-            &terrain_topo,
-            &face_topo,
-            EditorPhase::Height3D,
-            &FactionManager::default(),
-            &TerrainConfig::default(),
-        );
-        if let Some(bevy::mesh::VertexAttributeValues::Float32x3(pos)) =
-            w_3d.unwrap().attribute(Mesh::ATTRIBUTE_POSITION)
-        {
-            assert_eq!(pos[0][1], map.get_hex_height(0, 0));
-        }
-        if let Some(bevy::mesh::VertexAttributeValues::Float32x3(pos)) =
-            r_3d.unwrap().attribute(Mesh::ATTRIBUTE_POSITION)
-        {
-            assert_eq!(pos[0][1], map.get_hex_height(0, 0) + 2.5);
-        }
     }
 }

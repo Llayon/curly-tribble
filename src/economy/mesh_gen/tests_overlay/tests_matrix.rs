@@ -56,6 +56,8 @@ mod tests {
                     let roof = roof_opt.expect("roof mesh expected");
 
                     let expected_verts = map.tiles.len() * 7;
+                    let expected_indices = map.tiles.len() * 18;
+
                     let Some(bevy::mesh::VertexAttributeValues::Float32x3(w_pos)) =
                         water.attribute(Mesh::ATTRIBUTE_POSITION)
                     else {
@@ -69,6 +71,61 @@ mod tests {
 
                     assert_eq!(w_pos.len(), expected_verts);
                     assert_eq!(r_pos.len(), expected_verts);
+
+                    let Some(bevy::mesh::Indices::U32(w_ind)) = water.indices() else {
+                        panic!("no water indices");
+                    };
+                    let Some(bevy::mesh::Indices::U32(r_ind)) = roof.indices() else {
+                        panic!("no roof indices");
+                    };
+
+                    assert_eq!(w_ind.len(), expected_indices);
+                    assert_eq!(r_ind.len(), expected_indices);
+
+                    for p in w_pos.iter().chain(r_pos.iter()) {
+                        assert!(
+                            p[0].is_finite() && p[1].is_finite() && p[2].is_finite(),
+                            "overlay positions must be finite"
+                        );
+                    }
+
+                    if let Some(bevy::mesh::VertexAttributeValues::Float32x3(nor)) =
+                        water.attribute(Mesh::ATTRIBUTE_NORMAL)
+                    {
+                        for n in nor {
+                            assert!(n[1] > 0.999, "water normals must point +Y");
+                        }
+                    }
+                    if let Some(bevy::mesh::VertexAttributeValues::Float32x3(nor)) =
+                        roof.attribute(Mesh::ATTRIBUTE_NORMAL)
+                    {
+                        for n in nor {
+                            assert!(n[1] > 0.999, "roof normals must point +Y");
+                        }
+                    }
+
+                    // Verify exact 6 source corners match overlay XZ for every cell
+                    let mut sorted_coords: Vec<crate::map::HexCoord> =
+                        map.tiles.keys().copied().collect();
+                    sorted_coords.sort_by_key(|c| (c.q, c.r));
+
+                    for (cell_idx, &c) in sorted_coords.iter().enumerate() {
+                        let f_id = face_topo.hex_to_face[&c];
+                        let face = &face_topo.faces[f_id.index()];
+                        let base_v = cell_idx * 7;
+
+                        for i in 0..6 {
+                            let src_pos = face_topo.vertices[face.vertices[i].index()].position;
+
+                            let w_corner = w_pos[base_v + 1 + i];
+                            assert_eq!(w_corner[0].to_bits(), src_pos.x.to_bits());
+                            assert_eq!(w_corner[2].to_bits(), src_pos.y.to_bits());
+
+                            let r_corner = r_pos[base_v + 1 + i];
+                            assert_eq!(r_corner[0].to_bits(), src_pos.x.to_bits());
+                            assert_eq!(r_corner[2].to_bits(), src_pos.y.to_bits());
+                        }
+                    }
 
                     executed += 1;
                 }
