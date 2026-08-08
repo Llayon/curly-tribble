@@ -25,7 +25,9 @@
 - [SOP: A River Routing](docs/superpowers/patterns/a_river_routing.md): Pathfinding-based river generation on terraced terrain.
 - [SOP: Zenith Navigator](docs/superpowers/patterns/zenith_navigator.md): Standards for asynchronous, reactive pathfinding.
 - [SOP: HexFaceTopology Debug Overlay](docs/superpowers/patterns/hex_face_topology_debug_overlay.md): Fingerprint-triggered topology regeneration and optional flat-phase Gizmos diagnostics.
+- [SOP: Warped Half-Edge Landscape Editing](docs/superpowers/patterns/warped_half_edge_landscape_editing.md): Authoritative edge pick index, side classification, and vertex-connected stroke state.
 - [ADR 0007: HexFaceTopology Diagnostic Overlay](docs/superpowers/adr/0007-hex-face-topology-debug-overlay.md): Resource ownership, cache derivation, failure policy, and debug-only rendering boundaries.
+- [ADR 0009: Warped Half-Edge Landscape Editing](docs/superpowers/adr/0009-warped-half-edge-landscape-editing.md): Half-edge pick index derivation, side classification law, explicit click semantics, and stroke propagation.
 - [Design: Advanced Terrain Generation](docs/superpowers/specs/2026-05-11-advanced-terrain-gen-design.md): Sharp ridges, pass masks, and terraced plateaus logic.
 - [Plan: Advanced Terrain Implementation](docs/superpowers/plans/2026-05-11-advanced-terrain-gen.md): Technical steps for the unified TerrainConfig inspector.
 - [Design: Procedural Rivers](docs/superpowers/specs/2026-05-12-pathfinding-rivers-design.md): Dijkstra-based river routing and mud banks.
