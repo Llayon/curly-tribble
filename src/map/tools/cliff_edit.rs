@@ -1,12 +1,20 @@
 // src/map/tools/cliff_edit.rs
 //! Warped edge cliff picking and landscape editing.
 
-use crate::map::data::EdgeCoord;
+use crate::game_state::{CurrentTool, EditorPhase, LandscapeTool};
+use crate::map::data::{CliffLowerSide, EdgeCoord, EdgeData, EdgeType, MapData};
 use crate::map::face_topology::types::VertexId;
 use crate::map::tools::landscape_edge_picker::LandscapeEdgePickIndex;
+use crate::map::tools::utils::get_mouse_world_pos;
 use bevy::prelude::*;
 
 pub const CLIFF_PICK_RADIUS_RATIO: f32 = 0.25;
+
+#[derive(Resource, Default, Debug, Clone, PartialEq, Eq)]
+pub struct HoveredCliffEdge {
+    pub edge: Option<EdgeCoord>,
+    pub side: Option<LogicalEdgeSide>,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum LogicalEdgeSide {
@@ -20,6 +28,55 @@ pub struct LandscapeEdgeHit {
     pub side: Option<LogicalEdgeSide>,
     pub vertices: [VertexId; 2],
     pub distance_squared: f32,
+}
+
+#[allow(clippy::similar_names)]
+pub fn apply_single_cliff_click(
+    map_data: &mut MapData,
+    hit: &LandscapeEdgeHit,
+    is_lmb: bool,
+    is_rmb: bool,
+) -> bool {
+    if is_rmb {
+        return map_data.edges.remove(&hit.logical_edge).is_some();
+    }
+
+    if is_lmb {
+        let current_data = map_data
+            .edges
+            .get(&hit.logical_edge)
+            .copied()
+            .unwrap_or_default();
+        if current_data.edge_type == EdgeType::Flat {
+            map_data.edges.insert(
+                hit.logical_edge,
+                EdgeData {
+                    edge_type: EdgeType::Cliff,
+                    cliff_lower_side: CliffLowerSide::Unresolved,
+                },
+            );
+            return true;
+        }
+
+        if let Some(side) = hit.side {
+            let new_lower = match side {
+                LogicalEdgeSide::A => CliffLowerSide::A,
+                LogicalEdgeSide::B => CliffLowerSide::B,
+            };
+            if current_data.cliff_lower_side != new_lower {
+                map_data.edges.insert(
+                    hit.logical_edge,
+                    EdgeData {
+                        edge_type: EdgeType::Cliff,
+                        cliff_lower_side: new_lower,
+                    },
+                );
+                return true;
+            }
+        }
+    }
+
+    false
 }
 
 #[must_use]
@@ -104,4 +161,42 @@ pub fn pick_landscape_edge(
     });
 
     hits.into_iter().next()
+}
+
+#[allow(clippy::similar_names)]
+pub fn handle_single_click_cliff_tools(
+    mouse: Res<ButtonInput<MouseButton>>,
+    q_camera: Query<(&Camera, &GlobalTransform), With<Camera3d>>,
+    q_window: Query<&Window, With<bevy::window::PrimaryWindow>>,
+    pick_index: Res<LandscapeEdgePickIndex>,
+    mut map_data: ResMut<MapData>,
+    current_tool: Res<CurrentTool>,
+    phase: Res<State<EditorPhase>>,
+    mut hovered: ResMut<HoveredCliffEdge>,
+) {
+    if *phase.get() != EditorPhase::Landscape || current_tool.landscape != LandscapeTool::Cliff {
+        if hovered.edge.is_some() {
+            *hovered = HoveredCliffEdge::default();
+        }
+        return;
+    }
+
+    let Some(world_pos) = get_mouse_world_pos(&q_camera, &q_window) else {
+        *hovered = HoveredCliffEdge::default();
+        return;
+    };
+
+    let current_hit = pick_landscape_edge(world_pos.xz(), &pick_index);
+    if let Some(ref hit) = current_hit {
+        hovered.edge = Some(hit.logical_edge);
+        hovered.side = hit.side;
+
+        let is_lmb = mouse.just_pressed(MouseButton::Left);
+        let is_rmb = mouse.just_pressed(MouseButton::Right);
+        if is_lmb || is_rmb {
+            apply_single_cliff_click(&mut map_data, hit, is_lmb, is_rmb);
+        }
+    } else {
+        *hovered = HoveredCliffEdge::default();
+    }
 }

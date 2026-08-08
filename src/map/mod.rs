@@ -143,6 +143,7 @@ impl Plugin for MapPlugin {
                 export::MapExportPlugin,
                 phase_transitions::PhaseTransitionsPlugin,
                 validation::ValidationPlugin,
+                tools::landscape::LandscapeToolPlugin,
             ))
             .add_systems(
                 Startup,
@@ -160,7 +161,6 @@ impl Plugin for MapPlugin {
                     systems::handle_regeneration.in_set(GameSet::Logic),
                     tools::handle_shape_tools.in_set(GameSet::Logic),
                     tools::handle_faction_tools.in_set(GameSet::Logic),
-                    tools::handle_landscape_tools.in_set(GameSet::Logic),
                     tools::handle_sediment_tools.in_set(GameSet::Logic),
                     tools::handle_bio_tools.in_set(GameSet::Logic),
                     tools::handle_npc_tools.in_set(GameSet::Logic),

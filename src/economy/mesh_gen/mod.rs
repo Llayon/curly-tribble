@@ -45,6 +45,7 @@ impl Plugin for MeshGenPlugin {
                         .run_if(|phase: Res<State<EditorPhase>>| {
                             *phase.get() >= EditorPhase::Landscape
                         }),
+                    cliff_gizmos::draw_hovered_cliff_gizmo.run_if(in_state(EditorPhase::Landscape)),
                     gizmos::draw_forest_gizmos.run_if(|phase: Res<State<EditorPhase>>| {
                         *phase.get() >= EditorPhase::Sediments
                     }),

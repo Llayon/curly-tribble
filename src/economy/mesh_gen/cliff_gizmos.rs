@@ -114,3 +114,31 @@ pub fn draw_cliffs_gizmos(
         }
     }
 }
+
+pub fn draw_hovered_cliff_gizmo(
+    hovered: Res<crate::map::tools::HoveredCliffEdge>,
+    pick_index: Res<crate::map::tools::LandscapeEdgePickIndex>,
+    mut gizmos: Gizmos,
+) {
+    let Some(edge_coord) = hovered.edge else {
+        return;
+    };
+
+    if let Some(editable) = pick_index.edges.iter().find(|e| e.logical_edge == edge_coord) {
+        let p0 = Vec3::new(editable.segment_start.x, 0.08, editable.segment_start.y);
+        let p1 = Vec3::new(editable.segment_end.x, 0.08, editable.segment_end.y);
+
+        gizmos.line(p0, p1, Color::srgb(1.0, 0.9, 0.2));
+
+        let mid = (p0 + p1) * 0.5;
+        if let Some(side) = hovered.side {
+            let target_xz = match side {
+                crate::map::tools::LogicalEdgeSide::A => editable.center_a,
+                crate::map::tools::LogicalEdgeSide::B => editable.center_b,
+            };
+            let target = Vec3::new(target_xz.x, 0.08, target_xz.y);
+            let dir = (target - mid).normalize_or_zero();
+            gizmos.line(mid, mid + dir * 0.4, Color::srgb(1.0, 0.8, 0.1));
+        }
+    }
+}

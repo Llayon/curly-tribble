@@ -5,11 +5,21 @@ use crate::map::{
 };
 use bevy::prelude::*;
 
+use crate::sets::GameSet;
+
 pub struct LandscapeToolPlugin;
 
 impl Plugin for LandscapeToolPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<super::landscape_edge_picker::LandscapeEdgePickIndex>();
+        app.init_resource::<super::landscape_edge_picker::LandscapeEdgePickIndex>()
+            .init_resource::<super::cliff_edit::HoveredCliffEdge>()
+            .add_systems(
+                Update,
+                (
+                    handle_landscape_tools.in_set(GameSet::Logic),
+                    super::cliff_edit::handle_single_click_cliff_tools.in_set(GameSet::Logic),
+                ),
+            );
     }
 }
 
