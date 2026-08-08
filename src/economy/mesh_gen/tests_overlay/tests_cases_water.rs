@@ -52,7 +52,8 @@ mod tests {
             EditorPhase::Shape,
             &FactionManager::default(),
             &TerrainConfig::default(),
-        );
+        )
+        .expect("valid map meshes");
 
         let water_mesh = water_opt.expect("water mesh should be created for Land + Lake");
         let Some(bevy::mesh::VertexAttributeValues::Float32x3(positions)) =
@@ -147,6 +148,39 @@ mod tests {
     }
 
     #[test]
+    fn create_global_map_meshes_fails_fast_on_missing_topology_face() {
+        let mut map = MapData::default();
+        let c1 = HexCoord::new(0, 0);
+        let mut t1 = TileData::default();
+        t1.ocean_state = OceanState::Land;
+        t1.landscape_feature = LandscapeFeature::Lake;
+        map.tiles.insert(c1, t1);
+
+        let (face_topo, terrain_topo) = build_test_topology(&map, HexDeformationProfile::Subtle);
+
+        let c_extra = HexCoord::new(10, 10);
+        let mut t_extra = TileData::default();
+        t_extra.ocean_state = OceanState::Land;
+        t_extra.landscape_feature = LandscapeFeature::Lake;
+        map.tiles.insert(c_extra, t_extra);
+
+        let err = create_global_map_meshes(
+            &map,
+            &terrain_topo,
+            &face_topo,
+            EditorPhase::Shape,
+            &FactionManager::default(),
+            &TerrainConfig::default(),
+        )
+        .expect_err("create_global_map_meshes must fail fast if HexFaceTopology is missing face");
+
+        assert_eq!(
+            err,
+            crate::economy::mesh_gen::generator::OverlayGeometryError::MissingFaceForTile(c_extra)
+        );
+    }
+
+    #[test]
     fn overlay_eligibility_semantics() {
         let coords = [
             HexCoord::new(0, 0),
@@ -183,7 +217,8 @@ mod tests {
             EditorPhase::Shape,
             &FactionManager::default(),
             &TerrainConfig::default(),
-        );
+        )
+        .expect("valid map meshes");
 
         let water = water_opt.expect("water mesh should exist");
         let roof = roof_opt.expect("roof mesh should exist");

@@ -90,14 +90,24 @@ impl Command for SpawnGlobalTerrainCommand {
 
         world.insert_resource(self.topology.clone());
 
-        let (mesh, water_mesh, roof_mesh) = create_global_map_meshes(
+        let (mesh, water_mesh, roof_mesh) = match create_global_map_meshes(
             &self.map_data,
             &self.topology,
             &self.face_topology,
             self.phase,
             &self.faction_manager,
             &self.config,
-        );
+        ) {
+            Ok(m) => m,
+            Err(err) => {
+                bevy::log::tracing::event!(
+                    bevy::log::tracing::Level::ERROR,
+                    error = ?err,
+                    "Failed to create map meshes due to invalid topology"
+                );
+                return;
+            }
+        };
 
         let min_elev = self
             .map_data

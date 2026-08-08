@@ -51,7 +51,8 @@ mod tests {
             EditorPhase::Shape,
             &FactionManager::default(),
             &TerrainConfig::default(),
-        );
+        )
+        .expect("valid map meshes");
 
         let roof_mesh = roof_opt.expect("roof mesh should be created for Roofed state");
         let Some(bevy::mesh::VertexAttributeValues::Float32x3(positions)) =
@@ -143,7 +144,8 @@ mod tests {
             EditorPhase::Shape,
             &FactionManager::default(),
             &TerrainConfig::default(),
-        );
+        )
+        .expect("valid map meshes");
         if let Some(bevy::mesh::VertexAttributeValues::Float32x3(pos)) =
             w_flat.unwrap().attribute(Mesh::ATTRIBUTE_POSITION)
         {
@@ -162,7 +164,8 @@ mod tests {
             EditorPhase::Height3D,
             &FactionManager::default(),
             &TerrainConfig::default(),
-        );
+        )
+        .expect("valid map meshes");
         if let Some(bevy::mesh::VertexAttributeValues::Float32x3(pos)) =
             w_3d.unwrap().attribute(Mesh::ATTRIBUTE_POSITION)
         {

@@ -65,8 +65,10 @@ fn append_overlay_face(
     *vertex_count += 7;
 }
 
-#[must_use]
-#[allow(clippy::too_many_lines, clippy::missing_panics_doc)]
+/// Creates map ground, water, and roof meshes from authoritative topology.
+///
+/// # Errors
+/// Returns `OverlayGeometryError` if any tile's face or vertex lookup fails in `HexFaceTopology`.
 pub fn create_global_map_meshes(
     map: &MapData,
     topology: &crate::map::topology::TerrainTopology,
@@ -74,7 +76,7 @@ pub fn create_global_map_meshes(
     phase: EditorPhase,
     faction_manager: &FactionManager,
     config: &TerrainConfig,
-) -> (Mesh, Option<Mesh>, Option<Mesh>) {
+) -> Result<(Mesh, Option<Mesh>, Option<Mesh>), OverlayGeometryError> {
     let is_flat = phase < EditorPhase::Height3D;
     let is_factions_filter = phase == EditorPhase::Factions;
     let mode = if is_flat {
@@ -149,46 +151,26 @@ pub fn create_global_map_meshes(
             || tile_data.landscape_feature == LandscapeFeature::Lake)
             && tile_data.ocean_state == OceanState::Land
         {
-            match extract_warped_face_corners(coord, face_topology) {
-                Ok(corners) => {
-                    append_overlay_face(
-                        &mut water_vertices,
-                        &mut water_indices,
-                        &corners,
-                        center_y,
-                        &mut water_vertex_count,
-                    );
-                }
-                Err(err) => {
-                    bevy::log::tracing::event!(
-                        bevy::log::tracing::Level::ERROR,
-                        error = ?err,
-                        "Failed to extract warped face corners for water overlay tile"
-                    );
-                }
-            }
+            let corners = extract_warped_face_corners(coord, face_topology)?;
+            append_overlay_face(
+                &mut water_vertices,
+                &mut water_indices,
+                &corners,
+                center_y,
+                &mut water_vertex_count,
+            );
         }
 
         if tile_data.roof_state == RoofState::Roofed {
             let roof_y = center_y + 2.5;
-            match extract_warped_face_corners(coord, face_topology) {
-                Ok(corners) => {
-                    append_overlay_face(
-                        &mut roof_vertices,
-                        &mut roof_indices,
-                        &corners,
-                        roof_y,
-                        &mut roof_vertex_count,
-                    );
-                }
-                Err(err) => {
-                    bevy::log::tracing::event!(
-                        bevy::log::tracing::Level::ERROR,
-                        error = ?err,
-                        "Failed to extract warped face corners for roof overlay tile"
-                    );
-                }
-            }
+            let corners = extract_warped_face_corners(coord, face_topology)?;
+            append_overlay_face(
+                &mut roof_vertices,
+                &mut roof_indices,
+                &corners,
+                roof_y,
+                &mut roof_vertex_count,
+            );
         }
     }
 
@@ -206,7 +188,7 @@ pub fn create_global_map_meshes(
     let water_mesh = create_optional_mesh(water_vertices, water_indices);
     let roof_mesh = create_optional_mesh(roof_vertices, roof_indices);
 
-    (terrain_mesh, water_mesh, roof_mesh)
+    Ok((terrain_mesh, water_mesh, roof_mesh))
 }
 
 fn tile_color(

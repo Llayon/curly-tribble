@@ -276,7 +276,8 @@ mod tests {
             EditorPhase::Height3D,
             &default(),
             &default(),
-        );
+        )
+        .unwrap();
         let Some(bevy::mesh::VertexAttributeValues::Float32x3(nor)) =
             mesh.attribute(Mesh::ATTRIBUTE_NORMAL)
         else {
@@ -288,13 +289,10 @@ mod tests {
         );
         assert!(
             EditorPhase::Balance < EditorPhase::Height3D
-                && EditorPhase::Height3D >= EditorPhase::Height3D,
-            "Test 7: Unlit behavior"
-        );
-        assert!(
-            EditorPhase::Balance <= EditorPhase::Deposits
+                && EditorPhase::Height3D >= EditorPhase::Height3D
+                && EditorPhase::Balance <= EditorPhase::Deposits
                 && EditorPhase::Height3D <= EditorPhase::Deposits,
-            "Test 8: Gizmos active"
+            "Test 7 & 8: Phase behavior"
         );
     }
 }

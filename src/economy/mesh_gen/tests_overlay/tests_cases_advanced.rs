@@ -62,7 +62,8 @@ mod tests {
             EditorPhase::Shape,
             &FactionManager::default(),
             &TerrainConfig::default(),
-        );
+        )
+        .expect("valid map meshes");
 
         let mut rev_coords = base_coords.clone();
         rev_coords.reverse();
@@ -74,7 +75,8 @@ mod tests {
             EditorPhase::Shape,
             &FactionManager::default(),
             &TerrainConfig::default(),
-        );
+        )
+        .expect("valid map meshes");
 
         let mut shuf_coords = base_coords.clone();
         let mut state = 0x1234_5678_u32;
@@ -91,7 +93,8 @@ mod tests {
             EditorPhase::Shape,
             &FactionManager::default(),
             &TerrainConfig::default(),
-        );
+        )
+        .expect("valid map meshes");
 
         let extract_pos = |m: &Mesh| {
             if let Some(bevy::mesh::VertexAttributeValues::Float32x3(p)) =
@@ -188,7 +191,8 @@ mod tests {
             EditorPhase::Shape,
             &FactionManager::default(),
             &TerrainConfig::default(),
-        );
+        )
+        .expect("valid map meshes");
 
         // Water shared boundary check
         let water = w_opt.unwrap();

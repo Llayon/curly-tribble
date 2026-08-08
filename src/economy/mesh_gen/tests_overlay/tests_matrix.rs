@@ -50,7 +50,8 @@ mod tests {
                         EditorPhase::Shape,
                         &FactionManager::default(),
                         &TerrainConfig::default(),
-                    );
+                    )
+                    .expect("valid map meshes");
 
                     let water = water_opt.expect("water mesh expected");
                     let roof = roof_opt.expect("roof mesh expected");
