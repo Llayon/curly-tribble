@@ -28,8 +28,10 @@
 - [SOP: Warped Half-Edge Landscape Editing](docs/superpowers/patterns/warped_half_edge_landscape_editing.md): Authoritative edge pick index, side classification, and vertex-connected stroke state.
 - [SOP: SurfaceTopology Standards](docs/superpowers/patterns/surface_topology.md): Standard for derived side-by-side triangulated surface topology, coarse provenance, and 2-manifold half-edge twins.
 - [SOP: SurfaceTerrainBridge Standards](docs/superpowers/patterns/surface_terrain_bridge.md): Standard for pure projection derivation from SurfaceTopology to TerrainTopology rendering representation.
+- [SOP: HeightConstraint Binding Standards](docs/superpowers/patterns/height_constraint_binding.md): Standard for compiling persistent authoring intent onto SurfaceTopology face and boundary identities.
 - [ADR 0004: Semantic SurfaceTopology Foundation](docs/superpowers/adr/0004_surface_topology_foundation.md): Side-by-side surface model derived strictly from HexFaceTopology with explicit coarse vertex provenance.
 - [ADR 0005: SurfaceTopology Production Bridge](docs/superpowers/adr/0005_surface_topology_production_bridge.md): Production terrain rendering bridge routing handle_rebuild_mesh through SurfaceTopology.
+- [ADR 0006: Landscape Height Constraint Compilation](docs/superpowers/adr/0006_landscape_height_constraint_compilation.md): Derived semantic height constraint compilation on SurfaceTopology.
 - [ADR 0007: HexFaceTopology Diagnostic Overlay](docs/superpowers/adr/0007-hex-face-topology-debug-overlay.md): Resource ownership, cache derivation, failure policy, and debug-only rendering boundaries.
 - [ADR 0009: Warped Half-Edge Landscape Editing](docs/superpowers/adr/0009-warped-half-edge-landscape-editing.md): Half-edge pick index derivation, side classification law, explicit click semantics, and stroke propagation.
 - [Design: Advanced Terrain Generation](docs/superpowers/specs/2026-05-11-advanced-terrain-gen-design.md): Sharp ridges, pass masks, and terraced plateaus logic.
