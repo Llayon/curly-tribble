@@ -4,7 +4,7 @@
 use crate::map::data::{CliffLowerSide, EdgeCoord};
 use crate::map::height_constraints::types::RegionHeightIntent;
 use crate::map::height_graph::diagnostics::HeightGraphDiagnostic;
-use crate::map::surface_topology::types::{SurfaceFaceId, SurfaceVertexId};
+use crate::map::surface_topology::types::{SurfaceFaceId, SurfaceHalfEdgeId, SurfaceVertexId};
 use crate::map::HexCoord;
 use bevy::prelude::*;
 
@@ -104,6 +104,58 @@ pub struct HeightGraphStats {
     pub unresolved_cliff_count: usize,
     pub diagnostic_count: usize,
     pub error_diagnostic_count: usize,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum HeightGraphBuildError {
+    EmptySurfaceOnConstraints,
+    PartialEmptySurface {
+        vertex_count: usize,
+        face_count: usize,
+    },
+    FaceNodeCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    InvalidSurfaceFace(SurfaceFaceId),
+    InvalidSurfaceVertex(SurfaceVertexId),
+    InvalidSurfaceHalfEdge(SurfaceHalfEdgeId),
+    MissingTwin(SurfaceHalfEdgeId),
+    NonReciprocalTwin {
+        a: SurfaceHalfEdgeId,
+        b: SurfaceHalfEdgeId,
+    },
+    TwinOrientationMismatch {
+        a: SurfaceHalfEdgeId,
+        b: SurfaceHalfEdgeId,
+    },
+    FaceMissingVertex {
+        face: SurfaceFaceId,
+        vertex: SurfaceVertexId,
+    },
+    MixedSurfaceVerticesInNode {
+        node: HeightNodeId,
+    },
+    MissingFaceCornerMapping {
+        face: SurfaceFaceId,
+        corner: u8,
+    },
+    DuplicateFaceCornerMapping {
+        face: SurfaceFaceId,
+        corner: u8,
+    },
+    RegionNodeMismatch {
+        hex: HexCoord,
+    },
+    CliffRelationMismatch {
+        edge: EdgeCoord,
+        vertex: SurfaceVertexId,
+    },
+    InconsistentCliffVertexRelation {
+        edge: EdgeCoord,
+        vertex: SurfaceVertexId,
+    },
+    InvalidComponent(HeightSheetComponentId),
 }
 
 #[derive(Resource, Debug, Clone, PartialEq, Eq, Default)]

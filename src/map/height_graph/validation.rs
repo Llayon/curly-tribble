@@ -2,11 +2,11 @@
 //! Structural validator and partition completeness proofs for Milestone M4.1 — Height Constraint Graph.
 
 use crate::map::height_constraints::types::HeightConstraintSet;
-use crate::map::height_graph::builder::HeightGraphBuildError;
 use crate::map::height_graph::types::HeightConstraintGraph;
+use crate::map::height_graph::types::HeightGraphBuildError;
 use crate::map::surface_topology::types::{SurfaceFaceId, SurfaceHalfEdgeId, SurfaceTopology};
 use bevy::prelude::*;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 #[allow(dead_code)]
 pub struct HeightGraphValidationPlugin;
@@ -15,6 +15,15 @@ impl Plugin for HeightGraphValidationPlugin {
     fn build(&self, _app: &mut App) {}
 }
 
+/// Validates derived `HeightConstraintGraph` structural partition and completeness.
+///
+/// # Errors
+/// Returns `HeightGraphBuildError` if structural partition completeness or continuity is broken.
+#[allow(
+    clippy::too_many_lines,
+    clippy::similar_names,
+    clippy::cast_possible_truncation
+)]
 pub fn validate_height_constraint_graph(
     graph: &HeightConstraintGraph,
     surface: &SurfaceTopology,
@@ -85,7 +94,8 @@ pub fn validate_height_constraint_graph(
                         });
                     }
 
-                    if !seen_corners.insert((face_id, corner_idx as u8)) {
+                    let corner_key = (face_id, corner_idx as u8);
+                    if !seen_corners.insert(corner_key) {
                         return Err(HeightGraphBuildError::DuplicateFaceCornerMapping {
                             face: face_id,
                             corner: corner_idx as u8,

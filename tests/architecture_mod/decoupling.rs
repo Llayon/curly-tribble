@@ -252,3 +252,56 @@ fn test_production_map_plugin_registers_height_constraints() {
         "Production Plugin Registration Violation in src/map/mod.rs: MapPlugin must register HeightConstraintsPlugin."
     );
 }
+
+/// Architecture Guard: Enforces that MapPlugin registers HeightGraphPlugin in production.
+#[test]
+fn test_production_map_plugin_registers_height_graph() {
+    let sniffer = CodeSniffer::new("src/map/mod.rs");
+    let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+    assert!(
+        code_no_tests.contains("height_graph::HeightGraphPlugin"),
+        "Production Plugin Registration Violation in src/map/mod.rs: MapPlugin must register HeightGraphPlugin."
+    );
+}
+
+/// Architecture Guard: Enforces strict decoupling for src/map/height_graph/ modules.
+#[test]
+fn test_height_graph_decoupling() {
+    let files = [
+        "src/map/height_graph/types.rs",
+        "src/map/height_graph/builder.rs",
+        "src/map/height_graph/validation.rs",
+        "src/map/height_graph/diagnostics.rs",
+        "src/map/height_graph/runtime.rs",
+        "src/map/height_graph/mod.rs",
+    ];
+
+    let forbidden = [
+        "MapData",
+        "TileData",
+        "LandscapeFeature",
+        "EdgeType",
+        "HexFaceTopology",
+        "BoundCliffEdges",
+        "TerrainTopology",
+        "terrain_adapter",
+        "topology_adapter",
+        "WorldSeed",
+        "TerrainConfig",
+        "f32",
+        "f64",
+    ];
+
+    for file in files {
+        let sniffer = CodeSniffer::new(file);
+        let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+        for item in forbidden {
+            assert!(
+                !code_no_tests.contains(item),
+                "HeightGraph Architecture Violation in {file}: code must not contain '{item}'."
+            );
+        }
+    }
+}
