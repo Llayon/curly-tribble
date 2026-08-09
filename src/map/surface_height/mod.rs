@@ -1,8 +1,10 @@
 // src/map/surface_height/mod.rs
 //! Module entry point for Milestone M5 — SurfaceHeightLayer & Deterministic HeightSolver.
 
+pub mod guide;
 pub mod types;
 
+pub use guide::*;
 pub use types::*;
 
 use bevy::prelude::*;
