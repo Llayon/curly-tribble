@@ -2,9 +2,11 @@
 //! Module entry point for Milestone M5 — SurfaceHeightLayer & Deterministic HeightSolver.
 
 pub mod guide;
+pub mod targets;
 pub mod types;
 
 pub use guide::*;
+pub use targets::*;
 pub use types::*;
 
 use bevy::prelude::*;
