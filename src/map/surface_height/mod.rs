@@ -1,5 +1,5 @@
 // src/map/surface_height/mod.rs
-//! Module entry point for Milestone M5 — SurfaceHeightLayer & Deterministic HeightSolver.
+//! Module entry point for Milestone M5 — `SurfaceHeightLayer` & Deterministic `HeightSolver`.
 
 pub mod guide;
 pub mod hard_constraints;
@@ -8,6 +8,19 @@ pub mod solver;
 pub mod targets;
 pub mod types;
 pub mod validation;
+
+#[cfg(test)]
+pub mod tests_determinism;
+#[cfg(test)]
+pub mod tests_guide;
+#[cfg(test)]
+pub mod tests_matrix;
+#[cfg(test)]
+pub mod tests_runtime;
+#[cfg(test)]
+pub mod tests_solver;
+#[cfg(test)]
+pub mod tests_targets;
 
 pub use guide::*;
 pub use hard_constraints::*;

@@ -308,3 +308,79 @@ fn test_height_graph_decoupling() {
         }
     }
 }
+
+/// Architecture Guard: Enforces strict 3-tier decoupling for src/map/surface_height/ modules.
+#[test]
+fn test_surface_height_decoupling() {
+    let core_files = [
+        "src/map/surface_height/types.rs",
+        "src/map/surface_height/targets.rs",
+        "src/map/surface_height/hard_constraints.rs",
+        "src/map/surface_height/solver.rs",
+        "src/map/surface_height/validation.rs",
+    ];
+
+    let core_forbidden = [
+        "MapData",
+        "TileData",
+        "SurfaceTopology",
+        "SurfaceFace",
+        "HexFaceTopology",
+        "TerrainTopology",
+        "MAX_HEIGHT",
+        "HEX_SIZE",
+        "Vec2",
+        "Vec3",
+        "RebuildMeshEvent",
+    ];
+
+    for file in core_files {
+        let sniffer = CodeSniffer::new(file);
+        let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+        for item in core_forbidden {
+            assert!(
+                !code_no_tests.contains(item),
+                "SurfaceHeight Core Architecture Violation in {file}: code must not contain '{item}'."
+            );
+        }
+    }
+
+    let guide_forbidden = [
+        "TerrainTopology",
+        "compute_vertex_heights",
+        "Vec2",
+        "Vec3",
+        "RebuildMeshEvent",
+    ];
+    let guide_sniffer = CodeSniffer::new("src/map/surface_height/guide.rs");
+    let guide_code = guide_sniffer
+        .clean
+        .split("#[cfg(test)]")
+        .next()
+        .unwrap_or("");
+    for item in guide_forbidden {
+        assert!(
+            !guide_code.contains(item),
+            "SurfaceHeight Guide Architecture Violation in guide.rs: code must not contain '{item}'."
+        );
+    }
+
+    let runtime_forbidden = [
+        "TerrainTopology",
+        "compute_vertex_heights",
+        "SpawnGlobalTerrainCommand",
+        "RebuildMeshEvent",
+    ];
+    let runtime_sniffer = CodeSniffer::new("src/map/surface_height/runtime.rs");
+    let runtime_code = runtime_sniffer
+        .clean
+        .split("#[cfg(test)]")
+        .next()
+        .unwrap_or("");
+    for item in runtime_forbidden {
+        assert!(
+            !runtime_code.contains(item),
+            "SurfaceHeight Runtime Architecture Violation in runtime.rs: code must not contain '{item}'."
+        );
+    }
+}
