@@ -8,6 +8,7 @@ pub mod diagnostics;
 pub mod runtime;
 pub mod types;
 pub mod validation;
+pub mod validation_completeness;
 
 pub use builder::*;
 pub use builder_diagnostics::*;
@@ -16,6 +17,7 @@ pub use diagnostics::*;
 pub use runtime::*;
 pub use types::*;
 pub use validation::*;
+pub use validation_completeness::*;
 
 use bevy::prelude::*;
 

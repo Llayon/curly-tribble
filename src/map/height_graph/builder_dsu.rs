@@ -81,6 +81,42 @@ pub fn build_height_nodes_via_dsu(
     let mut cliff_seam_halfs: HashMap<SurfaceHalfEdgeId, SurfaceHalfEdgeId> = HashMap::new();
     for cliff in &constraints.cliffs {
         for segment in &cliff.segments {
+            let he_a = surface.half_edges.get(segment.half_edge_a.index()).ok_or(
+                HeightGraphBuildError::InvalidSurfaceHalfEdge(segment.half_edge_a),
+            )?;
+            let he_b = surface.half_edges.get(segment.half_edge_b.index()).ok_or(
+                HeightGraphBuildError::InvalidSurfaceHalfEdge(segment.half_edge_b),
+            )?;
+
+            if he_a.twin != Some(segment.half_edge_b) || he_b.twin != Some(segment.half_edge_a) {
+                return Err(HeightGraphBuildError::NonReciprocalTwin {
+                    a: segment.half_edge_a,
+                    b: segment.half_edge_b,
+                });
+            }
+
+            if he_a.origin != he_b.destination || he_a.destination != he_b.origin {
+                return Err(HeightGraphBuildError::TwinOrientationMismatch {
+                    a: segment.half_edge_a,
+                    b: segment.half_edge_b,
+                });
+            }
+
+            let face_a = surface.faces.get(he_a.incident_face.index()).ok_or(
+                HeightGraphBuildError::InvalidSurfaceFace(he_a.incident_face),
+            )?;
+            let face_b = surface.faces.get(he_b.incident_face.index()).ok_or(
+                HeightGraphBuildError::InvalidSurfaceFace(he_b.incident_face),
+            )?;
+
+            if face_a.owner_hex != cliff.logical_edge.a || face_b.owner_hex != cliff.logical_edge.b
+            {
+                return Err(HeightGraphBuildError::CliffRelationMismatch {
+                    edge: cliff.logical_edge,
+                    vertex: he_a.origin,
+                });
+            }
+
             cliff_seam_halfs.insert(segment.half_edge_a, segment.half_edge_b);
             cliff_seam_halfs.insert(segment.half_edge_b, segment.half_edge_a);
         }
@@ -177,7 +213,19 @@ pub fn build_height_nodes_via_dsu(
         let mut incident_faces = Vec::new();
         for &occ in &occurrences {
             let f_idx = occ / 3;
+            let c_idx = occ % 3;
             let f_id = SurfaceFaceId::new(f_idx);
+            let f_ref = surface
+                .faces
+                .get(f_idx)
+                .ok_or(HeightGraphBuildError::InvalidSurfaceFace(f_id))?;
+
+            if f_ref.vertices[c_idx] != surface_vertex {
+                return Err(HeightGraphBuildError::MixedSurfaceVerticesInNode {
+                    node: HeightNodeId::new(0),
+                });
+            }
+
             if !incident_faces.contains(&f_id) {
                 incident_faces.push(f_id);
             }

@@ -271,7 +271,10 @@ fn test_height_graph_decoupling() {
     let files = [
         "src/map/height_graph/types.rs",
         "src/map/height_graph/builder.rs",
+        "src/map/height_graph/builder_dsu.rs",
+        "src/map/height_graph/builder_diagnostics.rs",
         "src/map/height_graph/validation.rs",
+        "src/map/height_graph/validation_completeness.rs",
         "src/map/height_graph/diagnostics.rs",
         "src/map/height_graph/runtime.rs",
         "src/map/height_graph/mod.rs",

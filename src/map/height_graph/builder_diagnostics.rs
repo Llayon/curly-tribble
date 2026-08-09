@@ -1,7 +1,7 @@
 // src/map/height_graph/builder_diagnostics.rs
 //! Diagnostic extraction and cycle detection for `HeightConstraintGraph`.
 
-use crate::map::data::CliffLowerSide;
+use crate::map::data::{CliffLowerSide, EdgeCoord};
 use crate::map::height_graph::diagnostics::{
     HeightDiagnosticSeverity, HeightGraphDiagnostic, HeightGraphDiagnosticKind,
 };
@@ -22,16 +22,31 @@ pub fn collect_height_graph_diagnostics(
 ) -> Vec<HeightGraphDiagnostic> {
     let mut diagnostics = Vec::new();
 
-    // 1. Info: Collapsed cliff samples (same height node on both sides)
+    // 1. Info / Error: Collapsed cliff samples vs Unsplittable cliffs
+    let mut cliff_groups: HashMap<EdgeCoord, Vec<&CliffNodeRelation>> = HashMap::new();
     for rel in cliff_relations {
-        if rel.node_a == rel.node_b {
+        cliff_groups.entry(rel.logical_edge).or_default().push(rel);
+    }
+
+    for (edge, rels) in cliff_groups {
+        let all_collapsed = !rels.is_empty() && rels.iter().all(|r| r.node_a == r.node_b);
+        if all_collapsed {
             diagnostics.push(HeightGraphDiagnostic {
-                severity: HeightDiagnosticSeverity::Info,
-                kind: HeightGraphDiagnosticKind::CollapsedCliffSample {
-                    edge: rel.logical_edge,
-                    vertex: rel.surface_vertex,
-                },
+                severity: HeightDiagnosticSeverity::Error,
+                kind: HeightGraphDiagnosticKind::UnsplittableCliff { edge },
             });
+        } else {
+            for rel in rels {
+                if rel.node_a == rel.node_b {
+                    diagnostics.push(HeightGraphDiagnostic {
+                        severity: HeightDiagnosticSeverity::Info,
+                        kind: HeightGraphDiagnosticKind::CollapsedCliffSample {
+                            edge: rel.logical_edge,
+                            vertex: rel.surface_vertex,
+                        },
+                    });
+                }
+            }
         }
     }
 

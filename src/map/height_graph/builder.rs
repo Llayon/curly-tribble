@@ -1,7 +1,7 @@
 // src/map/height_graph/builder.rs
 //! Pure combinatorial builder for Milestone M4.1 — Height Constraint Graph.
 
-use crate::map::data::CliffLowerSide;
+use crate::map::data::{CliffLowerSide, EdgeCoord};
 use crate::map::height_constraints::types::HeightConstraintSet;
 use crate::map::height_graph::builder_diagnostics::collect_height_graph_diagnostics;
 use crate::map::height_graph::builder_dsu::build_height_nodes_via_dsu;
@@ -156,7 +156,7 @@ pub fn build_height_constraint_graph(
     region_node_constraints.sort_by_key(|r| r.hex);
 
     // 8. Bind Cliff Node Relations
-    let mut cliff_relations = Vec::new();
+    let mut rel_map: HashMap<(EdgeCoord, SurfaceVertexId), CliffNodeRelation> = HashMap::new();
     for cliff in &constraints.cliffs {
         for segment in &cliff.segments {
             let he_a = surface.half_edges.get(segment.half_edge_a.index()).ok_or(
@@ -205,16 +205,30 @@ pub fn build_height_constraint_graph(
                         corner: corner_b_v as u8,
                     })?;
 
-                cliff_relations.push(CliffNodeRelation {
+                let rel = CliffNodeRelation {
                     logical_edge: cliff.logical_edge,
                     surface_vertex: vert_id,
                     node_a,
                     node_b,
                     lower_side: cliff.lower_side,
-                });
+                };
+
+                let key = (cliff.logical_edge, vert_id);
+                if let Some(existing) = rel_map.get(&key) {
+                    if existing != &rel {
+                        return Err(HeightGraphBuildError::InconsistentCliffVertexRelation {
+                            edge: cliff.logical_edge,
+                            vertex: vert_id,
+                        });
+                    }
+                } else {
+                    rel_map.insert(key, rel);
+                }
             }
         }
     }
+
+    let mut cliff_relations: Vec<CliffNodeRelation> = rel_map.into_values().collect();
     cliff_relations.sort_by(|a, b| {
         a.logical_edge
             .cmp(&b.logical_edge)
@@ -222,7 +236,6 @@ pub fn build_height_constraint_graph(
             .then_with(|| a.node_a.cmp(&b.node_a))
             .then_with(|| a.node_b.cmp(&b.node_b))
     });
-    cliff_relations.dedup();
 
     // 9. Collect diagnostics
     let diagnostics = collect_height_graph_diagnostics(&cliff_relations);
