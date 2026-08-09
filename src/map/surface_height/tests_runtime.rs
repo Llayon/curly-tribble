@@ -3,11 +3,19 @@
 
 #[cfg(test)]
 pub mod tests {
-    use crate::map::data::{LandscapeFeature, MapData, OceanState, TileData};
-    use crate::map::height_constraints::HeightConstraintSet;
+    use crate::map::data::{
+        CliffLowerSide, EdgeCoord, EdgeData, EdgeType, LandscapeFeature, MapData, OceanState,
+        TileData,
+    };
+    use crate::map::height_graph::runtime::{
+        HeightGraphGenerationOutcome, HeightGraphGenerationState,
+    };
     use crate::map::height_graph::types::HeightConstraintGraph;
     use crate::map::surface_height::guide::LegacyHeightGuide;
-    use crate::map::surface_height::runtime::HeightSolveGenerationState;
+    use crate::map::surface_height::runtime::{
+        HeightSolveGenerationOutcome, HeightSolveGenerationState,
+    };
+    use crate::map::surface_height::targets::HeightTargetField;
     use crate::map::surface_height::types::{HeightSolverConfig, SurfaceHeightLayer};
     use crate::map::surface_topology::types::SurfaceTopology;
     use crate::map::HexCoord;
@@ -34,9 +42,10 @@ pub mod tests {
         app.add_message::<crate::map::RebuildMeshEvent>();
         app.insert_resource(crate::map::data::WorldSeed::new(42));
         app.init_resource::<MapData>();
-
         app
     }
+
+    // ─── Existing 3 tests ────────────────────────────────────────────────────
 
     #[test]
     fn elevation_only_edit_regenerates_m5_without_topology_change() {
@@ -61,7 +70,6 @@ pub mod tests {
             .generation_count;
         assert_eq!(initial_gen, 1);
 
-        // Edit elevation only
         {
             let mut map_data = app.world_mut().resource_mut::<MapData>();
             if let Some(tile) = map_data.tiles.get_mut(&HexCoord::new(0, 0)) {
@@ -141,7 +149,6 @@ pub mod tests {
             .generation_count;
         assert_eq!(initial_gen, 1);
 
-        // Edit landscape feature: None -> Mountain
         {
             let mut map_data = app.world_mut().resource_mut::<MapData>();
             if let Some(tile) = map_data.tiles.get_mut(&HexCoord::new(0, 0)) {

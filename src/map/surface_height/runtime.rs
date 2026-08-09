@@ -7,7 +7,7 @@ use crate::map::height_graph::types::HeightConstraintGraph;
 use crate::map::surface_height::guide::{derive_legacy_height_guide, LegacyHeightGuide};
 use crate::map::surface_height::hard_constraints::compile_hard_constraints;
 use crate::map::surface_height::solver::solve_surface_heights;
-use crate::map::surface_height::targets::compile_height_targets;
+use crate::map::surface_height::targets::{compile_height_targets, HeightTargetField};
 use crate::map::surface_height::types::{HeightSolverConfig, SurfaceHeightLayer};
 use crate::map::surface_height::validation::validate_surface_height_layer;
 use crate::map::surface_topology::types::SurfaceTopology;
@@ -118,6 +118,7 @@ pub fn regenerate_surface_height_layer(
     graph_state: Res<HeightGraphGenerationState>,
     config: Res<HeightSolverConfig>,
     mut guide: ResMut<LegacyHeightGuide>,
+    mut targets: ResMut<HeightTargetField>,
     mut layer: ResMut<SurfaceHeightLayer>,
     mut state: ResMut<HeightSolveGenerationState>,
 ) {
@@ -136,6 +137,7 @@ pub fn regenerate_surface_height_layer(
             state.failure_count += 1;
             state.last_outcome = HeightSolveGenerationOutcome::Failure;
             *guide = LegacyHeightGuide::default();
+            *targets = HeightTargetField::default();
             *layer = SurfaceHeightLayer::default();
             return;
         }
@@ -151,7 +153,7 @@ pub fn regenerate_surface_height_layer(
     // Strict no-retry policy: record attempt BEFORE work
     state.last_attempt = Some(current_inputs);
 
-    let result: Result<(LegacyHeightGuide, SurfaceHeightLayer), ()> = (|| {
+    let result: Result<(LegacyHeightGuide, HeightTargetField, SurfaceHeightLayer), ()> = (|| {
         config.validate_config().map_err(|_| ())?;
         let derived_guide =
             derive_legacy_height_guide(&map_data, &surface, &graph).map_err(|_| ())?;
@@ -175,11 +177,12 @@ pub fn regenerate_surface_height_layer(
             &config,
         )
         .map_err(|_| ())?;
-        Ok((derived_guide, solved_layer))
+        Ok((derived_guide, compiled_targets, solved_layer))
     })();
 
-    if let Ok((new_guide, new_layer)) = result {
+    if let Ok((new_guide, new_targets, new_layer)) = result {
         *guide = new_guide;
+        *targets = new_targets;
         *layer = new_layer;
         state.generation_count += 1;
         state.last_outcome = HeightSolveGenerationOutcome::Success;
@@ -187,6 +190,7 @@ pub fn regenerate_surface_height_layer(
         state.failure_count += 1;
         state.last_outcome = HeightSolveGenerationOutcome::Failure;
         *guide = LegacyHeightGuide::default();
+        *targets = HeightTargetField::default();
         *layer = SurfaceHeightLayer::default();
     }
 }

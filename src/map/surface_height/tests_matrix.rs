@@ -1,16 +1,20 @@
 // src/map/surface_height/tests_matrix.rs
-//! Canonical 144-case matrix proof, production smoke gate, and synthetic 4,608 combinatorial stress matrix.
+//! Canonical 144-case geometry-independence proof, semantic 144-case surface height matrix,
+//! and production 40x40 smoke gate. Synthetic 4,608 matrix is in tests_matrix_synthetic.rs.
 
 #[cfg(test)]
 pub mod tests {
-    use crate::map::data::{CliffLowerSide, EdgeCoord, MapData, OceanState, TileData, WorldSeed};
+    use crate::map::data::{
+        CliffLowerSide, EdgeCoord, EdgeData, EdgeType, LandscapeFeature, MapData, OceanState,
+        TileData, WorldSeed,
+    };
     use crate::map::face_topology::generate_hex_face_topology_with_profile;
     use crate::map::face_topology::profiles::HexDeformationProfile;
     use crate::map::face_topology::tests_quality_shared::shared as q;
     use crate::map::height_constraints::compile_height_constraints;
     use crate::map::height_graph::builder::build_height_constraint_graph;
     use crate::map::height_graph::types::{
-        CliffNodeRelation, HeightConstraintGraph, HeightNode, HeightNodeId,
+        CliffNodeRelation, HeightConstraintGraph, HeightContinuityEdge, HeightNode, HeightNodeId,
     };
     use crate::map::surface_height::guide::{
         derive_legacy_height_guide, HeightGuideSample, LegacyHeightGuide,
@@ -21,9 +25,10 @@ pub mod tests {
     use crate::map::surface_height::types::HeightSolverConfig;
     use crate::map::surface_height::validation::validate_surface_height_layer;
     use crate::map::surface_topology::generate_surface_topology;
-    use crate::map::surface_topology::types::SurfaceTopology;
+    use crate::map::surface_topology::types::{SurfaceFaceId, SurfaceVertexId};
     use crate::map::HexCoord;
     use bevy::prelude::*;
+    use std::collections::HashMap;
 
     #[allow(dead_code)]
     pub struct SurfaceHeightMatrixTestsPlugin;
@@ -32,57 +37,74 @@ pub mod tests {
         fn build(&self, _app: &mut App) {}
     }
 
-    fn build_test_surface(map_data: &MapData) -> SurfaceTopology {
-        let seed = WorldSeed::new(42);
-        let face_top =
-            generate_hex_face_topology_with_profile(map_data, seed, HexDeformationProfile::Organic)
-                .unwrap();
-        generate_surface_topology(&face_top).unwrap()
-    }
-
+    /// True production feasibility gate: runs spawn_map_internal with full landscape generation
+    /// (Mountains, Plateaus, Lakes, generate_cliffs, apply_rivers) over 40×40 × FAST_SEEDS.
     #[test]
     fn production_default_landscape_is_solver_feasible() {
-        for seed in q::FAST_SEEDS {
-            let mut app = App::new();
-            app.add_plugins(MinimalPlugins);
+        use crate::game_state::EditorPhase;
+        use crate::map::generation::terrain::spawn_map_internal;
+        use crate::map::navigation::NavigationMap;
+        use crate::map::terrain_gen::{TerrainConfig, TerrainGenerator};
+        use crate::map::GenerationMode;
 
+        // TerrainConfig::default() sets map_width = 40, map_height = 40.
+        let terrain_config = TerrainConfig::default();
+
+        for &seed_val in &q::FAST_SEEDS {
+            // TerrainGenerator has no Default impl — must use ::new(seed).
+            let terrain_gen = TerrainGenerator::new(seed_val);
+            let seed = WorldSeed::new(seed_val);
             let mut map_data = MapData::default();
-            let radius = 10i32;
-            for q in -radius..=radius {
-                for r in -radius..=radius {
-                    if (q + r).abs() <= radius {
-                        let hex = HexCoord::new(q, r);
-                        let elev =
-                            0.10 + 0.001 * (q * 13 + r * 17 + (seed as i32)).abs() as f32 % 0.70;
-                        map_data.tiles.insert(
-                            hex,
-                            TileData {
-                                elevation: elev,
-                                ocean_state: OceanState::Land,
-                                ..Default::default()
-                            },
-                        );
-                    }
-                }
-            }
+            let mut nav_map = NavigationMap::default();
 
-            let surface = build_test_surface(&map_data);
+            // Full production generation: apply_landscape_generation + generate_cliffs inside.
+            spawn_map_internal(
+                &terrain_gen,
+                &terrain_config,
+                &seed,
+                &mut map_data,
+                &mut nav_map,
+                EditorPhase::Landscape,
+                GenerationMode::Reset,
+                Some(EditorPhase::Landscape),
+            );
+
+            let face_top = generate_hex_face_topology_with_profile(
+                &map_data,
+                seed,
+                HexDeformationProfile::Organic,
+            )
+            .unwrap();
+            let surface = generate_surface_topology(&face_top).unwrap();
             let constraints = compile_height_constraints(&map_data, &surface).unwrap();
             let graph = build_height_constraint_graph(&surface, &constraints).unwrap();
             let guide = derive_legacy_height_guide(&map_data, &surface, &graph).unwrap();
 
-            let config = HeightSolverConfig::default();
+            let config = HeightSolverConfig::default(); // cliff_min_drop = 0.10
             let targets = compile_height_targets(&graph, &guide, &config).unwrap();
             let hard = compile_hard_constraints(&graph, &guide, &config).unwrap();
-            let layer = solve_surface_heights(&graph, &guide, &targets, &hard, &config).unwrap();
+            let layer = solve_surface_heights(&graph, &guide, &targets, &hard, &config)
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "production 40x40 landscape seed={seed_val} must be solver-feasible: {e:?}"
+                    )
+                });
 
             validate_surface_height_layer(&layer, &graph, &guide, &hard, &config).unwrap();
             assert_eq!(layer.heights.len(), graph.nodes.len());
+            // Production world generates real cliffs; assert constraints when cliffs exist.
+            if !hard.edges.is_empty() {
+                assert!(layer.stats.resolved_cliff_constraint_count > 0);
+            }
         }
     }
 
+    // ─── Canonical 144 — geometry independence ───────────────────────────────
+
+    /// Proof: 6 shapes × 3 profiles × 8 seeds produce bit-exact height layers per shape/seed,
+    /// proving solver output is geometry-independent (no face-corner randomness bleeds through).
     #[test]
-    fn canonical_144_case_surface_height_matrix() {
+    fn canonical_144_geometry_independence() {
         let config = HeightSolverConfig::default();
 
         for (_shape_name, map_template) in q::all_shapes() {
@@ -109,7 +131,6 @@ pub mod tests {
 
                     let bits: Vec<u32> = layer.heights.iter().map(|h| h.to_bits()).collect();
                     if let Some(ref base) = baseline_bits {
-                        // Proof of geometry-independence: same logical graph identity produces bit-exact height layer
                         assert_eq!(&bits, base);
                     } else {
                         baseline_bits = Some(bits);
@@ -119,89 +140,122 @@ pub mod tests {
         }
     }
 
+    // ─── Canonical 144 — semantic surface height ─────────────────────────────
+
+    /// Proof: 6 shapes × 3 profiles × 8 seeds with deterministic elevation ranks,
+    /// region intents (Mountain/Plateau/Lake/River/None), and resolved cliff decorator.
+    /// Verifies solver handles full semantic surface for all geometry shapes.
     #[test]
-    #[ignore = "Extended 4,608 synthetic graph-level solver matrix"]
-    fn synthetic_graph_extended_4608_matrix() {
-        // 6 graph families x 256 seeds x 3 solver profiles = 4,608 cases
-        let mut total_cases = 0;
+    fn canonical_144_semantic_surface_height_matrix() {
+        let config = HeightSolverConfig::default();
 
-        let profiles = [
-            HeightSolverConfig {
-                guide_weight: 8.0,
-                region_weight: 1.0,
-                smoothness_weight: 0.10,
-                ..Default::default()
-            }, // GuideDominant
-            HeightSolverConfig::default(), // Balanced
-            HeightSolverConfig {
-                guide_weight: 2.0,
-                region_weight: 4.0,
-                smoothness_weight: 0.80,
-                ..Default::default()
-            }, // Smooth
-        ];
+        for (shape_name, mut map_template) in q::all_shapes() {
+            // 1. Sort all tile coords deterministically
+            let sorted_coords: Vec<HexCoord> = {
+                let mut coords: Vec<_> = map_template.tiles.keys().copied().collect();
+                coords.sort_by(|a, b| a.q.cmp(&b.q).then_with(|| a.r.cmp(&b.r)));
+                coords
+            };
 
-        for family in 0..6 {
-            for seed in 0..256u32 {
-                for config in &profiles {
-                    let node_count = 10 + (seed as usize % 15);
-                    let mut nodes = Vec::with_capacity(node_count);
-                    let mut samples = Vec::with_capacity(node_count);
+            // 2. Assign deterministic elevation rank per tile index
+            for (idx, coord) in sorted_coords.iter().enumerate() {
+                if let Some(tile) = map_template.tiles.get_mut(coord) {
+                    let t = (idx % 8) as f32 / 7.0;
+                    tile.elevation = (0.10 + 0.70 * t).clamp(0.0, 1.0);
+                }
+            }
 
-                    for i in 0..node_count {
-                        nodes.push(HeightNode {
-                            surface_vertex:
-                                crate::map::surface_topology::types::SurfaceVertexId::new(i),
-                            incident_faces: vec![
-                                crate::map::surface_topology::types::SurfaceFaceId::new(i),
-                            ],
-                        });
-                        let target_val =
-                            0.10 + (0.03 * (i as f32 + seed as f32 % 10.0)).clamp(0.0, 0.80);
-                        samples.push(HeightGuideSample {
-                            target: target_val,
-                            hard_pin: if family == 5 && i == 0 {
-                                Some(0.0)
-                            } else {
-                                None
-                            },
-                        });
-                    }
-
-                    let mut cliff_relations = Vec::new();
-                    if family != 0 {
-                        // Generate deterministic DAG edges
-                        for i in 0..(node_count - 1) {
-                            if (i + seed as usize) % 2 == 0 {
-                                cliff_relations.push(CliffNodeRelation {
-                                    logical_edge: EdgeCoord::new(HexCoord::new(i as i32, 0), HexCoord::new((i + 1) as i32, 0)),
-                                    surface_vertex: crate::map::surface_topology::types::SurfaceVertexId::new(i),
-                                    node_a: HeightNodeId::new(i),
-                                    node_b: HeightNodeId::new(i + 1),
-                                    lower_side: CliffLowerSide::A,
-                                });
-                            }
-                        }
-                    }
-
-                    let graph = HeightConstraintGraph {
-                        nodes,
-                        cliff_relations,
-                        ..Default::default()
+            // 3. Assign deterministic region semantics (all 4 M5 region types)
+            for (idx, coord) in sorted_coords.iter().enumerate() {
+                if let Some(tile) = map_template.tiles.get_mut(coord) {
+                    tile.landscape_feature = match idx % 5 {
+                        0 => LandscapeFeature::None,
+                        1 => LandscapeFeature::Mountain,
+                        2 => LandscapeFeature::Plateau,
+                        3 => LandscapeFeature::Lake,
+                        _ => LandscapeFeature::River,
                     };
-                    let guide = LegacyHeightGuide { samples };
+                }
+            }
 
-                    let targets = compile_height_targets(&graph, &guide, config).unwrap();
-                    let hard = compile_hard_constraints(&graph, &guide, config).unwrap();
-                    let layer =
-                        solve_surface_heights(&graph, &guide, &targets, &hard, config).unwrap();
+            // 4. Derive resolved cliffs from strict scalar rank ordering (no directed cycles possible)
+            let cliff_edges = derive_ranked_cliff_edges(&map_template, &sorted_coords);
+            for (edge, data) in cliff_edges {
+                map_template.edges.insert(edge, data);
+            }
 
-                    validate_surface_height_layer(&layer, &graph, &guide, &hard, config).unwrap();
-                    total_cases += 1;
+            for profile in q::all_profiles() {
+                for seed_val in q::FAST_SEEDS {
+                    let seed = WorldSeed::new(seed_val);
+                    let face_top =
+                        generate_hex_face_topology_with_profile(&map_template, seed, profile)
+                            .unwrap();
+                    let surface = generate_surface_topology(&face_top).unwrap();
+                    let constraints = compile_height_constraints(&map_template, &surface).unwrap();
+                    let graph = build_height_constraint_graph(&surface, &constraints).unwrap();
+                    let guide =
+                        derive_legacy_height_guide(&map_template, &surface, &graph).unwrap();
+
+                    let targets = compile_height_targets(&graph, &guide, &config)
+                        .unwrap_or_else(|e| panic!("targets {shape_name} seed={seed_val}: {e:?}"));
+                    let hard = compile_hard_constraints(&graph, &guide, &config)
+                        .unwrap_or_else(|e| panic!("hard {shape_name} seed={seed_val}: {e:?}"));
+                    let layer = solve_surface_heights(&graph, &guide, &targets, &hard, &config)
+                        .unwrap_or_else(|e| panic!("solver {shape_name} seed={seed_val}: {e:?}"));
+                    validate_surface_height_layer(&layer, &graph, &guide, &hard, &config)
+                        .unwrap_or_else(|e| panic!("validate {shape_name} seed={seed_val}: {e:?}"));
                 }
             }
         }
+    }
 
-        assert_eq!(total_cases, 4608);
+    /// Deterministic cliff edges from elevation rank ordering.
+    /// Visits each canonical logical edge exactly once via the coord == edge.a guard.
+    /// Directed by strict rank: no cycles possible by construction.
+    fn derive_ranked_cliff_edges(
+        map: &MapData,
+        sorted_coords: &[HexCoord],
+    ) -> Vec<(EdgeCoord, EdgeData)> {
+        let rank: HashMap<HexCoord, usize> = sorted_coords
+            .iter()
+            .enumerate()
+            .map(|(i, &c)| (c, i))
+            .collect();
+
+        let mut edges = Vec::new();
+        for &coord in sorted_coords {
+            for neighbor in coord.neighbors() {
+                if !map.tiles.contains_key(&neighbor) {
+                    continue;
+                }
+
+                let edge = EdgeCoord::new(coord, neighbor);
+
+                // Visit each canonical logical edge exactly once
+                if coord != edge.a {
+                    continue;
+                }
+
+                let rank_a = rank[&edge.a];
+                let rank_b = rank[&edge.b];
+
+                debug_assert_ne!(rank_a, rank_b, "elevation ranks should differ");
+
+                let cliff_lower_side = if rank_a < rank_b {
+                    CliffLowerSide::A
+                } else {
+                    CliffLowerSide::B
+                };
+
+                edges.push((
+                    edge,
+                    EdgeData {
+                        edge_type: EdgeType::Cliff,
+                        cliff_lower_side,
+                    },
+                ));
+            }
+        }
+        edges
     }
 }

@@ -13,8 +13,11 @@ use bevy::prelude::*;
 #[derive(Debug, Clone, PartialEq)]
 pub enum HeightSolveError {
     TargetCountMismatch,
+    GuideCountMismatch,
     BoundCountMismatch,
     InvalidNeighborNode(HeightNodeId),
+    InvalidConstraintNode(HeightNodeId),
+    InvalidTopologicalNode(HeightNodeId),
     NonFiniteTarget(HeightNodeId),
     NonFiniteResult(HeightNodeId),
     HardProjectionViolation {
@@ -40,9 +43,25 @@ pub fn solve_surface_heights(
     if targets.samples.len() != node_count {
         return Err(HeightSolveError::TargetCountMismatch);
     }
+    if guide.samples.len() != node_count {
+        return Err(HeightSolveError::GuideCountMismatch);
+    }
     if constraints.lower_bounds.len() != node_count || constraints.upper_bounds.len() != node_count
     {
         return Err(HeightSolveError::BoundCountMismatch);
+    }
+    for edge in &constraints.edges {
+        if edge.lower_node.index() >= node_count {
+            return Err(HeightSolveError::InvalidConstraintNode(edge.lower_node));
+        }
+        if edge.higher_node.index() >= node_count {
+            return Err(HeightSolveError::InvalidConstraintNode(edge.higher_node));
+        }
+    }
+    for &node_id in &constraints.topological_order {
+        if node_id.index() >= node_count {
+            return Err(HeightSolveError::InvalidTopologicalNode(node_id));
+        }
     }
 
     // 1. Initial solver state contract: height[i] = target[i].clamp(lower[i], upper[i])

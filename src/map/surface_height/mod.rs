@@ -10,13 +10,19 @@ pub mod types;
 pub mod validation;
 
 #[cfg(test)]
+pub mod tests_cliffs;
+#[cfg(test)]
 pub mod tests_determinism;
 #[cfg(test)]
 pub mod tests_guide;
 #[cfg(test)]
 pub mod tests_matrix;
 #[cfg(test)]
+pub mod tests_matrix_synthetic;
+#[cfg(test)]
 pub mod tests_runtime;
+#[cfg(test)]
+pub mod tests_runtime_transactional;
 #[cfg(test)]
 pub mod tests_solver;
 #[cfg(test)]

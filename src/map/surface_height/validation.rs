@@ -18,6 +18,13 @@ pub enum SurfaceHeightValidationError {
         expected: usize,
         actual: usize,
     },
+    GuideCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    InvalidNodeReference {
+        node: HeightNodeId,
+    },
     NonFiniteHeight {
         node: HeightNodeId,
     },
@@ -57,6 +64,12 @@ pub fn validate_surface_height_layer(
         return Err(SurfaceHeightValidationError::NodeCountMismatch {
             expected: node_count,
             actual: layer.heights.len(),
+        });
+    }
+    if guide.samples.len() != node_count {
+        return Err(SurfaceHeightValidationError::GuideCountMismatch {
+            expected: node_count,
+            actual: guide.samples.len(),
         });
     }
 
@@ -99,6 +112,16 @@ pub fn validate_surface_height_layer(
     // 3. Validate resolved cliff minimum drops and maximum violation
     let mut max_cliff_violation = 0.0f32;
     for edge in &constraints.edges {
+        if edge.lower_node.index() >= node_count {
+            return Err(SurfaceHeightValidationError::InvalidNodeReference {
+                node: edge.lower_node,
+            });
+        }
+        if edge.higher_node.index() >= node_count {
+            return Err(SurfaceHeightValidationError::InvalidNodeReference {
+                node: edge.higher_node,
+            });
+        }
         let low = layer.heights[edge.lower_node.index()];
         let high = layer.heights[edge.higher_node.index()];
         let drop = high - low;
