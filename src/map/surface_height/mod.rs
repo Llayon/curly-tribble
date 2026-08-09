@@ -3,11 +3,13 @@
 
 pub mod guide;
 pub mod hard_constraints;
+pub mod solver;
 pub mod targets;
 pub mod types;
 
 pub use guide::*;
 pub use hard_constraints::*;
+pub use solver::*;
 pub use targets::*;
 pub use types::*;
 
