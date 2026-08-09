@@ -119,6 +119,35 @@ pub struct HeightConstraintGraph {
     pub stats: HeightGraphStats,
 }
 
+impl HeightConstraintGraph {
+    #[must_use]
+    pub fn region_nodes_for_hex(&self, hex: HexCoord) -> Option<&[HeightNodeId]> {
+        self.regions
+            .iter()
+            .find(|r| r.hex == hex)
+            .map(|r| r.nodes.as_slice())
+    }
+
+    pub fn cliff_relations_for_edge(
+        &self,
+        edge: EdgeCoord,
+    ) -> impl Iterator<Item = &CliffNodeRelation> {
+        self.cliff_relations
+            .iter()
+            .filter(move |r| r.logical_edge == edge)
+    }
+
+    #[must_use]
+    pub fn height_nodes_for_surface_vertex(&self, vertex: SurfaceVertexId) -> Vec<HeightNodeId> {
+        self.nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, node)| node.surface_vertex == vertex)
+            .map(|(idx, _)| HeightNodeId::new(idx))
+            .collect()
+    }
+}
+
 #[allow(dead_code)]
 pub struct HeightGraphTypesPlugin;
 
