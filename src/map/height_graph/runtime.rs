@@ -12,10 +12,19 @@ use crate::map::surface_topology::types::SurfaceTopology;
 use crate::sets::GameSet;
 use bevy::prelude::*;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum HeightGraphGenerationOutcome {
+    #[default]
+    Uninitialized,
+    Success,
+    Failure,
+}
+
 #[derive(Resource, Debug, Default)]
 pub struct HeightGraphGenerationState {
     pub generation_count: u64,
     pub failure_count: u64,
+    pub last_outcome: HeightGraphGenerationOutcome,
 }
 
 pub struct HeightGraphRuntimePlugin;
@@ -47,6 +56,7 @@ pub fn regenerate_height_constraint_graph(
         HeightConstraintCompilationOutcome::Uninitialized => return,
         HeightConstraintCompilationOutcome::Failure => {
             state.failure_count += 1;
+            state.last_outcome = HeightGraphGenerationOutcome::Failure;
             *graph = HeightConstraintGraph::default();
             return;
         }
@@ -59,15 +69,18 @@ pub fn regenerate_height_constraint_graph(
                 Ok(()) => {
                     *graph = new_graph;
                     state.generation_count += 1;
+                    state.last_outcome = HeightGraphGenerationOutcome::Success;
                 }
                 Err(_err) => {
                     state.failure_count += 1;
+                    state.last_outcome = HeightGraphGenerationOutcome::Failure;
                     *graph = HeightConstraintGraph::default();
                 }
             }
         }
         Err(_err) => {
             state.failure_count += 1;
+            state.last_outcome = HeightGraphGenerationOutcome::Failure;
             *graph = HeightConstraintGraph::default();
         }
     }
