@@ -30,12 +30,13 @@
 - [SOP: SurfaceTerrainBridge Standards](docs/superpowers/patterns/surface_terrain_bridge.md): Standard for pure projection derivation from SurfaceTopology to TerrainTopology rendering representation.
 - [SOP: HeightConstraint Binding Standards](docs/superpowers/patterns/height_constraint_binding.md): Standard for compiling persistent authoring intent onto SurfaceTopology face and boundary identities.
 - [SOP: HeightConstraintGraph Standards](docs/superpowers/patterns/height_constraint_graph.md): Standard for derived height degrees of freedom (HeightNodeId) and cliff-seam height domain partitioning.
+- [SOP: SurfaceHeightSolver Standards](docs/superpowers/patterns/surface_height_solver.md): Standard for deterministic Jacobi height solver, target compilation, hard cliff DAG bounds, and validation on SurfaceHeightLayer.
 - [ADR 0004: Semantic SurfaceTopology Foundation](docs/superpowers/adr/0004_surface_topology_foundation.md): Side-by-side surface model derived strictly from HexFaceTopology with explicit coarse vertex provenance.
 - [ADR 0005: SurfaceTopology Production Bridge](docs/superpowers/adr/0005_surface_topology_production_bridge.md): Production terrain rendering bridge routing handle_rebuild_mesh through SurfaceTopology.
 - [ADR 0006: Landscape Height Constraint Compilation](docs/superpowers/adr/0006_landscape_height_constraint_compilation.md): Derived semantic height constraint compilation on SurfaceTopology.
 - [ADR 0007: HexFaceTopology Diagnostic Overlay](docs/superpowers/adr/0007-hex-face-topology-debug-overlay.md): Resource ownership, cache derivation, failure policy, and debug-only rendering boundaries.
 - [ADR 0008: Derived Height Constraint Graph & Cliff-Seam Height Domains](docs/superpowers/adr/0008_height_constraint_graph.md): Combinatorial height graph model, occurrence partition completeness, and cliff seam domain partitioning.
-- [ADR 0009: Warped Half-Edge Landscape Editing](docs/superpowers/adr/0009-warped-half-edge-landscape-editing.md): Half-edge pick index derivation, side classification law, explicit click semantics, and stroke propagation.
+- [ADR 0009: Deterministic Surface Height Layer & Height Solver](docs/superpowers/adr/0009_surface_height_solver.md): Normalized height domain, side-by-side Jacobi solver, hard cliff bounds, and validation layer.
 - [Design: Advanced Terrain Generation](docs/superpowers/specs/2026-05-11-advanced-terrain-gen-design.md): Sharp ridges, pass masks, and terraced plateaus logic.
 - [Plan: Advanced Terrain Implementation](docs/superpowers/plans/2026-05-11-advanced-terrain-gen.md): Technical steps for the unified TerrainConfig inspector.
 - [Design: Procedural Rivers](docs/superpowers/specs/2026-05-12-pathfinding-rivers-design.md): Dijkstra-based river routing and mud banks.
