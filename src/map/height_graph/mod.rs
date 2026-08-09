@@ -3,11 +3,13 @@
 
 pub mod builder;
 pub mod diagnostics;
+pub mod runtime;
 pub mod types;
 pub mod validation;
 
 pub use builder::*;
 pub use diagnostics::*;
+pub use runtime::*;
 pub use types::*;
 pub use validation::*;
 
@@ -17,6 +19,7 @@ pub struct HeightGraphPlugin;
 
 impl Plugin for HeightGraphPlugin {
     fn build(&self, app: &mut App) {
-        app.init_resource::<HeightConstraintGraph>();
+        app.init_resource::<HeightConstraintGraph>()
+            .add_plugins(HeightGraphRuntimePlugin);
     }
 }
