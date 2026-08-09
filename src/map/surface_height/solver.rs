@@ -1,5 +1,5 @@
 // src/map/surface_height/solver.rs
-//! Deterministic Jacobi height solver for Milestone M5 — SurfaceHeightLayer.
+//! Deterministic Jacobi height solver for Milestone M5 — `SurfaceHeightLayer`.
 
 use crate::map::height_graph::types::{HeightConstraintGraph, HeightNodeId};
 use crate::map::surface_height::guide::LegacyHeightGuide;

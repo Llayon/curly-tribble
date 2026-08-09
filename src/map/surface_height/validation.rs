@@ -1,5 +1,5 @@
 // src/map/surface_height/validation.rs
-//! Pure structural and numeric validator for Milestone M5 — SurfaceHeightLayer.
+//! Pure structural and numeric validator for Milestone M5 — `SurfaceHeightLayer`.
 
 use crate::map::height_graph::types::{HeightConstraintGraph, HeightNodeId};
 use crate::map::surface_height::guide::LegacyHeightGuide;
@@ -117,6 +117,7 @@ pub fn validate_surface_height_layer(
     }
 
     // 4. Re-calculate independent SurfaceHeightStats and verify exact match
+    #[allow(clippy::cast_possible_truncation)]
     let mean_h = if node_count > 0 {
         (sum_h / (node_count as f64)) as f32
     } else {

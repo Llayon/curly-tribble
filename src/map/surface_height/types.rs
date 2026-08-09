@@ -1,5 +1,5 @@
 // src/map/surface_height/types.rs
-//! Normalized domain models, configuration, and solver reports for Milestone M5 — SurfaceHeightLayer.
+//! Normalized domain models, configuration, and solver reports for Milestone M5 — `SurfaceHeightLayer`.
 
 use bevy::prelude::*;
 

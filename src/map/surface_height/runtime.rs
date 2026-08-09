@@ -1,5 +1,5 @@
 // src/map/surface_height/runtime.rs
-//! Bevy runtime system and plugin for Milestone M5 — SurfaceHeightLayer.
+//! Bevy runtime system and plugin for Milestone M5 — `SurfaceHeightLayer`.
 
 use crate::map::data::{MapData, OceanState};
 use crate::map::height_graph::runtime::{HeightGraphGenerationOutcome, HeightGraphGenerationState};
@@ -151,7 +151,7 @@ pub fn regenerate_surface_height_layer(
     // Strict no-retry policy: record attempt BEFORE work
     state.last_attempt = Some(current_inputs);
 
-    let result = (|| {
+    let result: Result<(LegacyHeightGuide, SurfaceHeightLayer), ()> = (|| {
         config.validate_config().map_err(|_| ())?;
         let derived_guide =
             derive_legacy_height_guide(&map_data, &surface, &graph).map_err(|_| ())?;
@@ -178,18 +178,15 @@ pub fn regenerate_surface_height_layer(
         Ok((derived_guide, solved_layer))
     })();
 
-    match result {
-        Ok((new_guide, new_layer)) => {
-            *guide = new_guide;
-            *layer = new_layer;
-            state.generation_count += 1;
-            state.last_outcome = HeightSolveGenerationOutcome::Success;
-        }
-        Err(()) => {
-            state.failure_count += 1;
-            state.last_outcome = HeightSolveGenerationOutcome::Failure;
-            *guide = LegacyHeightGuide::default();
-            *layer = SurfaceHeightLayer::default();
-        }
+    if let Ok((new_guide, new_layer)) = result {
+        *guide = new_guide;
+        *layer = new_layer;
+        state.generation_count += 1;
+        state.last_outcome = HeightSolveGenerationOutcome::Success;
+    } else {
+        state.failure_count += 1;
+        state.last_outcome = HeightSolveGenerationOutcome::Failure;
+        *guide = LegacyHeightGuide::default();
+        *layer = SurfaceHeightLayer::default();
     }
 }

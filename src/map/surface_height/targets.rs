@@ -1,5 +1,5 @@
 // src/map/surface_height/targets.rs
-//! Semantic preferred target and weight compilation for Milestone M5 — SurfaceHeightLayer.
+//! Semantic preferred target and weight compilation for Milestone M5 — `SurfaceHeightLayer`.
 
 use crate::map::height_constraints::types::RegionHeightIntent;
 use crate::map::height_graph::types::{HeightConstraintGraph, HeightNodeId};

@@ -1,5 +1,5 @@
 // src/map/surface_height/hard_constraints.rs
-//! Feasible DAG compilation and interval bound calculations for Milestone M5 — SurfaceHeightLayer.
+//! Feasible DAG compilation and interval bound calculations for Milestone M5 — `SurfaceHeightLayer`.
 
 use crate::map::height_graph::diagnostics::HeightDiagnosticSeverity;
 use crate::map::height_graph::types::{HeightConstraintGraph, HeightNodeId};
@@ -109,8 +109,8 @@ pub fn compile_hard_constraints(
 
     // Zero-indegree queue using BTreeSet for canonical deterministic lowest HeightNodeId selection
     let mut zero_indegree: BTreeSet<HeightNodeId> = BTreeSet::new();
-    for node_idx in 0..graph.nodes.len() {
-        if in_degree[node_idx] == 0 {
+    for (node_idx, &deg) in in_degree.iter().enumerate() {
+        if deg == 0 {
             zero_indegree.insert(HeightNodeId::new(node_idx));
         }
     }
