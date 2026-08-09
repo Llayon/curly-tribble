@@ -4,10 +4,12 @@
 pub mod builder;
 pub mod diagnostics;
 pub mod types;
+pub mod validation;
 
 pub use builder::*;
 pub use diagnostics::*;
 pub use types::*;
+pub use validation::*;
 
 use bevy::prelude::*;
 
