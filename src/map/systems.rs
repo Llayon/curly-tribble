@@ -4,7 +4,10 @@ use crate::map::generation::{
     auto_spawn_bio_deposits, auto_spawn_npcs, auto_spawn_treasures, spawn_map_internal,
 };
 use crate::map::navigation::NavigationMap;
-use crate::map::terrain_gen::{GenerationRequest, TerrainConfig, TerrainGenerator};
+use crate::map::terrain_bake::types::SurfaceTerrainBake;
+use crate::map::terrain_gen::{
+    GenerationRequest, TerrainConfig, TerrainConfigFingerprint, TerrainGenerator,
+};
 use crate::map::{
     FactionMarker, GenerateMapEvent, GenerationMode, MapData, MapEntity, MapVisualEntity,
     RebuildMeshEvent, WorldSeed,
@@ -117,6 +120,7 @@ pub fn handle_rebuild_mesh(
     faction_manager: Res<FactionManager>,
     config: Res<TerrainConfig>,
     phase: Res<State<EditorPhase>>,
+    bake: Option<Res<SurfaceTerrainBake>>,
 ) {
     if ev_rebuild.read().count() == 0 {
         return;
@@ -144,6 +148,9 @@ pub fn handle_rebuild_mesh(
                 phase: *phase.get(),
                 faction_manager: faction_manager.clone(),
                 config: (*config).clone(),
+                bake: bake
+                    .filter(|b| !b.vertices.is_empty())
+                    .map(|b| (*b).clone()),
             });
         }
         Err(err) => {
@@ -160,19 +167,28 @@ pub fn monitor_inspector_triggers(
     mut config: ResMut<TerrainConfig>,
     mut ev_gen: MessageWriter<GenerateMapEvent>,
     mut ev_rebuild: MessageWriter<RebuildMeshEvent>,
+    mut fingerprint: ResMut<TerrainConfigFingerprint>,
 ) {
-    if config.generation_request == GenerationRequest::None {
+    let current = config.mesh_fingerprint();
+    if fingerprint.last == current {
+        return;
+    }
+    fingerprint.last = current;
+
+    let request = config.generation_request;
+    if request == GenerationRequest::None {
         ev_rebuild.write(RebuildMeshEvent);
         return;
     }
 
-    let request = config.generation_request;
     let bypass = config.bypass_change_detection();
     bypass.generation_request = GenerationRequest::None;
 
     if request == GenerationRequest::RandomizeSeed {
         bypass.seed = rand::thread_rng().gen_range(0..999_999);
     }
+
+    fingerprint.last = config.mesh_fingerprint();
 
     ev_gen.write(GenerateMapEvent {
         mode: GenerationMode::Reset,

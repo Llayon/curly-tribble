@@ -1,8 +1,10 @@
 // src/economy/mesh_gen/mod.rs
+pub mod bake;
 pub mod billboards;
 pub mod cliff_gizmos;
 pub mod generator;
 pub mod gizmos;
+pub mod overlay;
 pub mod treasures;
 
 #[cfg(test)]
@@ -14,7 +16,7 @@ use crate::game_state::EditorPhase;
 use crate::map::zoning::{GlobalTerrainBundle, Roof, WaterBundle};
 use crate::map::{MapData, MapEntity, MapVisualEntity};
 use bevy::prelude::*;
-use generator::create_global_map_meshes;
+use generator::{create_global_map_meshes, create_global_map_meshes_from_bake};
 
 pub struct MeshGenPlugin;
 
@@ -66,6 +68,8 @@ pub struct SpawnGlobalTerrainCommand {
     pub phase: EditorPhase,
     pub faction_manager: crate::game_state::FactionManager,
     pub config: crate::map::terrain_gen::TerrainConfig,
+    /// M5.1 authoritative ground geometry when regenerated and non-empty.
+    pub bake: Option<crate::map::terrain_bake::types::SurfaceTerrainBake>,
 }
 
 impl Command for SpawnGlobalTerrainCommand {
@@ -97,20 +101,31 @@ impl Command for SpawnGlobalTerrainCommand {
 
         world.insert_resource(self.topology.clone());
 
-        let (mesh, water_mesh, roof_mesh) = match create_global_map_meshes(
-            &self.map_data,
-            &self.topology,
-            &self.face_topology,
-            self.phase,
-            &self.faction_manager,
-            &self.config,
-        ) {
+        let (mesh, water_mesh, roof_mesh) = match match &self.bake {
+            Some(bake) => create_global_map_meshes_from_bake(
+                &self.map_data,
+                bake,
+                &self.face_topology,
+                self.phase,
+                &self.faction_manager,
+                &self.config,
+            ),
+            None => create_global_map_meshes(
+                &self.map_data,
+                &self.topology,
+                &self.face_topology,
+                self.phase,
+                &self.faction_manager,
+                &self.config,
+            ),
+        } {
             Ok(m) => m,
             Err(err) => {
                 bevy::log::tracing::event!(
                     bevy::log::tracing::Level::ERROR,
                     error = ?err,
-                    "Failed to create map meshes due to invalid topology"
+                    bake_active = self.bake.is_some(),
+                    "Failed to create map meshes due to invalid geometry"
                 );
                 return;
             }
@@ -164,7 +179,7 @@ impl Command for SpawnGlobalTerrainCommand {
             .map_or(0, |t| t.triangles.len());
 
         debug!(
-            "TERRAIN REBUILD DIAGNOSTICS [Phase: {:?}]: TileCount={}, TopVerts={}, TopTris={}, ResTris={}, MinElev={:.3}, MaxElev={:.3}, MinMeshY={:.3}, MaxMeshY={:.3}, GroundUnlit={}, ExactUpNormals={}, SlopedNormals={}",
+            "TERRAIN REBUILD DIAGNOSTICS [Phase: {:?}]: TileCount={}, TopVerts={}, TopTris={}, ResTris={}, MinElev={:.3}, MaxElev={:.3}, MinMeshY={:.3}, MaxMeshY={:.3}, GroundUnlit={}, ExactUpNormals={}, SlopedNormals={}, BakeActive={}, BakeVerts={}, BakeFaces={}, BakeWalls={}",
             self.phase,
             self.map_data.tiles.len(),
             self.topology.vertices_xz.len(),
@@ -176,7 +191,11 @@ impl Command for SpawnGlobalTerrainCommand {
             max_mesh_y,
             is_flat,
             exact_up_normals,
-            sloped_normals
+            sloped_normals,
+            self.bake.is_some(),
+            self.bake.as_ref().map_or(0, |b| b.vertices.len()),
+            self.bake.as_ref().map_or(0, |b| b.faces.len()),
+            self.bake.as_ref().map_or(0, |b| b.cliff_walls.len()),
         );
 
         let (terrain_handle, water_handle, roof_handle) = {

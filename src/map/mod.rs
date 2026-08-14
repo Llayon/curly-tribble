@@ -25,6 +25,7 @@ pub mod roads;
 pub mod subhex;
 pub mod surface_height;
 pub mod surface_topology;
+pub mod terrain_bake;
 pub mod terrain_gen;
 pub mod topology;
 pub mod topology_adapter;
@@ -136,6 +137,7 @@ impl Plugin for MapPlugin {
                 height_constraints::HeightConstraintsPlugin,
                 height_graph::HeightGraphPlugin,
                 surface_height::SurfaceHeightPlugin,
+                terrain_bake::TerrainBakePlugin,
                 crate::economy::mesh_gen::MeshGenPlugin,
                 river_gen::RiverGenPlugin,
                 terrain_gen::TerrainGenPlugin,
@@ -189,7 +191,7 @@ impl Plugin for MapPlugin {
                         .in_set(GameSet::Logic),
                     systems::handle_rebuild_mesh
                         .in_set(GameSet::Visuals)
-                        .after(surface_topology::runtime::regenerate_surface_topology),
+                        .after(terrain_bake::runtime::regenerate_surface_terrain_bake),
                     tools::rebuild_landscape_edge_pick_index
                         .in_set(GameSet::Visuals)
                         .after(face_topology::runtime::regenerate_hex_face_topology),

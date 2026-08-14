@@ -4,7 +4,7 @@ use savage_fantasy::game_state::{EditorPhase, GameState};
 use savage_fantasy::map::data::OceanState;
 use savage_fantasy::map::terrain_gen::{TerrainConfig, TerrainGenerator};
 use savage_fantasy::map::topology::{
-    canonical_vertex_key, compute_vertex_heights, generate_topology_from_map_data,
+    canonical_vertex_key, compute_vertex_heights, generate_legacy_topology_from_map_data,
 };
 use savage_fantasy::map::{HexCoord, MapData, TileData, HEX_SIZE};
 
@@ -70,7 +70,7 @@ fn test_topology_validation_cases() {
     );
 
     // 2. Build topology
-    let topology_balance = generate_topology_from_map_data(&map_data);
+    let topology_balance = generate_legacy_topology_from_map_data(&map_data);
     let tri_count = topology_balance.triangles.len();
     assert_eq!(
         tri_count,
@@ -90,7 +90,7 @@ fn test_topology_validation_cases() {
     );
 
     // 4. Height3D uses identical topology & counts
-    let topology_height = generate_topology_from_map_data(&map_data);
+    let topology_height = generate_legacy_topology_from_map_data(&map_data);
     assert_eq!(
         topology_height.vertices_xz.len(),
         topology_balance.vertices_xz.len(),
@@ -137,7 +137,7 @@ fn test_topology_validation_cases() {
     );
 
     // 8. Rebuilding with same seed produces identical topology
-    let topology_rebuild = generate_topology_from_map_data(&map_data);
+    let topology_rebuild = generate_legacy_topology_from_map_data(&map_data);
     assert_eq!(
         topology_rebuild.vertices_xz, topology_balance.vertices_xz,
         "Rebuilding topology from same map data must yield identical vertex positions"

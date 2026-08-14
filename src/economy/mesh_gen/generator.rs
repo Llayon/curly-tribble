@@ -1,11 +1,20 @@
+// src/economy/mesh_gen/generator.rs
+//! Legacy topology-driven ground mesh generation, tile coloring, and the
+//! shared `OverlayGeometryError`. The M5.1 bake pipeline lives in `bake.rs`
+//! and the water/roof overlays live in `overlay.rs`.
+
 use crate::game_state::{EditorPhase, FactionManager};
-use crate::map::data::{OceanState, RoofState};
+use crate::map::data::OceanState;
+use crate::map::height_graph::types::HeightNodeId;
 use crate::map::terrain_gen::TerrainConfig;
 use crate::map::{LandscapeFeature, MapData, TerrainType};
 use bevy::asset::RenderAssetUsages;
 use bevy::mesh::Indices;
 use bevy::prelude::*;
 use bevy::render::render_resource::PrimitiveTopology;
+
+pub use super::bake::create_global_map_meshes_from_bake;
+pub(crate) use super::overlay::build_water_and_roof_meshes;
 
 pub struct MeshGeneratorPlugin;
 
@@ -18,57 +27,16 @@ pub enum OverlayGeometryError {
     MissingFaceForTile(crate::map::HexCoord),
     InvalidSourceFace(crate::map::face_topology::FaceId),
     InvalidSourceVertex(crate::map::face_topology::VertexId),
-}
-
-pub(crate) fn extract_warped_face_corners(
-    coord: crate::map::HexCoord,
-    face_topology: &crate::map::face_topology::types::HexFaceTopology,
-) -> Result<[Vec2; 6], OverlayGeometryError> {
-    let &face_id = face_topology
-        .hex_to_face
-        .get(&coord)
-        .ok_or(OverlayGeometryError::MissingFaceForTile(coord))?;
-    let face = face_topology
-        .faces
-        .get(face_id.index())
-        .ok_or(OverlayGeometryError::InvalidSourceFace(face_id))?;
-    let mut corners = [Vec2::ZERO; 6];
-    for (i, corner) in corners.iter_mut().enumerate() {
-        let v_id = face.vertices[i];
-        let v_idx = v_id.index();
-        if v_idx >= face_topology.vertices.len() {
-            return Err(OverlayGeometryError::InvalidSourceVertex(v_id));
-        }
-        *corner = face_topology.vertices[v_idx].position;
-    }
-    Ok(corners)
-}
-
-fn append_overlay_face(
-    vertices: &mut Vec<[f32; 3]>,
-    indices: &mut Vec<u32>,
-    corners: &[Vec2; 6],
-    y: f32,
-    vertex_count: &mut u32,
-) {
-    let center_xz =
-        (corners[0] + corners[1] + corners[2] + corners[3] + corners[4] + corners[5]) / 6.0;
-    vertices.push([center_xz.x, y, center_xz.y]);
-    for corner in corners {
-        vertices.push([corner.x, y, corner.y]);
-    }
-    let base = *vertex_count;
-    for i in 1..=6 {
-        let next = if i == 6 { 1 } else { i + 1 };
-        indices.extend_from_slice(&[base, base + next, base + i]);
-    }
-    *vertex_count += 7;
+    InvalidHeightNode(HeightNodeId),
+    HeightNodeIndexOverflow(HeightNodeId),
+    MissingBakeVertexOwner(HeightNodeId),
 }
 
 /// Creates map ground, water, and roof meshes from authoritative topology.
 ///
 /// # Errors
 /// Returns `OverlayGeometryError` if any tile's face or vertex lookup fails in `HexFaceTopology`.
+#[allow(clippy::too_many_arguments)]
 pub fn create_global_map_meshes(
     map: &MapData,
     topology: &crate::map::topology::TerrainTopology,
@@ -77,9 +45,9 @@ pub fn create_global_map_meshes(
     faction_manager: &FactionManager,
     config: &TerrainConfig,
 ) -> Result<(Mesh, Option<Mesh>, Option<Mesh>), OverlayGeometryError> {
-    let is_flat = phase < EditorPhase::Height3D;
-    let is_factions_filter = phase == EditorPhase::Factions;
-    let mode = if is_flat {
+    let flat_surface = phase < EditorPhase::Height3D;
+    let faction_filter = phase == EditorPhase::Factions;
+    let mode = if flat_surface {
         crate::map::topology::TerrainHeightMode::Flat
     } else {
         crate::map::topology::TerrainHeightMode::Relief3D
@@ -116,7 +84,7 @@ pub fn create_global_map_meshes(
             phase,
             faction_manager,
             config,
-            is_factions_filter,
+            faction_filter,
         );
         colors.push(color);
     }
@@ -128,51 +96,7 @@ pub fn create_global_map_meshes(
         indices.push(tri[2]);
     }
 
-    let mut water_vertices = Vec::new();
-    let mut water_indices = Vec::new();
-    let mut roof_vertices = Vec::new();
-    let mut roof_indices = Vec::new();
-
-    let mut water_vertex_count = 0;
-    let mut roof_vertex_count = 0;
-
-    let mut sorted_coords: Vec<crate::map::HexCoord> = map.tiles.keys().copied().collect();
-    sorted_coords.sort_by_key(|c| (c.q, c.r));
-
-    for coord in sorted_coords {
-        let tile_data = &map.tiles[&coord];
-        let center_y = if is_flat || tile_data.ocean_state == OceanState::Ocean {
-            0.0
-        } else {
-            map.get_hex_height(coord.q, coord.r)
-        };
-
-        if (tile_data.landscape_feature == LandscapeFeature::River
-            || tile_data.landscape_feature == LandscapeFeature::Lake)
-            && tile_data.ocean_state == OceanState::Land
-        {
-            let corners = extract_warped_face_corners(coord, face_topology)?;
-            append_overlay_face(
-                &mut water_vertices,
-                &mut water_indices,
-                &corners,
-                center_y,
-                &mut water_vertex_count,
-            );
-        }
-
-        if tile_data.roof_state == RoofState::Roofed {
-            let roof_y = center_y + 2.5;
-            let corners = extract_warped_face_corners(coord, face_topology)?;
-            append_overlay_face(
-                &mut roof_vertices,
-                &mut roof_indices,
-                &corners,
-                roof_y,
-                &mut roof_vertex_count,
-            );
-        }
-    }
+    let (water_mesh, roof_mesh) = build_water_and_roof_meshes(map, face_topology, phase)?;
 
     let mut terrain_mesh = Mesh::new(
         PrimitiveTopology::TriangleList,
@@ -185,13 +109,10 @@ pub fn create_global_map_meshes(
     terrain_mesh.insert_indices(Indices::U32(indices));
     terrain_mesh.compute_normals();
 
-    let water_mesh = create_optional_mesh(water_vertices, water_indices);
-    let roof_mesh = create_optional_mesh(roof_vertices, roof_indices);
-
     Ok((terrain_mesh, water_mesh, roof_mesh))
 }
 
-fn tile_color(
+pub(super) fn tile_color(
     map: &MapData,
     coord: crate::map::HexCoord,
     tile: &crate::map::TileData,
@@ -251,19 +172,4 @@ fn feature_color(tile: &crate::map::TileData, _phase: EditorPhase) -> [f32; 4] {
             TerrainType::Swamp => [0.2, 0.25, 0.2, 1.0],
         },
     }
-}
-
-fn create_optional_mesh(vertices: Vec<[f32; 3]>, indices: Vec<u32>) -> Option<Mesh> {
-    if vertices.is_empty() {
-        return None;
-    }
-
-    let mut mesh = Mesh::new(
-        PrimitiveTopology::TriangleList,
-        RenderAssetUsages::default(),
-    );
-    mesh.insert_attribute(Mesh::ATTRIBUTE_POSITION, vertices);
-    mesh.insert_indices(Indices::U32(indices));
-    mesh.compute_normals();
-    Some(mesh)
 }

@@ -133,7 +133,7 @@ mod tests {
         .expect("valid face topo");
 
         let missing_coord = HexCoord::new(99, 99);
-        let err = crate::economy::mesh_gen::generator::extract_warped_face_corners(
+        let err = crate::economy::mesh_gen::overlay::extract_warped_face_corners(
             missing_coord,
             &face_topo,
         )

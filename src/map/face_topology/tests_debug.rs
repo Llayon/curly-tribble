@@ -149,7 +149,7 @@ mod debug_tests {
             regenerate_hex_face_topology, HexFaceTopologyGenerationState,
         };
         use crate::map::face_topology::types::HexFaceTopology;
-        use crate::map::terrain_gen::TerrainConfig;
+        use crate::map::terrain_gen::{TerrainConfig, TerrainConfigFingerprint};
         use crate::map::{GenerateMapEvent, RebuildMeshEvent};
         use bevy::prelude::*;
 
@@ -157,6 +157,7 @@ mod debug_tests {
         app.insert_resource(map_40x40())
             .insert_resource(WorldSeed::new(42))
             .init_resource::<TerrainConfig>()
+            .init_resource::<TerrainConfigFingerprint>()
             .init_resource::<HexFaceTopology>()
             .init_resource::<HexFaceDebugSettings>()
             .init_resource::<HexFaceDebugCache>()
@@ -219,7 +220,7 @@ mod debug_tests {
         };
         use crate::map::face_topology::types::HexFaceTopology;
         use crate::map::systems::{handle_rebuild_mesh, monitor_inspector_triggers};
-        use crate::map::terrain_gen::TerrainConfig;
+        use crate::map::terrain_gen::{TerrainConfig, TerrainConfigFingerprint};
         use crate::map::{GenerateMapEvent, RebuildMeshEvent};
         use bevy::prelude::*;
 
@@ -232,6 +233,7 @@ mod debug_tests {
             .insert_resource(Assets::<Mesh>::default())
             .insert_resource(Assets::<StandardMaterial>::default())
             .init_resource::<TerrainConfig>()
+            .init_resource::<TerrainConfigFingerprint>()
             .init_resource::<HexFaceTopology>()
             .init_resource::<crate::map::surface_topology::types::SurfaceTopology>()
             .init_resource::<HexFaceDebugCache>()

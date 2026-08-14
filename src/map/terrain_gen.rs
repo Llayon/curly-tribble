@@ -6,7 +6,53 @@ use noise::{Fbm, NoiseFn, OpenSimplex};
 pub struct TerrainGenPlugin;
 
 impl Plugin for TerrainGenPlugin {
-    fn build(&self, _app: &mut App) {}
+    fn build(&self, app: &mut App) {
+        app.init_resource::<TerrainConfigFingerprint>();
+    }
+}
+
+/// Last-seen stable fingerprint of `TerrainConfig`'s mesh-affecting fields.
+///
+/// The inspector rewrites `TerrainConfig` on every UI frame, which would make
+/// `resource_changed` fire continuously. Comparing fingerprints instead of
+/// change detection turns per-frame rebuild spam into one rebuild per real edit.
+#[derive(Resource, Debug, Default)]
+pub struct TerrainConfigFingerprint {
+    pub last: u64,
+}
+
+impl TerrainConfig {
+    /// Stable fingerprint of fields that affect mesh/terrain output.
+    /// `generation_request` is intentionally excluded: it is consumed by the
+    /// monitor system itself and reset through change-detection bypass.
+    #[must_use]
+    pub fn mesh_fingerprint(&self) -> u64 {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash, Hasher};
+        let mut hasher = DefaultHasher::new();
+        self.map_width.hash(&mut hasher);
+        self.map_height.hash(&mut hasher);
+        self.seed.hash(&mut hasher);
+        self.deformation_profile.hash(&mut hasher);
+        self.macro_freq.to_bits().hash(&mut hasher);
+        self.macro_height.to_bits().hash(&mut hasher);
+        self.macro_sharpness.to_bits().hash(&mut hasher);
+        self.plateau_freq.to_bits().hash(&mut hasher);
+        self.plateau_height.to_bits().hash(&mut hasher);
+        self.plateau_steps.to_bits().hash(&mut hasher);
+        self.warp_freq.to_bits().hash(&mut hasher);
+        self.warp_strength.to_bits().hash(&mut hasher);
+        self.island_shape_weight.to_bits().hash(&mut hasher);
+        self.river_count.hash(&mut hasher);
+        self.river_start_elevation.to_bits().hash(&mut hasher);
+        self.river_depth.to_bits().hash(&mut hasher);
+        self.mud_banks.hash(&mut hasher);
+        self.build_area_layer.hash(&mut hasher);
+        self.forest_layer.hash(&mut hasher);
+        self.faction_layer.hash(&mut hasher);
+        self.cliff_layer.hash(&mut hasher);
+        hasher.finish()
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
@@ -17,14 +63,14 @@ pub enum GenerationRequest {
     Regenerate,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Reflect)]
 pub enum MudBankMode {
     Disabled,
     #[default]
     Enabled,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Reflect)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Reflect)]
 pub enum LayerVisibility {
     Hidden,
     #[default]
