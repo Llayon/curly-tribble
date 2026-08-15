@@ -236,6 +236,8 @@ mod debug_tests {
             .init_resource::<TerrainConfigFingerprint>()
             .init_resource::<HexFaceTopology>()
             .init_resource::<crate::map::surface_topology::types::SurfaceTopology>()
+            .init_resource::<crate::map::terrain_bake::types::SurfaceTerrainBake>()
+            .init_resource::<crate::map::terrain_bake::runtime::TerrainBakeGenerationState>()
             .init_resource::<HexFaceDebugCache>()
             .init_resource::<HexFaceTopologyGenerationState>()
             .init_resource::<crate::map::surface_topology::runtime::SurfaceTopologyGenerationState>(
@@ -252,6 +254,11 @@ mod debug_tests {
                 )
                     .chain(),
             );
+
+        app.world_mut()
+            .resource_mut::<crate::map::terrain_bake::runtime::TerrainBakeGenerationState>()
+            .last_outcome =
+            crate::map::terrain_bake::runtime::TerrainBakeGenerationOutcome::Success;
 
         // Initial setup frame
         app.update();

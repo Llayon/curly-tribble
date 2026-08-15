@@ -135,6 +135,14 @@ pub enum TerrainBakeValidationError {
         expected: usize,
         actual: usize,
     },
+    HeightCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    FaceNodeCountMismatch {
+        expected: usize,
+        actual: usize,
+    },
     NodeIndexMismatch {
         vertex_idx: usize,
         expected: HeightNodeId,
@@ -155,11 +163,23 @@ pub enum TerrainBakeValidationError {
     OwnerHexesMismatch {
         node: HeightNodeId,
     },
+    InvalidIncidentFace {
+        node: HeightNodeId,
+        face: SurfaceFaceId,
+    },
     FaceNodesMismatch {
         face: SurfaceFaceId,
     },
     FaceOwnerMismatch {
         face: SurfaceFaceId,
+    },
+    WallDetectionFailed,
+    WallSegmentMismatch {
+        expected: usize,
+        actual: usize,
+    },
+    WallNodeOutOfRange {
+        node: HeightNodeId,
     },
     StatsMismatch,
 }

@@ -22,7 +22,10 @@ pub mod tests {
     /// plus a HeightConstraintGraph with cliff split at that edge.
     ///
     /// Returns (surface, graph, seam_he_id, twin_he_id).
-    fn build_two_hex_cliff_surface(h0: f32, h1: f32) -> (SurfaceTopology, HeightConstraintGraph) {
+    pub(crate) fn build_two_hex_cliff_surface(
+        h0: f32,
+        h1: f32,
+    ) -> (SurfaceTopology, HeightConstraintGraph) {
         let hex_a = HexCoord::new(0, 0);
         let hex_b = HexCoord::new(1, 0);
 

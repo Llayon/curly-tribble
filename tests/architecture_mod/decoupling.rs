@@ -175,22 +175,104 @@ fn test_surface_terrain_adapter_decoupling() {
     }
 }
 
-/// Architecture Guard: Enforces that production terrain mesh rebuild in systems.rs routes ONLY through SurfaceTopology,
-/// forbidding direct calls to derive_terrain_topology(&map_data).
+/// Architecture Guard: Enforces that production terrain mesh rebuild in systems.rs routes
+/// ONLY through the authoritative M5.1 `SurfaceTerrainBake` (via
+/// `derive_terrain_topology_from_bake`), gates on `TerrainBakeGenerationOutcome::Success`,
+/// and never falls back to the legacy SurfaceTopology adapter or legacy height computation.
 #[test]
-fn test_production_terrain_routes_through_surface_topology() {
+fn test_production_terrain_routes_through_height_bake() {
     let sniffer = CodeSniffer::new("src/map/systems.rs");
     let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
 
     assert!(
-        code_no_tests.contains("derive_terrain_topology_from_surface"),
-        "Production Terrain Routing Violation in systems.rs: handle_rebuild_mesh must call derive_terrain_topology_from_surface."
+        code_no_tests.contains("derive_terrain_topology_from_bake"),
+        "Production Terrain Routing Violation in systems.rs: handle_rebuild_mesh must call derive_terrain_topology_from_bake."
     );
+    assert!(
+        code_no_tests.contains("TerrainBakeGenerationOutcome::Success"),
+        "Production Terrain Routing Violation in systems.rs: handle_rebuild_mesh must gate on TerrainBakeGenerationOutcome::Success."
+    );
+    assert!(
+        !code_no_tests.contains("derive_terrain_topology_from_surface"),
+        "Production Terrain Bypass Violation in systems.rs: handle_rebuild_mesh must not call derive_terrain_topology_from_surface."
+    );
+    assert!(
+        !code_no_tests.contains("compute_vertex_heights"),
+        "Production Terrain Bypass Violation in systems.rs: handle_rebuild_mesh must not call compute_vertex_heights."
+    );
+    assert!(
+        !code_no_tests.contains("create_global_map_meshes("),
+        "Production Terrain Bypass Violation in systems.rs: handle_rebuild_mesh must not call the legacy mesh generator."
+    );
+}
+
+/// Architecture Guard: Enforces that the production `SpawnGlobalTerrainCommand` is bake-only —
+/// the bake field is mandatory and the legacy `create_global_map_meshes` fallback is removed.
+#[test]
+fn test_production_terrain_command_is_bake_only() {
+    let raw =
+        std::fs::read_to_string("src/economy/mesh_gen/mod.rs").expect("mesh_gen/mod.rs must exist");
+    let code_no_tests = raw
+        .lines()
+        .filter(|line| !line.contains("#[cfg(test)]"))
+        .map(|line| line.split("//").next().unwrap_or("").trim())
+        .filter(|line| !line.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
 
     assert!(
-        !code_no_tests.contains("derive_terrain_topology(&map_data"),
-        "Production Terrain Bypass Violation in systems.rs: handle_rebuild_mesh must not call legacy derive_terrain_topology directly."
+        code_no_tests.contains("create_global_map_meshes_from_bake("),
+        "Production Command Violation in mesh_gen/mod.rs: SpawnGlobalTerrainCommand must call create_global_map_meshes_from_bake."
     );
+    assert!(
+        !code_no_tests.contains("create_global_map_meshes("),
+        "Production Command Violation in mesh_gen/mod.rs: SpawnGlobalTerrainCommand must not call the legacy create_global_map_meshes fallback."
+    );
+    assert!(
+        !code_no_tests.contains("bake: Option<"),
+        "Production Command Violation in mesh_gen/mod.rs: SpawnGlobalTerrainCommand.bake must be mandatory, not Option."
+    );
+}
+
+/// Architecture Guard: Enforces that terrain_bake core modules rely ONLY on height-domain
+/// data (`SurfaceTopology`, `HeightConstraintGraph`, `SurfaceHeightLayer`), forbidding
+/// MapData, legacy topology, and render-side geometry (MAX_HEIGHT, heights, meshes, phases).
+#[test]
+fn test_terrain_bake_core_decoupling() {
+    let files = [
+        "src/map/terrain_bake/types.rs",
+        "src/map/terrain_bake/builder.rs",
+        "src/map/terrain_bake/walls.rs",
+        "src/map/terrain_bake/runtime.rs",
+        "src/map/terrain_bake/validation.rs",
+    ];
+
+    let forbidden = [
+        "MapData",
+        "TileData",
+        "TerrainConfig",
+        "TerrainTopology",
+        "HexFaceTopology",
+        "MAX_HEIGHT",
+        "compute_vertex_heights",
+        "TerrainHeightMode",
+        ".elevation",
+        "create_global_map_meshes",
+        "SpawnGlobalTerrainCommand",
+        "EditorPhase",
+    ];
+
+    for file in files {
+        let sniffer = CodeSniffer::new(file);
+        let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+        for item in forbidden {
+            assert!(
+                !code_no_tests.contains(item),
+                "TerrainBake Core Architecture Violation in {file}: production code must not contain '{item}'."
+            );
+        }
+    }
 }
 
 /// Architecture Guard: Enforces that HeightConstraint compilation modules rely ONLY on MapData intent and SurfaceTopology identity/connectivity,

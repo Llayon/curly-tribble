@@ -4,13 +4,14 @@ use crate::map::generation::{
     auto_spawn_bio_deposits, auto_spawn_npcs, auto_spawn_treasures, spawn_map_internal,
 };
 use crate::map::navigation::NavigationMap;
+use crate::map::terrain_bake::runtime::{TerrainBakeGenerationOutcome, TerrainBakeGenerationState};
 use crate::map::terrain_bake::types::SurfaceTerrainBake;
 use crate::map::terrain_gen::{
     GenerationRequest, TerrainConfig, TerrainConfigFingerprint, TerrainGenerator,
 };
 use crate::map::{
-    FactionMarker, GenerateMapEvent, GenerationMode, MapData, MapEntity, MapVisualEntity,
-    RebuildMeshEvent, WorldSeed,
+    FactionMarker, GenerateMapEvent, GenerationMode, MapData, MapEntity, RebuildMeshEvent,
+    WorldSeed,
 };
 use bevy::prelude::*;
 use rand::Rng;
@@ -113,34 +114,35 @@ pub fn handle_regeneration(
 pub fn handle_rebuild_mesh(
     mut commands: Commands,
     mut ev_rebuild: MessageReader<RebuildMeshEvent>,
-    q_map_entities: Query<Entity, With<MapVisualEntity>>,
     map_data: Res<MapData>,
     face_topology: Res<crate::map::face_topology::types::HexFaceTopology>,
-    surface_topology: Res<crate::map::surface_topology::types::SurfaceTopology>,
+    bake_state: Res<TerrainBakeGenerationState>,
     faction_manager: Res<FactionManager>,
     config: Res<TerrainConfig>,
     phase: Res<State<EditorPhase>>,
-    bake: Option<Res<SurfaceTerrainBake>>,
+    bake: Res<SurfaceTerrainBake>,
 ) {
     if ev_rebuild.read().count() == 0 {
         return;
     }
 
-    if !map_data.tiles.is_empty()
-        && (face_topology.faces.is_empty() || surface_topology.faces.is_empty())
-    {
+    // Fail-closed: the ONLY authoritative source of ground geometry is a
+    // successfully generated SurfaceTerrainBake. A missing/empty/failed bake
+    // must never fall back to legacy topology — old terrain stays in place.
+    if bake_state.last_outcome != TerrainBakeGenerationOutcome::Success {
+        return;
+    }
+
+    if !map_data.tiles.is_empty() && face_topology.faces.is_empty() {
         bevy::log::tracing::event!(
             bevy::log::tracing::Level::ERROR,
-            "Cannot rebuild mesh: map is non-empty but topology generation failed"
+            "Cannot rebuild mesh: map is non-empty but face topology generation failed"
         );
         return;
     }
 
-    match crate::map::surface_topology::derive_terrain_topology_from_surface(&surface_topology) {
+    match crate::map::terrain_bake::derive_terrain_topology_from_bake(&bake) {
         Ok(derived_topology) => {
-            for entity in &q_map_entities {
-                commands.entity(entity).despawn();
-            }
             commands.queue(crate::economy::mesh_gen::SpawnGlobalTerrainCommand {
                 topology: derived_topology,
                 face_topology: (*face_topology).clone(),
@@ -148,16 +150,14 @@ pub fn handle_rebuild_mesh(
                 phase: *phase.get(),
                 faction_manager: faction_manager.clone(),
                 config: (*config).clone(),
-                bake: bake
-                    .filter(|b| !b.vertices.is_empty())
-                    .map(|b| (*b).clone()),
+                bake: (*bake).clone(),
             });
         }
         Err(err) => {
             bevy::log::tracing::event!(
                 bevy::log::tracing::Level::ERROR,
                 error = ?err,
-                "Failed to derive terrain topology from SurfaceTopology"
+                "Failed to derive terrain topology from SurfaceTerrainBake"
             );
         }
     }
@@ -270,13 +270,19 @@ mod tests {
             .insert_resource(FactionManager::default())
             .insert_resource(TerrainConfig::default())
             .init_resource::<crate::map::face_topology::types::HexFaceTopology>()
-            .init_resource::<crate::map::surface_topology::types::SurfaceTopology>()
+            .init_resource::<crate::map::terrain_bake::types::SurfaceTerrainBake>()
+            .init_resource::<crate::map::terrain_bake::runtime::TerrainBakeGenerationState>()
             .insert_resource(State::new(EditorPhase::Shape))
             .insert_resource(GameAssets::default())
             .insert_resource(Assets::<Mesh>::default())
             .insert_resource(Assets::<StandardMaterial>::default())
             .add_message::<RebuildMeshEvent>()
             .add_systems(Update, (request_rebuild, handle_rebuild_mesh).chain());
+
+        app.world_mut()
+            .resource_mut::<crate::map::terrain_bake::runtime::TerrainBakeGenerationState>()
+            .last_outcome =
+            crate::map::terrain_bake::runtime::TerrainBakeGenerationOutcome::Success;
 
         let visual_entity = app.world_mut().spawn((MapEntity, MapVisualEntity)).id();
         let content_entity = app.world_mut().spawn(MapEntity).id();

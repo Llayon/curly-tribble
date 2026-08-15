@@ -9,6 +9,8 @@ impl Plugin for OverlayTestsPlugin {
 }
 
 #[cfg(test)]
+mod tests_bake_regression;
+#[cfg(test)]
 mod tests_cases_advanced;
 #[cfg(test)]
 mod tests_cases_roof;

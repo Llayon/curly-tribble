@@ -4,6 +4,7 @@ Index of architectural decisions for "Savage Fantasy".
 
 | ID | Title | Status | Date |
 |----|-------|--------|------|
+| [0010](0010_surface_terrain_bake_production_cutover.md) | Surface Terrain Bake Production Cutover | Accepted | 2026-08-16 |
 | [0007](0007-hex-face-topology-debug-overlay.md) | HexFaceTopology Diagnostic Overlay | Accepted | 2026-08-02 |
 | [0006](0006-reactive-relocation-pipeline.md) | Reactive Relocation Pipeline | Accepted | — |
 | [0005](0005-hexagonal-grid-transition.md) | Hexagonal Grid Transition | Accepted | — |

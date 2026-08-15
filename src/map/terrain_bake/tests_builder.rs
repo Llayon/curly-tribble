@@ -115,10 +115,11 @@ pub mod tests {
         assert!(bake.cliff_walls.is_empty());
     }
 
-    /// 40×40 production smoke: full pipeline → bake builds and validates.
+    /// 40×40 production smoke: full pipeline → bake builds, validates, and renders.
     #[test]
     fn production_40x40_bake_smoke() {
-        use crate::game_state::EditorPhase;
+        use crate::economy::mesh_gen::bake::create_global_map_meshes_from_bake;
+        use crate::game_state::{EditorPhase, FactionManager};
         use crate::map::generation::terrain::spawn_map_internal;
         use crate::map::navigation::NavigationMap;
         use crate::map::terrain_gen::{TerrainConfig, TerrainGenerator};
@@ -126,6 +127,7 @@ pub mod tests {
 
         let terrain_config = TerrainConfig::default();
         let config = HeightSolverConfig::default();
+        let faction_manager = FactionManager::default();
 
         for &seed_val in &q::FAST_SEEDS {
             let terrain_gen = TerrainGenerator::new(seed_val);
@@ -181,6 +183,108 @@ pub mod tests {
                     "seed={seed_val}: normalized_height out of range"
                 );
             }
+
+            // ── Bake → renderer: production mesh invariants ──────────────────
+            let (mesh, water_mesh, roof_mesh) = create_global_map_meshes_from_bake(
+                &map_data,
+                &bake,
+                &face_top,
+                EditorPhase::Height3D,
+                &faction_manager,
+                &terrain_config,
+            )
+            .unwrap_or_else(|e| panic!("bake render failed seed={seed_val}: {e:?}"));
+
+            let ground_vertex_count = bake.vertices.len();
+
+            let Some(bevy::mesh::VertexAttributeValues::Float32x3(positions)) =
+                mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+            else {
+                panic!("seed={seed_val}: missing position attribute");
+            };
+            assert!(
+                positions.len() >= ground_vertex_count,
+                "seed={seed_val}: mesh must contain at least one vertex per bake node"
+            );
+            for (i, p) in positions.iter().enumerate() {
+                assert!(
+                    p.iter().all(|c| c.is_finite()),
+                    "seed={seed_val}: vertex {i} position must be finite"
+                );
+            }
+
+            let Some(bevy::mesh::VertexAttributeValues::Float32x3(normals)) =
+                mesh.attribute(Mesh::ATTRIBUTE_NORMAL)
+            else {
+                panic!("seed={seed_val}: missing normal attribute");
+            };
+            assert_eq!(normals.len(), positions.len(), "seed={seed_val}: normals");
+            for (i, n) in normals.iter().enumerate() {
+                assert!(
+                    n.iter().all(|c| c.is_finite()),
+                    "seed={seed_val}: vertex {i} normal must be finite"
+                );
+            }
+
+            let Some(bevy::mesh::Indices::U32(indices)) = mesh.indices() else {
+                panic!("seed={seed_val}: missing U32 indices");
+            };
+            let ground_index_count = bake.faces.len() * 3;
+            assert!(
+                indices.len() >= ground_index_count,
+                "seed={seed_val}: mesh must contain all ground face indices"
+            );
+            for (k, face) in bake.faces.iter().enumerate() {
+                for (c, &node_id) in face.nodes.iter().enumerate() {
+                    assert_eq!(
+                        indices[k * 3 + c],
+                        node_id.index() as u32,
+                        "seed={seed_val}: ground triangle {k} corner {c}"
+                    );
+                }
+            }
+            for &i in &indices[ground_index_count..] {
+                assert!(
+                    (i as usize) >= ground_vertex_count,
+                    "seed={seed_val}: wall index {i} must be >= ground_vertex_count"
+                );
+            }
+            for &i in indices {
+                assert!(
+                    (i as usize) < positions.len(),
+                    "seed={seed_val}: index {i} out of range"
+                );
+            }
+
+            if let Some(w) = water_mesh {
+                assert_optional_mesh_finite(&w, seed_val, "water");
+            }
+            if let Some(r) = roof_mesh {
+                assert_optional_mesh_finite(&r, seed_val, "roof");
+            }
+        }
+    }
+
+    fn assert_optional_mesh_finite(mesh: &Mesh, seed_val: u32, name: &str) {
+        let Some(bevy::mesh::VertexAttributeValues::Float32x3(positions)) =
+            mesh.attribute(Mesh::ATTRIBUTE_POSITION)
+        else {
+            panic!("seed={seed_val}: missing {name} position attribute");
+        };
+        for (i, p) in positions.iter().enumerate() {
+            assert!(
+                p.iter().all(|c| c.is_finite()),
+                "seed={seed_val}: {name} vertex {i} position must be finite"
+            );
+        }
+        let Some(bevy::mesh::Indices::U32(indices)) = mesh.indices() else {
+            panic!("seed={seed_val}: missing {name} U32 indices");
+        };
+        for &i in indices {
+            assert!(
+                (i as usize) < positions.len(),
+                "seed={seed_val}: {name} index {i} out of range"
+            );
         }
     }
 }

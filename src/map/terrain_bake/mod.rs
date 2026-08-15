@@ -22,7 +22,11 @@ pub mod tests_builder;
 #[cfg(test)]
 pub mod tests_compat;
 #[cfg(test)]
+pub mod tests_render;
+#[cfg(test)]
 pub mod tests_runtime;
+#[cfg(test)]
+pub mod tests_validation;
 #[cfg(test)]
 pub mod tests_walls;
 
