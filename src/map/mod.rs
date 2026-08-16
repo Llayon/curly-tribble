@@ -23,6 +23,7 @@ pub mod resources;
 pub mod river_gen;
 pub mod roads;
 pub mod subhex;
+pub mod surface_gameplay;
 pub mod surface_height;
 pub mod surface_topology;
 pub mod terrain_bake;
@@ -138,6 +139,9 @@ impl Plugin for MapPlugin {
                 height_graph::HeightGraphPlugin,
                 surface_height::SurfaceHeightPlugin,
                 terrain_bake::TerrainBakePlugin,
+                surface_gameplay::SurfaceGameplayPlugin,
+            ))
+            .add_plugins((
                 crate::economy::mesh_gen::MeshGenPlugin,
                 river_gen::RiverGenPlugin,
                 terrain_gen::TerrainGenPlugin,
