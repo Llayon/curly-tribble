@@ -76,10 +76,9 @@ pub struct SpawnGlobalTerrainCommand {
 impl Command for SpawnGlobalTerrainCommand {
     #[allow(clippy::too_many_lines)]
     fn apply(self, world: &mut World) {
-        world.insert_resource(self.topology.clone());
-
         // 1. GENERATE FIRST (pure): on failure nothing is touched, so a failed
-        //    bake rebuild leaves the previously rendered terrain fully intact.
+        //    bake rebuild leaves the previously rendered terrain fully intact —
+        //    including the previously published TerrainTopology resource.
         let generated = create_global_map_meshes_from_bake(
             &self.map_data,
             &self.bake,
@@ -100,7 +99,9 @@ impl Command for SpawnGlobalTerrainCommand {
             }
         };
 
-        // 2. SWAP: retire old assets and visuals only after new geometry exists.
+        // 2. SWAP: publish the new topology and retire old assets/visuals only
+        //    after new geometry exists.
+        world.insert_resource(self.topology.clone());
         let old_handles =
             if let Some(mut gen_assets) = world.get_resource_mut::<GeneratedMapAssets>() {
                 (

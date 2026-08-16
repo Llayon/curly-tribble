@@ -30,8 +30,19 @@ pub fn validate_surface_terrain_bake(
     graph: &HeightConstraintGraph,
     heights: &SurfaceHeightLayer,
 ) -> Result<(), TerrainBakeValidationError> {
-    // Empty is valid (empty contract)
-    if graph.nodes.is_empty() && bake.vertices.is_empty() && bake.faces.is_empty() {
+    // Empty is valid ONLY when every source and bake container is empty.
+    // Any partial-empty input falls through to structural checks and must
+    // produce a typed failure — never a silent "valid empty world" verdict.
+    if surface.vertices.is_empty()
+        && surface.faces.is_empty()
+        && graph.nodes.is_empty()
+        && graph.face_nodes.is_empty()
+        && heights.heights.is_empty()
+        && bake.vertices.is_empty()
+        && bake.faces.is_empty()
+        && bake.cliff_walls.is_empty()
+        && bake.stats == TerrainBakeStats::default()
+    {
         return Ok(());
     }
 

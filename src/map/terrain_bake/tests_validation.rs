@@ -107,6 +107,29 @@ pub mod tests {
         );
     }
 
+    /// Partial-empty inputs must NOT be accepted as a valid empty world:
+    /// non-empty surface/heights with an empty graph and bake previously
+    /// slipped through the old `graph.nodes.is_empty()` fast-path.
+    #[test]
+    fn validator_rejects_partial_empty_inputs() {
+        let (surface, _graph) = build_two_hex_cliff_surface(0.0, 0.0);
+        let mut layer = SurfaceHeightLayer::default();
+        layer.heights = vec![0.1, 0.9, 0.1, 0.9, 0.3, 0.3];
+
+        let bake = SurfaceTerrainBake::default();
+        let graph = crate::map::height_graph::types::HeightConstraintGraph::default();
+
+        let result = validate_surface_terrain_bake(&bake, &surface, &graph, &layer);
+        assert_eq!(
+            result,
+            Err(TerrainBakeValidationError::FaceNodeCountMismatch {
+                expected: surface.faces.len(),
+                actual: 0,
+            }),
+            "partial-empty inputs must fail with a typed error, not pass as empty"
+        );
+    }
+
     /// A heights layer shorter than the graph must be rejected up front.
     #[test]
     fn validator_rejects_truncated_heights() {
