@@ -145,6 +145,7 @@ pub enum SurfaceMetricsError {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SurfaceGameplayCompileError {
+    InvalidConfig(crate::map::surface_gameplay::config::SurfaceGameplayConfigError),
     MissingMetricsForTile(HexCoord),
     MetricWithoutTile(HexCoord),
 }
