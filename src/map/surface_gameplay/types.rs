@@ -6,6 +6,8 @@
 //! `MAX_HEIGHT`, `Mesh`, `MapData`, `TileData`, or legacy navigation types.
 
 use crate::map::data::EdgeCoord;
+use crate::map::height_graph::types::HeightNodeId;
+use crate::map::surface_topology::types::{SurfaceFaceId, SurfaceHalfEdgeId, SurfaceVertexId};
 use crate::map::HexCoord;
 use bevy::prelude::*;
 use std::collections::BTreeMap;
@@ -133,6 +135,10 @@ pub enum SurfaceMetricsError {
         bake_faces: usize,
     },
     NonFiniteHeight(HexCoord),
+    InvalidSurfaceVertex(SurfaceVertexId),
+    InvalidSurfaceFace(SurfaceFaceId),
+    InvalidSurfaceHalfEdge(SurfaceHalfEdgeId),
+    InvalidHeightNode(HeightNodeId),
 }
 
 // ─── Compile errors (stage 2) ─────────────────────────────────────────────────

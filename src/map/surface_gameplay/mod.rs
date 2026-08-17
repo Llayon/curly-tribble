@@ -4,10 +4,18 @@
 //! `SurfaceTerrainBake`), not from legacy `MapData` elevation.
 
 pub mod config;
+pub mod edges;
+pub mod metrics;
 pub mod types;
 
 pub use config::*;
+pub use metrics::*;
 pub use types::*;
+
+#[cfg(test)]
+pub mod tests_metrics;
+#[cfg(test)]
+pub mod tests_shared;
 
 use bevy::prelude::*;
 
@@ -21,6 +29,8 @@ impl Plugin for SurfaceGameplayPlugin {
             .register_type::<config::SurfaceGameplayConfig>()
             .add_plugins((
                 config::SurfaceGameplayConfigPlugin,
+                edges::SurfaceGameplayEdgesPlugin,
+                metrics::SurfaceGameplayMetricsPlugin,
                 types::SurfaceGameplayTypesPlugin,
             ));
     }
