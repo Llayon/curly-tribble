@@ -7,16 +7,23 @@ pub mod compiler;
 pub mod config;
 pub mod edges;
 pub mod metrics;
+pub mod runtime;
 pub mod types;
+pub mod validation;
 
+pub use compiler::*;
 pub use config::*;
 pub use metrics::*;
+pub use runtime::*;
 pub use types::*;
+pub use validation::*;
 
 #[cfg(test)]
 pub mod tests_compiler;
 #[cfg(test)]
 pub mod tests_metrics;
+#[cfg(test)]
+pub mod tests_runtime;
 #[cfg(test)]
 pub mod tests_shared;
 
@@ -35,7 +42,9 @@ impl Plugin for SurfaceGameplayPlugin {
                 config::SurfaceGameplayConfigPlugin,
                 edges::SurfaceGameplayEdgesPlugin,
                 metrics::SurfaceGameplayMetricsPlugin,
+                runtime::SurfaceGameplayRuntimePlugin,
                 types::SurfaceGameplayTypesPlugin,
+                validation::SurfaceGameplayValidationPlugin,
             ));
     }
 }
