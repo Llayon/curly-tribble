@@ -8,6 +8,7 @@ use super::generator::{tile_color, OverlayGeometryError};
 use super::overlay::build_water_and_roof_meshes;
 use crate::game_state::{EditorPhase, FactionManager};
 use crate::map::data::OceanState;
+use crate::map::surface_gameplay::types::SurfaceGameplayMap;
 use crate::map::terrain_bake::types::SurfaceTerrainBake;
 use crate::map::terrain_gen::TerrainConfig;
 use crate::map::{MapData, MAX_HEIGHT};
@@ -41,6 +42,9 @@ fn bake_world_pos(
 
 /// Color for a baked ground vertex. Fail-closed: empty `owner_hexes` is a
 /// malformed bake and must never silently fall back to a default tile.
+/// Buildability is policy-external: the lookup happens lazily only when the
+/// build-area layer is visible (Sediments phase), otherwise `buildable` is
+/// simply never consulted.
 fn bake_vertex_color(
     bake_v: &crate::map::terrain_bake::types::TerrainBakeVertex,
     map: &MapData,
@@ -48,6 +52,7 @@ fn bake_vertex_color(
     faction_manager: &FactionManager,
     config: &TerrainConfig,
     faction_filter: bool,
+    gameplay: &SurfaceGameplayMap,
 ) -> Result<[f32; 4], OverlayGeometryError> {
     if bake_v.owner_hexes.is_empty() {
         return Err(OverlayGeometryError::MissingBakeVertexOwner(
@@ -63,14 +68,25 @@ fn bake_vertex_color(
         .get_tile(eval_coord.q, eval_coord.r)
         .copied()
         .unwrap_or_default();
+    let buildable = if phase == EditorPhase::Sediments
+        && config.build_area_layer.is_visible()
+        && tile_data.ocean_state == OceanState::Land
+    {
+        gameplay
+            .cells
+            .get(&eval_coord)
+            .ok_or(OverlayGeometryError::MissingGameplayCell(eval_coord))?
+            .buildable
+    } else {
+        false
+    };
     Ok(tile_color(
-        map,
-        eval_coord,
         &tile_data,
         phase,
         faction_manager,
         config,
         faction_filter,
+        buildable,
     ))
 }
 
@@ -79,6 +95,107 @@ fn wall_triangle_area_sq(a: [f32; 3], b: [f32; 3], c: [f32; 3]) -> f32 {
     let ab = Vec3::new(b[0] - a[0], b[1] - a[1], b[2] - a[2]);
     let ac = Vec3::new(c[0] - a[0], c[1] - a[1], c[2] - a[2]);
     ab.cross(ac).length_squared()
+}
+
+/// Appends cliff wall triangles for all bake cliff segments.
+fn append_cliff_walls(
+    bake: &SurfaceTerrainBake,
+    map: &MapData,
+    phase: EditorPhase,
+    faction_manager: &FactionManager,
+    config: &TerrainConfig,
+    faction_filter: bool,
+    gameplay: &SurfaceGameplayMap,
+    flat_surface: bool,
+    vertices: &mut Vec<[f32; 3]>,
+    colors: &mut Vec<[f32; 4]>,
+) -> Result<Vec<u32>, OverlayGeometryError> {
+    let mut wall_indices = Vec::new();
+    for segment in &bake.cliff_walls {
+        let (ep0, ep1) = (&segment.endpoints[0], &segment.endpoints[1]);
+
+        let p0v = bake
+            .vertices
+            .get(ep0.primary_node.index())
+            .ok_or(OverlayGeometryError::InvalidHeightNode(ep0.primary_node))?;
+        let t0v = bake
+            .vertices
+            .get(ep0.twin_node.index())
+            .ok_or(OverlayGeometryError::InvalidHeightNode(ep0.twin_node))?;
+        let p1v = bake
+            .vertices
+            .get(ep1.primary_node.index())
+            .ok_or(OverlayGeometryError::InvalidHeightNode(ep1.primary_node))?;
+        let t1v = bake
+            .vertices
+            .get(ep1.twin_node.index())
+            .ok_or(OverlayGeometryError::InvalidHeightNode(ep1.twin_node))?;
+
+        let p0 = bake_world_pos(p0v, flat_surface);
+        let p1 = bake_world_pos(p1v, flat_surface);
+        let t0 = bake_world_pos(t0v, flat_surface);
+        let t1 = bake_world_pos(t1v, flat_surface);
+
+        let color_primary_0 = bake_vertex_color(
+            p0v,
+            map,
+            phase,
+            faction_manager,
+            config,
+            faction_filter,
+            gameplay,
+        )?;
+        let color_primary_1 = bake_vertex_color(
+            p1v,
+            map,
+            phase,
+            faction_manager,
+            config,
+            faction_filter,
+            gameplay,
+        )?;
+        let color_twin_0 = bake_vertex_color(
+            t0v,
+            map,
+            phase,
+            faction_manager,
+            config,
+            faction_filter,
+            gameplay,
+        )?;
+        let color_twin_1 = bake_vertex_color(
+            t1v,
+            map,
+            phase,
+            faction_manager,
+            config,
+            faction_filter,
+            gameplay,
+        )?;
+
+        // Tapered walls (one collapsed endpoint) produce exactly one live
+        // triangle; fully collapsed or equal-height segments produce none.
+        let candidates: [([[f32; 3]; 3], [[f32; 4]; 3]); 2] = [
+            (
+                [p0, p1, t1],
+                [color_primary_0, color_primary_1, color_twin_1],
+            ),
+            ([p0, t1, t0], [color_primary_0, color_twin_1, color_twin_0]),
+        ];
+        for (tri, tri_colors) in candidates {
+            if wall_triangle_area_sq(tri[0], tri[1], tri[2]) <= WALL_AREA_EPSILON_SQ {
+                continue;
+            }
+            let wall_base = u32::try_from(vertices.len())
+                .map_err(|_| OverlayGeometryError::HeightNodeIndexOverflow(ep0.primary_node))?;
+            for (pos, col) in tri.iter().zip(tri_colors) {
+                vertices.push(*pos);
+                colors.push(col);
+            }
+            wall_indices.extend_from_slice(&[wall_base, wall_base + 1, wall_base + 2]);
+        }
+    }
+    Ok(wall_indices)
 }
 
 /// Creates map ground, water, and roof meshes from the M5.1 `SurfaceTerrainBake`.
@@ -97,6 +214,7 @@ pub fn create_global_map_meshes_from_bake(
     phase: EditorPhase,
     faction_manager: &FactionManager,
     config: &TerrainConfig,
+    gameplay: &SurfaceGameplayMap,
 ) -> Result<(Mesh, Option<Mesh>, Option<Mesh>), OverlayGeometryError> {
     let flat_surface = phase < EditorPhase::Height3D;
     let faction_filter = phase == EditorPhase::Factions;
@@ -113,6 +231,7 @@ pub fn create_global_map_meshes_from_bake(
             faction_manager,
             config,
             faction_filter,
+            gameplay,
         )?);
     }
 
@@ -127,73 +246,27 @@ pub fn create_global_map_meshes_from_bake(
         }
     }
 
-    let mut wall_indices = Vec::new();
     if !flat_surface {
-        for segment in &bake.cliff_walls {
-            let (ep0, ep1) = (&segment.endpoints[0], &segment.endpoints[1]);
-
-            let p0v = bake
-                .vertices
-                .get(ep0.primary_node.index())
-                .ok_or(OverlayGeometryError::InvalidHeightNode(ep0.primary_node))?;
-            let t0v = bake
-                .vertices
-                .get(ep0.twin_node.index())
-                .ok_or(OverlayGeometryError::InvalidHeightNode(ep0.twin_node))?;
-            let p1v = bake
-                .vertices
-                .get(ep1.primary_node.index())
-                .ok_or(OverlayGeometryError::InvalidHeightNode(ep1.primary_node))?;
-            let t1v = bake
-                .vertices
-                .get(ep1.twin_node.index())
-                .ok_or(OverlayGeometryError::InvalidHeightNode(ep1.twin_node))?;
-
-            let p0 = bake_world_pos(p0v, flat_surface);
-            let p1 = bake_world_pos(p1v, flat_surface);
-            let t0 = bake_world_pos(t0v, flat_surface);
-            let t1 = bake_world_pos(t1v, flat_surface);
-
-            let color_primary_0 =
-                bake_vertex_color(p0v, map, phase, faction_manager, config, faction_filter)?;
-            let color_primary_1 =
-                bake_vertex_color(p1v, map, phase, faction_manager, config, faction_filter)?;
-            let color_twin_0 =
-                bake_vertex_color(t0v, map, phase, faction_manager, config, faction_filter)?;
-            let color_twin_1 =
-                bake_vertex_color(t1v, map, phase, faction_manager, config, faction_filter)?;
-
-            // Tapered walls (one collapsed endpoint) produce exactly one live
-            // triangle; fully collapsed or equal-height segments produce none.
-            let candidates: [([[f32; 3]; 3], [[f32; 4]; 3]); 2] = [
-                (
-                    [p0, p1, t1],
-                    [color_primary_0, color_primary_1, color_twin_1],
-                ),
-                ([p0, t1, t0], [color_primary_0, color_twin_1, color_twin_0]),
-            ];
-            for (tri, tri_colors) in candidates {
-                if wall_triangle_area_sq(tri[0], tri[1], tri[2]) <= WALL_AREA_EPSILON_SQ {
-                    continue;
-                }
-                let wall_base = u32::try_from(vertices.len())
-                    .map_err(|_| OverlayGeometryError::HeightNodeIndexOverflow(ep0.primary_node))?;
-                for (pos, col) in tri.iter().zip(tri_colors) {
-                    vertices.push(*pos);
-                    colors.push(col);
-                }
-                wall_indices.extend_from_slice(&[wall_base, wall_base + 1, wall_base + 2]);
-            }
-        }
+        let wall_indices = append_cliff_walls(
+            bake,
+            map,
+            phase,
+            faction_manager,
+            config,
+            faction_filter,
+            gameplay,
+            flat_surface,
+            &mut vertices,
+            &mut colors,
+        )?;
         debug_assert!(
             wall_indices
                 .iter()
                 .all(|&i| i as usize >= ground_vertex_count),
             "wall index isolation invariant violated"
         );
+        indices.extend_from_slice(&wall_indices);
     }
-
-    indices.extend_from_slice(&wall_indices);
 
     let (water_mesh, roof_mesh) = build_water_and_roof_meshes(map, face_topology, phase)?;
 

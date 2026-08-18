@@ -6,6 +6,7 @@ use crate::map::generation::{
 use crate::map::surface_gameplay::runtime::{
     SurfaceGameplayGenerationOutcome, SurfaceGameplayGenerationState,
 };
+use crate::map::surface_gameplay::types::SurfaceGameplayMap;
 use crate::map::terrain_bake::runtime::{TerrainBakeGenerationOutcome, TerrainBakeGenerationState};
 use crate::map::terrain_bake::types::SurfaceTerrainBake;
 use crate::map::terrain_gen::{
@@ -121,6 +122,7 @@ pub fn handle_rebuild_mesh(
     config: Res<TerrainConfig>,
     phase: Res<State<EditorPhase>>,
     bake: Res<SurfaceTerrainBake>,
+    gameplay: Res<SurfaceGameplayMap>,
 ) {
     if ev_rebuild.read().count() == 0 {
         return;
@@ -155,6 +157,7 @@ pub fn handle_rebuild_mesh(
                 faction_manager: faction_manager.clone(),
                 config: (*config).clone(),
                 bake: (*bake).clone(),
+                gameplay: (*gameplay).clone(),
             });
         }
         Err(err) => {

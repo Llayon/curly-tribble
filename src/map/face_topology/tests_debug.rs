@@ -240,6 +240,7 @@ mod debug_tests {
             .init_resource::<crate::map::terrain_bake::runtime::TerrainBakeGenerationState>()
             .init_resource::<crate::map::surface_gameplay::runtime::SurfaceGameplayGenerationState>(
             )
+            .init_resource::<crate::map::surface_gameplay::types::SurfaceGameplayMap>()
             .init_resource::<HexFaceDebugCache>()
             .init_resource::<HexFaceTopologyGenerationState>()
             .init_resource::<crate::map::surface_topology::runtime::SurfaceTopologyGenerationState>(

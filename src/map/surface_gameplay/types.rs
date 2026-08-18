@@ -75,7 +75,7 @@ pub enum TraversalBlockReason {
 }
 
 /// Authoritative gameplay cell policy.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct SurfaceGameplayCell {
     /// Land cell with finite solved geometry.
     pub walkable: bool,

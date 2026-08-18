@@ -30,6 +30,7 @@ pub enum OverlayGeometryError {
     InvalidHeightNode(HeightNodeId),
     HeightNodeIndexOverflow(HeightNodeId),
     MissingBakeVertexOwner(HeightNodeId),
+    MissingGameplayCell(crate::map::HexCoord),
 }
 
 /// Creates map ground, water, and roof meshes from authoritative topology.
@@ -77,14 +78,21 @@ pub fn create_global_map_meshes(
             .get_tile(eval_coord.q, eval_coord.r)
             .copied()
             .unwrap_or_default();
+        // LEGACY C7 branch: deterministic buildability lives only in the
+        // SurfaceGameplayMap (looked up in bake.rs). This approximate gate is
+        // documented for removal in C9 (ADR 0011).
+        let legacy_buildable = phase == EditorPhase::Sediments
+            && config.build_area_layer.is_visible()
+            && tile_data.ocean_state == OceanState::Land
+            && !map.is_too_steep(eval_coord.q, eval_coord.r)
+            && tile_data.terrain.allows_buildings();
         let color = tile_color(
-            map,
-            eval_coord,
             &tile_data,
             phase,
             faction_manager,
             config,
             faction_filter,
+            legacy_buildable,
         );
         colors.push(color);
     }
@@ -113,21 +121,22 @@ pub fn create_global_map_meshes(
 }
 
 pub(super) fn tile_color(
-    map: &MapData,
-    coord: crate::map::HexCoord,
     tile: &crate::map::TileData,
     phase: EditorPhase,
     factions: &FactionManager,
     config: &TerrainConfig,
     faction_filter: bool,
+    buildable: bool,
 ) -> [f32; 4] {
-    if phase == EditorPhase::Sediments
-        && config.build_area_layer.is_visible()
-        && tile.ocean_state == OceanState::Land
-        && !map.is_too_steep(coord.q, coord.r)
-        && tile.terrain.allows_buildings()
-    {
-        return [0.2, 1.0, 0.2, 1.0];
+    if phase == EditorPhase::Sediments && config.build_area_layer.is_visible() {
+        if tile.ocean_state == OceanState::Land {
+            return if buildable {
+                [0.2, 1.0, 0.2, 1.0]
+            } else {
+                [1.0, 0.25, 0.25, 1.0]
+            };
+        }
+        return [0.1, 0.4, 0.9, 1.0];
     }
     if tile.ocean_state == OceanState::Ocean {
         return [0.1, 0.4, 0.9, 1.0];

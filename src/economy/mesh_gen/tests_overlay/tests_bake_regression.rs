@@ -61,6 +61,22 @@ mod tests {
         map
     }
 
+    fn build_bake(map: &MapData) -> crate::map::terrain_bake::types::SurfaceTerrainBake {
+        let seed = WorldSeed::new(42);
+        let config = HeightSolverConfig::default();
+        let face_top =
+            generate_hex_face_topology_with_profile(map, seed, HexDeformationProfile::Subtle)
+                .expect("face topology");
+        let surface = generate_surface_topology(&face_top).expect("surface topology");
+        let constraints = compile_height_constraints(map, &surface).expect("height constraints");
+        let graph = build_height_constraint_graph(&surface, &constraints).expect("height graph");
+        let guide = derive_legacy_height_guide(map, &surface, &graph).expect("height guide");
+        let targets = compile_height_targets(&graph, &guide, &config).expect("height targets");
+        let hard = compile_hard_constraints(&graph, &guide, &config).expect("hard constraints");
+        let layer = solve_surface_heights(&graph, &guide, &targets, &hard, &config).expect("solve");
+        build_surface_terrain_bake(&surface, &graph, &layer).expect("terrain bake")
+    }
+
     /// Renders via BOTH paths and asserts water/roof overlays are bit-identical.
     #[test]
     fn bake_path_water_roof_bit_matches_legacy() {
@@ -103,6 +119,7 @@ mod tests {
             phase,
             &factions,
             &terrain_config,
+            &crate::map::surface_gameplay::types::SurfaceGameplayMap::default(),
         )
         .expect("bake render");
 
@@ -156,6 +173,94 @@ mod tests {
                 assert_eq!(ai, bi, "{name}: index mismatch legacy vs bake");
             }
             _ => panic!("{name}: overlay presence mismatch between legacy and bake paths"),
+        }
+    }
+
+    /// Buildability colors must come from the SurfaceGameplayMap (policy
+    /// external) whenever the build-area layer is visible in Sediments phase:
+    /// land buildable -> green, land non-buildable -> red, ocean -> blue.
+    #[test]
+    fn buildability_overlay_uses_surface_gameplay_map() {
+        let mut map = MapData::default();
+        let green_hex = HexCoord::new(0, 0);
+        let red_hex = HexCoord::new(1, 0);
+        let ocean_hex = HexCoord::new(2, 0);
+        for (hex, ocean_state, elevation) in [
+            (green_hex, OceanState::Land, 0.4),
+            (red_hex, OceanState::Land, 0.4),
+            (ocean_hex, OceanState::Ocean, 0.0),
+        ] {
+            map.tiles.insert(
+                hex,
+                TileData {
+                    ocean_state,
+                    elevation,
+                    ..Default::default()
+                },
+            );
+        }
+        let bake = build_bake(&map);
+        let face_top = generate_hex_face_topology_with_profile(
+            &map,
+            WorldSeed::new(42),
+            HexDeformationProfile::Subtle,
+        )
+        .expect("face topology");
+
+        let mut gameplay = crate::map::surface_gameplay::types::SurfaceGameplayMap::default();
+        gameplay.cells.insert(
+            green_hex,
+            crate::map::surface_gameplay::types::SurfaceGameplayCell {
+                buildable: true,
+                ..Default::default()
+            },
+        );
+        gameplay.cells.insert(
+            red_hex,
+            crate::map::surface_gameplay::types::SurfaceGameplayCell {
+                buildable: false,
+                ..Default::default()
+            },
+        );
+
+        let mut terrain_config = TerrainConfig::default();
+        terrain_config.build_area_layer = crate::map::terrain_gen::LayerVisibility::Visible;
+
+        let (mesh, _, _) = create_global_map_meshes_from_bake(
+            &map,
+            &bake,
+            &face_top,
+            EditorPhase::Sediments,
+            &FactionManager::default(),
+            &terrain_config,
+            &gameplay,
+        )
+        .expect("bake render");
+
+        let Some(bevy::mesh::VertexAttributeValues::Float32x4(colors)) =
+            mesh.attribute(Mesh::ATTRIBUTE_COLOR)
+        else {
+            panic!("missing color attribute");
+        };
+        let green = [0.2, 1.0, 0.2, 1.0];
+        let red = [1.0, 0.25, 0.25, 1.0];
+        let blue = [0.1, 0.4, 0.9, 1.0];
+
+        for (vertex, color) in bake.vertices.iter().zip(colors) {
+            let owns = |hex| vertex.owner_hexes.contains(&hex);
+            let (coord_name, expected) = if owns(green_hex) {
+                ("green", green)
+            } else if owns(red_hex) {
+                ("red", red)
+            } else if owns(ocean_hex) {
+                ("ocean", blue)
+            } else {
+                continue;
+            };
+            assert_eq!(
+                *color, expected,
+                "vertex {vertex:?} (owner {coord_name}) must be {coord_name}"
+            );
         }
     }
 }

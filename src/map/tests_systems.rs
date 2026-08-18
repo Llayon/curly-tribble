@@ -9,6 +9,7 @@ pub mod tests {
     use crate::map::surface_gameplay::runtime::{
         SurfaceGameplayGenerationOutcome, SurfaceGameplayGenerationState,
     };
+    use crate::map::surface_gameplay::types::SurfaceGameplayMap;
     use crate::map::systems::handle_rebuild_mesh;
     use crate::map::terrain_bake::runtime::{
         TerrainBakeGenerationOutcome, TerrainBakeGenerationState,
@@ -39,6 +40,7 @@ pub mod tests {
             .init_resource::<SurfaceTerrainBake>()
             .init_resource::<TerrainBakeGenerationState>()
             .init_resource::<SurfaceGameplayGenerationState>()
+            .init_resource::<SurfaceGameplayMap>()
             .insert_resource(State::new(EditorPhase::Shape))
             .insert_resource(GameAssets::default())
             .insert_resource(Assets::<Mesh>::default())

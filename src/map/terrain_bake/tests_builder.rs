@@ -189,6 +189,7 @@ pub mod tests {
                 EditorPhase::Height3D,
                 &faction_manager,
                 &terrain_config,
+                &crate::map::surface_gameplay::types::SurfaceGameplayMap::default(),
             )
             .unwrap_or_else(|e| panic!("bake render failed seed={seed_val}: {e:?}"));
 

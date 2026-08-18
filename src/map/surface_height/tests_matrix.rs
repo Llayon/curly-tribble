@@ -5,8 +5,7 @@
 #[cfg(test)]
 pub mod tests {
     use crate::map::data::{
-        CliffLowerSide, EdgeCoord, EdgeData, EdgeType, LandscapeFeature, MapData, OceanState,
-        TileData, WorldSeed,
+        CliffLowerSide, EdgeCoord, EdgeData, EdgeType, LandscapeFeature, MapData, WorldSeed,
     };
     use crate::map::face_topology::generate_hex_face_topology_with_profile;
     use crate::map::face_topology::profiles::HexDeformationProfile;

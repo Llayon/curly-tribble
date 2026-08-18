@@ -63,6 +63,7 @@ pub mod tests {
             phase,
             &FactionManager::default(),
             &TerrainConfig::default(),
+            &crate::map::surface_gameplay::types::SurfaceGameplayMap::default(),
         )
         .expect("bake render must succeed");
 

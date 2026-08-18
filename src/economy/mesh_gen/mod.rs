@@ -71,6 +71,8 @@ pub struct SpawnGlobalTerrainCommand {
     /// M5.1 authoritative ground geometry. Rebuild is fail-closed: the command
     /// is only constructed from a validated, successfully generated bake.
     pub bake: crate::map::terrain_bake::types::SurfaceTerrainBake,
+    /// Solved surface gameplay layer, authoritative for buildability colors.
+    pub gameplay: crate::map::surface_gameplay::types::SurfaceGameplayMap,
 }
 
 impl Command for SpawnGlobalTerrainCommand {
@@ -86,6 +88,7 @@ impl Command for SpawnGlobalTerrainCommand {
             self.phase,
             &self.faction_manager,
             &self.config,
+            &self.gameplay,
         );
         let (mesh, water_mesh, roof_mesh) = match generated {
             Ok(m) => m,
