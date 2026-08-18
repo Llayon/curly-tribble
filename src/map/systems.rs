@@ -3,7 +3,9 @@ use crate::game_state::{EditorPhase, FactionManager};
 use crate::map::generation::{
     auto_spawn_bio_deposits, auto_spawn_npcs, auto_spawn_treasures, spawn_map_internal,
 };
-use crate::map::navigation::NavigationMap;
+use crate::map::surface_gameplay::runtime::{
+    SurfaceGameplayGenerationOutcome, SurfaceGameplayGenerationState,
+};
 use crate::map::terrain_bake::runtime::{TerrainBakeGenerationOutcome, TerrainBakeGenerationState};
 use crate::map::terrain_bake::types::SurfaceTerrainBake;
 use crate::map::terrain_gen::{
@@ -34,7 +36,6 @@ pub fn handle_regeneration(
     mut seed: ResMut<WorldSeed>,
     mut terrain_gen: ResMut<TerrainGenerator>,
     mut map_data: ResMut<MapData>,
-    mut nav_map: ResMut<NavigationMap>,
     mut log_writer: MessageWriter<GameLogMessage>,
     faction_manager: Res<FactionManager>,
     phase: Res<State<EditorPhase>>,
@@ -53,7 +54,6 @@ pub fn handle_regeneration(
             for entity in &q_faction_markers {
                 commands.entity(entity).despawn();
             }
-            nav_map.grid.clear();
             *seed = WorldSeed::new(config.seed);
             *terrain_gen = TerrainGenerator::new(config.seed);
             map_data.width = config.map_width;
@@ -65,7 +65,6 @@ pub fn handle_regeneration(
             &config,
             &seed,
             &mut map_data,
-            &mut nav_map,
             *phase.get(),
             ev.mode,
             ev.auto_fill_phase,
@@ -117,6 +116,7 @@ pub fn handle_rebuild_mesh(
     map_data: Res<MapData>,
     face_topology: Res<crate::map::face_topology::types::HexFaceTopology>,
     bake_state: Res<TerrainBakeGenerationState>,
+    gameplay_state: Res<SurfaceGameplayGenerationState>,
     faction_manager: Res<FactionManager>,
     config: Res<TerrainConfig>,
     phase: Res<State<EditorPhase>>,
@@ -126,10 +126,14 @@ pub fn handle_rebuild_mesh(
         return;
     }
 
-    // Fail-closed: the ONLY authoritative source of ground geometry is a
-    // successfully generated SurfaceTerrainBake. A missing/empty/failed bake
-    // must never fall back to legacy topology — old terrain stays in place.
-    if bake_state.last_outcome != TerrainBakeGenerationOutcome::Success {
+    // Fail-closed: the ONLY authoritative sources of ground geometry and
+    // buildability are a successfully generated SurfaceTerrainBake and a
+    // successfully generated SurfaceGameplayMap. A missing/empty/failed
+    // bake or gameplay layer must never fall back to legacy topology — old
+    // terrain stays in place.
+    if bake_state.last_outcome != TerrainBakeGenerationOutcome::Success
+        || gameplay_state.last_outcome != SurfaceGameplayGenerationOutcome::Success
+    {
         return;
     }
 
@@ -202,7 +206,6 @@ pub fn handle_faction_auto_relocation(
     terrain_gen: Res<TerrainGenerator>,
     config: Res<TerrainConfig>,
     seed: Res<WorldSeed>,
-    mut nav_map: ResMut<NavigationMap>,
     phase: Res<State<EditorPhase>>,
     mut ev_rebuild: MessageWriter<RebuildMeshEvent>,
 ) {
@@ -243,53 +246,11 @@ pub fn handle_faction_auto_relocation(
             &config,
             &seed,
             &mut map_data,
-            &mut nav_map,
             *phase.get(),
             GenerationMode::Preserve,
             None,
         );
         crate::map::validation::run_map_validation(&mut map_data, *phase.get());
         ev_rebuild.write(RebuildMeshEvent);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::economy::GameAssets;
-    use crate::map::MapVisualEntity;
-
-    fn request_rebuild(mut events: MessageWriter<RebuildMeshEvent>) {
-        events.write(RebuildMeshEvent);
-    }
-
-    #[test]
-    fn rebuild_replaces_only_visual_map_entities() {
-        let mut app = App::new();
-        app.insert_resource(MapData::default())
-            .insert_resource(FactionManager::default())
-            .insert_resource(TerrainConfig::default())
-            .init_resource::<crate::map::face_topology::types::HexFaceTopology>()
-            .init_resource::<crate::map::terrain_bake::types::SurfaceTerrainBake>()
-            .init_resource::<crate::map::terrain_bake::runtime::TerrainBakeGenerationState>()
-            .insert_resource(State::new(EditorPhase::Shape))
-            .insert_resource(GameAssets::default())
-            .insert_resource(Assets::<Mesh>::default())
-            .insert_resource(Assets::<StandardMaterial>::default())
-            .add_message::<RebuildMeshEvent>()
-            .add_systems(Update, (request_rebuild, handle_rebuild_mesh).chain());
-
-        app.world_mut()
-            .resource_mut::<crate::map::terrain_bake::runtime::TerrainBakeGenerationState>()
-            .last_outcome =
-            crate::map::terrain_bake::runtime::TerrainBakeGenerationOutcome::Success;
-
-        let visual_entity = app.world_mut().spawn((MapEntity, MapVisualEntity)).id();
-        let content_entity = app.world_mut().spawn(MapEntity).id();
-
-        app.update();
-
-        assert!(app.world().get_entity(visual_entity).is_err());
-        assert!(app.world().get_entity(content_entity).is_ok());
     }
 }

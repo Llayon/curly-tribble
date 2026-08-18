@@ -1,5 +1,6 @@
 use super::algo::compute_astar_path;
 use super::types::{ComputingPath, NavigationMap};
+use crate::map::surface_gameplay::types::SurfaceGameplayMap;
 use bevy::prelude::*;
 use bevy::tasks::AsyncComputeTaskPool;
 
@@ -50,18 +51,18 @@ impl Command for ComputePathCommand {
             return;
         };
 
-        let Some(map_data) = world.get_resource::<crate::map::MapData>() else {
+        let Some(gameplay) = world.get_resource::<SurfaceGameplayMap>() else {
             return;
         };
-        let map_data = map_data.clone();
 
         let grid = nav_map_res.grid.clone();
+        let gameplay = gameplay.clone();
         let thread_pool = AsyncComputeTaskPool::get();
         let target_pos = self.target_pos;
         let radius = self.radius;
 
         let task = thread_pool.spawn(async move {
-            compute_astar_path(&grid, start_pos, target_pos, radius, &map_data)
+            compute_astar_path(&gameplay, &grid, start_pos, target_pos, radius)
         });
 
         // ВАЖНО: Вставляем компонент немедленно через World, а не через очередь команд,

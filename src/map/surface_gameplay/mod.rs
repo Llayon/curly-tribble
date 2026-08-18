@@ -10,6 +10,7 @@ pub mod metrics;
 pub mod runtime;
 pub mod types;
 pub mod validation;
+pub mod world;
 
 pub use compiler::*;
 pub use config::*;
@@ -45,6 +46,7 @@ impl Plugin for SurfaceGameplayPlugin {
                 runtime::SurfaceGameplayRuntimePlugin,
                 types::SurfaceGameplayTypesPlugin,
                 validation::SurfaceGameplayValidationPlugin,
+                world::SurfaceGameplayWorldPlugin,
             ));
     }
 }

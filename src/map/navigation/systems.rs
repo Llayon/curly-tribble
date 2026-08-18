@@ -1,4 +1,7 @@
-use super::types::{world_to_grid, ComputingPath, Path, PathBlockEvent, AGENT_HEIGHT};
+use super::types::{world_to_grid, ComputingPath, Path, PathBlockEvent};
+use crate::map::surface_gameplay::types::SurfaceGameplayMap;
+use crate::map::surface_gameplay::world::gameplay_center_world_pos;
+use crate::map::HexCoord;
 use bevy::prelude::*;
 use futures_lite::future;
 
@@ -30,7 +33,7 @@ pub fn follow_path(
     mut commands: Commands,
     mut query: Query<(bevy::prelude::Entity, &mut Transform, &mut Path), With<Path>>,
     time: Res<Time>,
-    map: Res<crate::map::MapData>,
+    gameplay: Res<SurfaceGameplayMap>,
 ) {
     for (entity, mut transform, mut path) in &mut query {
         if path.current_index >= path.points.len() {
@@ -50,11 +53,10 @@ pub fn follow_path(
             transform.translation += move_dir * speed * time.delta_secs();
 
             let grid_pos = world_to_grid(transform.translation);
-            if let Some(tile) = map.get_tile(grid_pos.x, grid_pos.y) {
-                let target_y = (tile.elevation * crate::map::MAX_HEIGHT) + AGENT_HEIGHT;
-                let lerp_factor = (10.0 * time.delta_secs()).min(1.0);
-                transform.translation.y += (target_y - transform.translation.y) * lerp_factor;
-            }
+            let target_y =
+                gameplay_center_world_pos(HexCoord::new(grid_pos.x, grid_pos.y), &gameplay).y;
+            let lerp_factor = (10.0 * time.delta_secs()).min(1.0);
+            transform.translation.y += (target_y - transform.translation.y) * lerp_factor;
 
             transform.look_to(move_dir, Vec3::Y);
         }

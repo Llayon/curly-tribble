@@ -113,6 +113,8 @@ pub fn validate_mines(
     mut map_data: ResMut<MapData>,
     q_mines: Query<(Entity, &crate::map::mines::MineDeposit)>,
     nav_map: Res<crate::map::navigation::NavigationMap>,
+    gameplay: Res<crate::map::surface_gameplay::types::SurfaceGameplayMap>,
+    gameplay_state: Res<crate::map::surface_gameplay::runtime::SurfaceGameplayGenerationState>,
     phase: Res<State<crate::game_state::EditorPhase>>,
 ) {
     if !map_data.is_changed() || *phase.get() < crate::game_state::EditorPhase::Mines {
@@ -192,21 +194,25 @@ pub fn validate_mines(
         if let Some(start) = start_coord {
             let start_pos = start.to_world(HEX_SIZE);
             let mut is_accessible = false;
-            for n in coord.neighbors() {
-                if let Some(tile) = map_data.get_tile(n.q, n.r) {
-                    if tile.ocean_state == OceanState::Land {
-                        let target_pos = n.to_world(HEX_SIZE);
-                        if crate::map::navigation::compute_astar_path(
-                            &nav_map.grid,
-                            start_pos,
-                            target_pos,
-                            1.5,
-                            &map_data,
-                        )
-                        .is_some()
-                        {
-                            is_accessible = true;
-                            break;
+            let gameplay_ready = gameplay_state.last_outcome
+                == crate::map::surface_gameplay::runtime::SurfaceGameplayGenerationOutcome::Success;
+            if gameplay_ready {
+                for n in coord.neighbors() {
+                    if let Some(tile) = map_data.get_tile(n.q, n.r) {
+                        if tile.ocean_state == OceanState::Land {
+                            let target_pos = n.to_world(HEX_SIZE);
+                            if crate::map::navigation::compute_astar_path(
+                                &gameplay,
+                                &nav_map.grid,
+                                start_pos,
+                                target_pos,
+                                1.5,
+                            )
+                            .is_some()
+                            {
+                                is_accessible = true;
+                                break;
+                            }
                         }
                     }
                 }

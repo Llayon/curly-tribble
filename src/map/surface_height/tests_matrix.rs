@@ -43,7 +43,6 @@ pub mod tests {
     fn production_default_landscape_is_solver_feasible() {
         use crate::game_state::EditorPhase;
         use crate::map::generation::terrain::spawn_map_internal;
-        use crate::map::navigation::NavigationMap;
         use crate::map::terrain_gen::{TerrainConfig, TerrainGenerator};
         use crate::map::GenerationMode;
 
@@ -55,7 +54,6 @@ pub mod tests {
             let terrain_gen = TerrainGenerator::new(seed_val);
             let seed = WorldSeed::new(seed_val);
             let mut map_data = MapData::default();
-            let mut nav_map = NavigationMap::default();
 
             // Full production generation: apply_landscape_generation + generate_cliffs inside.
             spawn_map_internal(
@@ -63,7 +61,6 @@ pub mod tests {
                 &terrain_config,
                 &seed,
                 &mut map_data,
-                &mut nav_map,
                 EditorPhase::Landscape,
                 GenerationMode::Reset,
                 Some(EditorPhase::Landscape),

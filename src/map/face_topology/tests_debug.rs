@@ -238,6 +238,8 @@ mod debug_tests {
             .init_resource::<crate::map::surface_topology::types::SurfaceTopology>()
             .init_resource::<crate::map::terrain_bake::types::SurfaceTerrainBake>()
             .init_resource::<crate::map::terrain_bake::runtime::TerrainBakeGenerationState>()
+            .init_resource::<crate::map::surface_gameplay::runtime::SurfaceGameplayGenerationState>(
+            )
             .init_resource::<HexFaceDebugCache>()
             .init_resource::<HexFaceTopologyGenerationState>()
             .init_resource::<crate::map::surface_topology::runtime::SurfaceTopologyGenerationState>(
@@ -259,6 +261,10 @@ mod debug_tests {
             .resource_mut::<crate::map::terrain_bake::runtime::TerrainBakeGenerationState>()
             .last_outcome =
             crate::map::terrain_bake::runtime::TerrainBakeGenerationOutcome::Success;
+        app.world_mut()
+            .resource_mut::<crate::map::surface_gameplay::runtime::SurfaceGameplayGenerationState>()
+            .last_outcome =
+            crate::map::surface_gameplay::runtime::SurfaceGameplayGenerationOutcome::Success;
 
         // Initial setup frame
         app.update();

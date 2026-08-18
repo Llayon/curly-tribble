@@ -121,7 +121,6 @@ pub mod tests {
         use crate::economy::mesh_gen::bake::create_global_map_meshes_from_bake;
         use crate::game_state::{EditorPhase, FactionManager};
         use crate::map::generation::terrain::spawn_map_internal;
-        use crate::map::navigation::NavigationMap;
         use crate::map::terrain_gen::{TerrainConfig, TerrainGenerator};
         use crate::map::GenerationMode;
 
@@ -133,14 +132,12 @@ pub mod tests {
             let terrain_gen = TerrainGenerator::new(seed_val);
             let seed = WorldSeed::new(seed_val);
             let mut map_data = MapData::default();
-            let mut nav_map = NavigationMap::default();
 
             spawn_map_internal(
                 &terrain_gen,
                 &terrain_config,
                 &seed,
                 &mut map_data,
-                &mut nav_map,
                 EditorPhase::Landscape,
                 GenerationMode::Reset,
                 Some(EditorPhase::Landscape),

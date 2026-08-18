@@ -44,6 +44,10 @@ fn test_mines_validation() {
 
     app.insert_resource(map_data);
     app.insert_resource(NavigationMap::default());
+    app.init_resource::<savage_fantasy::map::surface_gameplay::types::SurfaceGameplayMap>();
+    app.init_resource::<
+        savage_fantasy::map::surface_gameplay::runtime::SurfaceGameplayGenerationState,
+    >();
 
     app.world_mut().spawn(MineBundle {
         deposit: MineDeposit {

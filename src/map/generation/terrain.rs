@@ -1,6 +1,5 @@
 use crate::game_state::EditorPhase;
 use crate::map::data::{OceanState, RoofState};
-use crate::map::navigation::NavigationMap;
 use crate::map::terrain_gen::{TerrainConfig, TerrainGenerator};
 use crate::map::{
     ForestType, GenerationMode, HexCoord, LandscapeFeature, MapData, TerrainType, TileData,
@@ -22,7 +21,6 @@ pub fn spawn_map_internal(
     terrain_config: &TerrainConfig,
     seed: &WorldSeed,
     map_data: &mut MapData,
-    nav_map: &mut NavigationMap,
     phase: EditorPhase,
     generation_mode: GenerationMode,
     auto_fill: Option<EditorPhase>,
@@ -49,8 +47,6 @@ pub fn spawn_map_internal(
     if auto_fill == Some(EditorPhase::Factions) {
         super::factions::auto_spawn_player_territory(map_data, seed.value());
     }
-
-    rebuild_navigation_grid(map_data, nav_map);
 }
 
 fn build_base_tiles(
@@ -215,22 +211,5 @@ fn apply_landscape_generation(
     crate::map::river_gen::apply_rivers(map_data, terrain_config, seed.value());
     if terrain_config.mud_banks == crate::map::terrain_gen::MudBankMode::Enabled {
         crate::map::river_gen::apply_mud_banks(map_data);
-    }
-}
-
-fn rebuild_navigation_grid(map_data: &MapData, nav_map: &mut NavigationMap) {
-    nav_map.grid.clear();
-    for (coord, tile) in &map_data.tiles {
-        let cost =
-            if tile.ocean_state == OceanState::Ocean || map_data.is_too_steep(coord.q, coord.r) {
-                crate::map::navigation::COST_BLOCKER
-            } else {
-                match tile.terrain {
-                    TerrainType::Swamp => 50,
-                    TerrainType::Stony => 80,
-                    _ => crate::map::navigation::COST_BASE,
-                }
-            };
-        nav_map.grid.insert(IVec2::new(coord.q, coord.r), cost);
     }
 }
