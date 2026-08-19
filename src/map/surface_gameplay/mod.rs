@@ -22,6 +22,8 @@ pub use validation::*;
 #[cfg(test)]
 pub mod tests_compiler;
 #[cfg(test)]
+pub mod tests_matrix;
+#[cfg(test)]
 pub mod tests_metrics;
 #[cfg(test)]
 pub mod tests_runtime;

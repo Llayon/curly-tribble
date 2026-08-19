@@ -466,3 +466,194 @@ fn test_surface_height_decoupling() {
         );
     }
 }
+
+/// Architecture Guard (M6): navigation production modules must route through
+/// the authoritative `SurfaceGameplayMap` and the dynamic-only overlay grid,
+/// never legacy `MapData` elevation or legacy topology.
+#[test]
+fn test_navigation_decoupling() {
+    let files = [
+        "src/map/navigation/types.rs",
+        "src/map/navigation/algo.rs",
+        "src/map/navigation/commands.rs",
+        "src/map/navigation/systems.rs",
+        "src/map/navigation/mod.rs",
+    ];
+
+    let forbidden = [
+        "MapData",
+        "TileData",
+        "TerrainType",
+        "OceanState",
+        "MAX_HEIGHT",
+        "TerrainTopology",
+        "compute_vertex_heights",
+        ".elevation",
+        "create_global_map_meshes",
+        "SpawnGlobalTerrainCommand",
+        "RebuildMeshEvent",
+    ];
+
+    for file in files {
+        let sniffer = CodeSniffer::new(file);
+        let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+        for item in forbidden {
+            assert!(
+                !code_no_tests.contains(item),
+                "Navigation Architecture Violation in {file}: production code must not contain '{item}'. Pathfinding must route through SurfaceGameplayMap."
+            );
+        }
+    }
+}
+
+/// Architecture Guard (M6): surface_gameplay core (types/metrics/edges) must
+/// stay pure-geometry; only compiler/runtime may read MapData classification
+/// fields, and only world.rs may convert to world space (MAX_HEIGHT).
+#[test]
+fn test_surface_gameplay_decoupling() {
+    let core_files = [
+        "src/map/surface_gameplay/types.rs",
+        "src/map/surface_gameplay/metrics.rs",
+        "src/map/surface_gameplay/edges.rs",
+    ];
+    let core_forbidden = [
+        "MapData",
+        "TileData",
+        "TerrainType",
+        "OceanState",
+        "MAX_HEIGHT",
+        "HEX_SIZE",
+        "Mesh",
+        "TerrainTopology",
+        "compute_vertex_heights",
+        "TerrainHeightMode",
+        ".elevation",
+        "NavigationMap",
+        "compute_astar_path",
+    ];
+    for file in core_files {
+        let sniffer = CodeSniffer::new(file);
+        let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+        for item in core_forbidden {
+            assert!(
+                !code_no_tests.contains(item),
+                "SurfaceGameplay Core Architecture Violation in {file}: production code must not contain '{item}'."
+            );
+        }
+    }
+
+    let classification_files = [
+        "src/map/surface_gameplay/compiler.rs",
+        "src/map/surface_gameplay/runtime.rs",
+        "src/map/surface_gameplay/validation.rs",
+        "src/map/surface_gameplay/mod.rs",
+        "src/map/surface_gameplay/config.rs",
+    ];
+    let classification_forbidden = [
+        "MAX_HEIGHT",
+        "HEX_SIZE",
+        "bevy::mesh",
+        "Mesh::new",
+        "TerrainTopology",
+        "compute_vertex_heights",
+        "TerrainHeightMode",
+        ".elevation",
+        "NavigationMap",
+        "compute_astar_path",
+    ];
+    for file in classification_files {
+        let sniffer = CodeSniffer::new(file);
+        let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+        for item in classification_forbidden {
+            assert!(
+                !code_no_tests.contains(item),
+                "SurfaceGameplay Architecture Violation in {file}: production code must not contain '{item}'."
+            );
+        }
+    }
+
+    let world_sniffer = CodeSniffer::new("src/map/surface_gameplay/world.rs");
+    let world_code = world_sniffer
+        .clean
+        .split("#[cfg(test)]")
+        .next()
+        .unwrap_or("");
+    for item in [
+        "MapData",
+        "TileData",
+        "TerrainType",
+        "OceanState",
+        "Mesh",
+        "compute_vertex_heights",
+        ".elevation",
+        "NavigationMap",
+    ] {
+        assert!(
+            !world_code.contains(item),
+            "SurfaceGameplay World Architecture Violation in world.rs: code must not contain '{item}'."
+        );
+    }
+}
+
+/// Architecture Guard (M6): map generation must not build or touch the
+/// navigation layer — static NavigationMap is retired; pathfinding is
+/// gameplay-driven.
+#[test]
+fn test_generation_terrain_decoupling() {
+    let sniffer = CodeSniffer::new("src/map/generation/terrain.rs");
+    let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+    let forbidden = [
+        "NavigationMap",
+        "NavObstacle",
+        "compute_astar_path",
+        "world_to_grid",
+        "AGENT_HEIGHT",
+        "COST_BASE",
+        "COST_BLOCKER",
+    ];
+    for item in forbidden {
+        assert!(
+            !code_no_tests.contains(item),
+            "Generation Architecture Violation in terrain.rs: code must not contain '{item}'."
+        );
+    }
+}
+
+/// Architecture Guard (M6): production mesh rebuild routes through the solved
+/// gameplay layer — gated on gameplay Success and feeding it to the command;
+/// buildability colors come from SurfaceGameplayMap cells.
+#[test]
+fn test_production_terrain_routes_through_gameplay() {
+    let sniffer = CodeSniffer::new("src/map/systems.rs");
+    let code_no_tests = sniffer.clean.split("#[cfg(test)]").next().unwrap_or("");
+
+    assert!(
+        code_no_tests.contains("SurfaceGameplayGenerationOutcome::Success"),
+        "Production Terrain Routing Violation in systems.rs: handle_rebuild_mesh must gate on SurfaceGameplayGenerationOutcome::Success."
+    );
+    assert!(
+        code_no_tests.contains("gameplay: (*gameplay).clone()"),
+        "Production Terrain Routing Violation in systems.rs: SpawnGlobalTerrainCommand must receive the SurfaceGameplayMap."
+    );
+    assert!(
+        !code_no_tests.contains("compute_astar_path"),
+        "Production Terrain Routing Violation in systems.rs: systems.rs must not run pathfinding directly."
+    );
+
+    let bake_sniffer = CodeSniffer::new("src/economy/mesh_gen/bake.rs");
+    let bake_code = bake_sniffer
+        .clean
+        .split("#[cfg(test)]")
+        .next()
+        .unwrap_or("");
+    assert!(
+        bake_code.contains("MissingGameplayCell"),
+        "Production Mesh Violation in bake.rs: buildability lookup must fail closed with MissingGameplayCell."
+    );
+    assert!(
+        bake_code.contains("gameplay"),
+        "Production Mesh Violation in bake.rs: bake coloring must receive the SurfaceGameplayMap."
+    );
+}
